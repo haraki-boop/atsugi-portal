@@ -1,67 +1,114 @@
+// @ts-nocheck
 'use client';
 
-import React, { useState } from 'react';
+import { ArrowRight, MapPin, Search, Globe, Shield, Zap, TrendingUp, Bot } from 'lucide-react';
 import Link from 'next/link';
-import { MapPin, Shield, Activity, Globe, Zap } from 'lucide-react';
 
-const LOCATIONS = [
-  { id: 'ATSUGI', name: '厚木営業所', lat: 35.44, lng: 139.36, city: 'KANAGAWA', addr: '神奈川県厚木市' },
-  { id: 'SOUTH-KANTO', name: 'イオンフードサプライ 南関東センター', lat: 35.68, lng: 139.98, city: 'CHIBA', addr: '千葉県船橋市高瀬町24-12' },
-  { id: 'HANNAN', name: '尾家産業(株)阪南支店', lat: 34.44, lng: 135.36, city: 'OSAKA', addr: '大阪府貝塚市二色中町5-1' },
-  { id: 'MEDIENT', name: 'メディエントランス（株）', lat: 34.82, lng: 135.48, city: 'OSAKA', addr: '大阪府箕面市船場西2丁目1-1' },
-];
+export default function PortalPage() {
+  // 拠点のデータ (ピンの位置と情報を管理)
+  const centers = [
+    { id: 'ATSUGI', name: '昭和冷蔵', top: '55%', left: '42%', color: '#deff9a' },
+  ];
 
-export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans overflow-hidden relative">
-      {/* 世界地図の背景（オーバーレイ） */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
+    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-lime-500/30 overflow-hidden relative">
+      
+      {/* 背景：デジタル・グリッドと地図の装飾 */}
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
         <img 
-          src="https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&q=80&w=2000" 
-          alt="World Map" 
-          className="w-full h-full object-cover"
+          src="https://www.transparentpng.com/download/world-map/blue-digital-world-map-background-png-hW6t9K.png" 
+          className="w-full h-full object-cover filter brightness-50"
+          alt="Digital World Map"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-transparent to-slate-950"></div>
       </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6">
-        <div className="text-center mb-16 space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 rounded-full border border-blue-500/20 text-blue-400 text-[10px] font-black tracking-[0.4em] uppercase mb-4 animate-pulse">
-            <Zap size={12} /> System_Operational
+      {/* ヘッダー */}
+      <header className="relative z-10 h-24 border-b border-white/5 flex items-center justify-between px-12 backdrop-blur-md bg-slate-950/50">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-lime-400 rounded-lg flex items-center justify-center">
+            <Zap size={24} className="text-slate-950" />
           </div>
-          <h1 className="text-7xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-            AFS_COMMAND <span className="text-blue-500">CENTER</span>
-          </h1>
-          <p className="text-slate-400 font-mono tracking-[0.8em] text-[10px] uppercase opacity-60">Global Logistics Matrix Monitoring v4.0</p>
+          <div>
+            <h1 className="text-xl font-black tracking-tighter italic uppercase">Management_Portal</h1>
+            <p className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">Global Intelligence Network</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-8">
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-slate-500 uppercase">System Status</p>
+            <p className="text-xs font-black text-lime-400">ONLINE_ENCRYPTED</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="relative z-10 flex flex-col items-center pt-20 px-10 pb-20 max-w-7xl mx-auto">
+        
+        {/* メインタイトル */}
+        <div className="text-center space-y-4 mb-16">
+          <h2 className="text-6xl font-black italic tracking-tighter leading-none uppercase">
+            経営ダッシュボード
+          </h2>
+          <p className="text-slate-400 font-medium tracking-widest text-sm uppercase">
+            Strategic Logistics Management System
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl w-full px-4">
-          {LOCATIONS.map((loc) => (
-            <Link key={loc.id} href={`/dashboard/${loc.id}`} className="no-underline group">
-              <div className="h-full bg-slate-900/40 backdrop-blur-md hover:bg-blue-600 transition-all duration-500 p-8 rounded-[2.5rem] border border-white/5 flex flex-col justify-between shadow-2xl group-hover:-translate-y-4">
-                <div className="space-y-6">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                    <MapPin size={24} className="text-blue-400 group-hover:text-white" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-blue-500 group-hover:text-blue-100 font-black mb-1 tracking-widest">{loc.city}</div>
-                    <div className="text-xl font-black tracking-tighter text-white leading-tight">{loc.name}</div>
-                    <div className="text-[9px] text-slate-500 group-hover:text-blue-200 mt-4 leading-relaxed font-medium">{loc.addr}</div>
+        {/* マップエリア */}
+        <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+          
+          <div className="space-y-8 order-2 lg:order-1">
+             <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-sm">
+                <TrendingUp className="text-lime-400 mb-4" />
+                <h3 className="font-black text-xs uppercase mb-2">Total Logistics Flow</h3>
+                <p className="text-3xl font-black tracking-tighter italic">LIVE <span className="text-sm font-normal text-slate-500 italic">Syncing...</span></p>
+             </div>
+             <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-sm">
+                <Bot className="text-blue-400 mb-4" />
+                <h3 className="font-black text-xs uppercase mb-2">AI Summary</h3>
+                <p className="text-sm text-slate-400 font-medium italic leading-relaxed">
+                  昭和冷蔵の稼働データ正常。実績と予測の乖離を監視中。
+                </p>
+             </div>
+          </div>
+
+          <div className="lg:col-span-2 relative aspect-[16/10] bg-slate-900/50 rounded-[3rem] border border-white/10 shadow-2xl order-1 lg:order-2 overflow-hidden group">
+            <div className="absolute inset-0 opacity-40">
+               <svg viewBox="0 0 1000 1000" className="w-full h-full fill-slate-700">
+                 <path d="M600,400 L650,450 L630,550 L550,600 L500,550 L520,450 Z" />
+               </svg>
+            </div>
+
+            {centers.map((center) => (
+              <Link key={center.id} href={`/dashboard/${center.id}`}>
+                <div 
+                  className="absolute cursor-pointer group/pin hover:z-50"
+                  style={{ top: center.top, left: center.left }}
+                >
+                  <div className="absolute -inset-4 bg-lime-400/20 rounded-full animate-ping"></div>
+                  <div className="relative flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 bg-slate-950 border-2 border-lime-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.5)]">
+                      <MapPin size={16} className="text-lime-400 fill-lime-400" />
+                    </div>
+                    <div className="bg-white px-4 py-1.5 rounded-full shadow-xl">
+                      <span className="text-[10px] font-black text-slate-950 whitespace-nowrap">{center.name}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-8 flex justify-end">
-                  <Shield size={20} className="text-slate-700 group-hover:text-white/40" />
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-20 flex gap-12 text-[8px] text-slate-600 font-mono tracking-[0.5em] uppercase">
-          <span>Encrypted_Link: Active</span>
-          <span>Buffer_Status: Clear</span>
+        <div className="mt-24 grid grid-cols-1 md:grid-cols-4 gap-8 w-full border-t border-white/5 pt-12">
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-lime-400 uppercase tracking-widest">Active Node</h4>
+              <p className="text-3xl font-black italic tracking-tighter">昭和冷蔵</p>
+           </div>
         </div>
-      </div>
+
+      </main>
     </div>
   );
 }
