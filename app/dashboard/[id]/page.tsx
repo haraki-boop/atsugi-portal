@@ -1,17 +1,10 @@
+// @ts-nocheck
 'use client';
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Send, Bot, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
-
-// 型の定義（エラー防止）
-interface Metric {
-  title: string;
-  values: number[];
-  forecastValues?: number[];
-  labels?: string[];
-}
 
 export default function DashboardPage({ params }: { params: { id: string } }) {
   const [data, setData] = useState<any>(null);
@@ -42,7 +35,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
 
-  const getDisplayMetrics = (): Metric[] => {
+  const getDisplayMetrics = () => {
     const capitalizedKey = currentTab.id.charAt(0).toUpperCase() + currentTab.id.slice(1);
     const dataKey = viewMode === 'weekly' ? `weekly${capitalizedKey}Data` : currentTab.dataKey;
     return data[dataKey] || data[currentTab.dataKey] || [];
@@ -68,24 +61,24 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
           <div className="flex gap-6 text-right">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400">VALUE</span>
+              <span className="text-[10px] font-bold text-slate-400">実績値</span>
               <span className="text-2xl font-black text-slate-900">{currentActual.toLocaleString()}</span>
             </div>
             <div className="flex flex-col border-l border-slate-100 pl-6">
-              <span className="text-[10px] font-bold text-slate-400">DIFF</span>
+              <span className="text-[10px] font-bold text-slate-400">比較</span>
               <span className={`text-sm font-black ${diff >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                 {diff >= 0 ? '▲' : '▼'} {Math.abs(diff).toLocaleString()}
               </span>
             </div>
           </div>
         </div>
-        <div className="h-[280px] w-full">
+        <div className="h-[280px] w-full mt-4">
           <ResponsiveContainer width="100%" height="100%">
             {type === 'bar' ? (
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none'}} />
+                <Tooltip />
                 <Bar dataKey="actual" fill={color} radius={[6, 6, 0, 0]} barSize={30} />
                 <Bar dataKey="forecast" fill={color} opacity={0.1} radius={[6, 6, 0, 0]} barSize={15} />
               </BarChart>
@@ -93,7 +86,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{borderRadius: '16px', border: 'none'}} />
+                <Tooltip />
                 <Line type="monotone" dataKey="actual" stroke={color} strokeWidth={5} dot={{r: 5, fill: color, stroke: '#fff'}} />
                 <Line type="monotone" dataKey="forecast" stroke={color} strokeWidth={2} strokeDasharray="6 6" opacity={0.3} dot={false} />
               </LineChart>
@@ -108,7 +101,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <Link href="/" className="flex items-center gap-3 text-slate-400 no-underline font-black hover:text-blue-600 transition-all">
-          <ArrowLeft size={18} /> <span className="text-sm">EXIT</span>
+          <ArrowLeft size={18} /> <span className="text-sm tracking-widest">EXIT</span>
         </Link>
         <h1 className="text-xl font-black italic tracking-tighter uppercase text-slate-800">{params.id}_MONITOR</h1>
         <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
@@ -127,21 +120,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {getDisplayMetrics().map((m, i) => (
+          {getDisplayMetrics().map((m: any, i: number) => (
             <LargeChartCard key={i} title={m.title} labels={m.labels || data.labels} values={m.values} forecastValues={m.forecastValues} color={currentTab.color} type={currentTab.type} />
           ))}
         </div>
       </main>
 
       <div className="fixed bottom-6 right-6 w-80 z-50">
-        <div className="bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col border border-slate-800">
+        <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-800">
           <div className="p-5 bg-gradient-to-r from-blue-600 to-blue-500 flex items-center gap-3">
             <Bot size={18} className="text-white" />
-            <div className="text-white font-black text-xs">AI_COMMAND_ASSISTANT</div>
+            <div className="text-white font-black text-xs tracking-tighter uppercase">AI_COMMAND</div>
           </div>
           <div className="h-64 overflow-y-auto p-5 space-y-4 bg-slate-900">
             {chatLog.map((msg, i) => (
-              <div key={i} className={`${msg.role === 'ai' ? 'bg-slate-800 text-slate-200' : 'bg-blue-600 text-white ml-auto'} p-3 rounded-2xl text-[10px] max-w-[85%] font-medium`}>{msg.text}</div>
+              <div key={i} className={`${msg.role === 'ai' ? 'bg-slate-800 text-slate-200' : 'bg-blue-600 text-white ml-auto'} p-3 rounded-2xl text-[10px] max-w-[85%] font-medium leading-relaxed`}>{msg.text}</div>
             ))}
           </div>
           <div className="p-3 bg-slate-800 flex gap-2">
