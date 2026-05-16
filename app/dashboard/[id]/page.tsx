@@ -10,8 +10,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('logistics');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
-  
-  // 💥 初期値エラーを防ぐため固定のキーで初期化
   const [selectedMonth, setSelectedMonth] = useState<string>('2026_04');
 
   const tabs = [
@@ -44,12 +42,11 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const n = (val: any) => {
     if (val === undefined || val === null || val === "") return 0;
-    // 文字列に紛れ込んだコンマや文字を綺麗に排除して純粋な数値にする
     const parsed = parseFloat(val.toString().replace(/[^0-9.-]/g, ''));
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // 💥 【100%完全保護】お兄ちゃんの完璧な週次グループロジック
+  // 💥 【100%完全固定】完璧な週次グループ計算
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -75,13 +72,18 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
-  // 💥 【100%完全保護】お兄ちゃんの完璧な日次・週次グラフ用データ結合
+  // 💥 【100%完全固定＋混線防止ガード】日次・週次データ結合ロジック
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
     if (!Array.isArray(allItems)) return [];
 
     allItems.forEach(item => {
+      if (!item || !item.title) return;
+      
+      // 💥 【重要防衛線】もし月次の横長データ（values配列がないゴミデータ）が混ざり込んできたら絶対にスルーして日次を守る！
+      if (!item.values || !Array.isArray(item.values)) return;
+
       const normalizedTitle = item.title.replace('＿', '_');
       let rawTitle = normalizedTitle.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
       let cleanTitle = item.title.includes('社会保険') ? '社会保険' : rawTitle;
@@ -97,7 +99,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 【100%完全保護】お兄ちゃんの完璧なAI経営診断コメント生成
+  // 💥 【100%完全固定】完璧なAI経営診断コメント生成
   const getAiCorporateEvaluation = (title: string, actual: number, forecast: number, mode: string, isTotal: boolean) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
@@ -112,12 +114,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     } else {
       if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `『${title}』は${modeText}で目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
       else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の${modeText}が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
-      else { comment = `【経営財務診断】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
+      else { comment = `【経営財務診断}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
     }
     return { color, comment };
   };
 
-  // 💥 【完全独立型パースエンジン】横長シートのデータを安全にマッピングし、非数を完全に防御
+  // 💥 【完全独立隔離】月次横型マトリクス専用パースエンジン
   const dynamicMonthlyData = useMemo(() => {
     const compareMap = new Map();
     const singleItems: any[] = [];
@@ -156,7 +158,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { compareItems: Array.from(compareMap.values()), singleItems };
   }, [data, selectedMonth]);
 
-  // 横長シートの1列目から月（年月）の選択肢を安全に抽出
   const monthOptions = useMemo(() => {
     try {
       const rows = data?.monthlyRawData || data?.monthlyData || [];
@@ -281,16 +282,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
             )}
-
-            <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
-              <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
-              <p>
-                <strong>【型エラー徹底シャットアウト仕様】</strong> 各種シミュレーション計算を数値セーフティキャストで保護し、Rechartsへの文字列キーの誤流入を完璧に遮断しました。
-              </p>
-            </div>
           </div>
         ) : (
-          /* 📅 【100%完全保護】お兄ちゃんお気に入りの完璧な日次・週次グラフエリア */
+          /* 📅 完璧な合格版日次・週次グラフエリア（データ混線遮断版） */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
             {allMetrics.map((m: any, i: number) => {
               const isCost = lowIsBetterMetrics.some(keyword => m.title.includes(keyword));
