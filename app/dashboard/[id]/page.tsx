@@ -11,8 +11,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
 
-  const [selectedCenter, setSelectedCenter] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>(''); // 👈 シートに書かれている「4月」などの文字列がそのまま入るよ！
+  // 実際のシートに合わせて初期値をセット
+  const [selectedMonth, setSelectedMonth] = useState<string>('2026_04');
 
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
@@ -33,31 +33,19 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         setData(json);
         const mItems = json?.monthlyRawData || [];
         if (mItems.length > 1) {
-          const centers = [...new Set(mItems.slice(1).map((r: any) => r[0]))].filter(Boolean);
-          if (centers.length > 0) {
-            setSelectedCenter(centers[0]);
-            const months = [...new Set(mItems.filter((r: any) => r[0] === centers[0]).map((r: any) => r[1]))].filter(Boolean);
-            if (months.length > 0) {
-              setSelectedMonth(months[0]); // 最初の月（例：「4月」）を初期セット
-            }
+          // 2行目の1列目から、存在する年月（例: 2026_04）を初期値として安全に取得
+          const firstMonth = mItems[1]?.[0];
+          if (firstMonth) {
+            setSelectedMonth(firstMonth.toString());
           }
         }
-      }).catch(e => console.error(e));
+      }).catch(e => console.error("Data fetch failed", e));
   }, []);
-
-  useEffect(() => {
-    if (!data) return;
-    const mItems = data.monthlyRawData || [];
-    const months = [...new Set(mItems.filter((r: any) => r[0] === selectedCenter).map((r: any) => r[1]))].filter(Boolean);
-    if (months.length > 0 && !months.includes(selectedMonth)) {
-      setSelectedMonth(months[0]);
-    }
-  }, [selectedCenter, data]);
 
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
-  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "原価"];
+  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "原価", "総工数"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
   const n = (val) => {
@@ -126,24 +114,25 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { color, comment };
   };
 
-  // 💥 【無加工ストレート抽出】シートの計算結果の行をそのまま表示するシンプル・軽量エンジン
+  // 📊 【横並びマトリクス専用エンジン】お兄ちゃんのスプレッドシートの形に100%合わせた抽出ロジック
   const dynamicMonthlyData = useMemo(() => {
-    if (!data || !data.monthlyRawData) return { compareItems: [], singleItems: [] };
-    const rows = data.monthlyRawData || [];
-    
-    // 選択された「拠点」と「月（例：4月）」に100%一致する行だけを抽出
-    const filteredRows = rows.filter(r => r[0] === selectedCenter && r[1] === selectedMonth);
-
     const compareMap = new Map();
     const singleItems = [];
+    if (!data || !data.monthlyRawData || data.monthlyRawData.length < 2) return { compareItems: [], singleItems: [] };
 
-    filteredRows.forEach(row => {
-      const rawKey = row[2] || '';
-      if (!rawKey) return;
-      const normalizedKey = rawKey.replace('＿', '_');
+    const headers = data.monthlyRawData[0] || []; // 1行目: [年月, 予算_売上, 実績_売上, ...]
+    const rows = data.monthlyRawData.slice(1);     // 2行目以降のデータ行
 
-      // 3列目の値をそのまま画面の表示用にする（シート側で集計済みのrow[3]を使用）
-      const rawValue = row[3] || "0"; 
+    // 選択された「年月」の行を見つける
+    const targetRow = rows.find(r => r && r[0]?.toString() === selectedMonth);
+    if (!targetRow) return { compareItems: [], singleItems: [] };
+
+    // 各列の項目名と数値をマッピングしていく
+    headers.forEach((headerName, index) => {
+      if (index === 0 || !headerName) return; // 1列目の「年月」はスキップ
+      
+      const rawValue = targetRow[index] !== undefined ? targetRow[index] : "0";
+      const normalizedKey = headerName.replace('＿', '_').replace('予算_', '予測_'); // 予算表記を予測に統一
 
       if (normalizedKey.startsWith('実績_') || normalizedKey.startsWith('予測_')) {
         const cleanTitle = normalizedKey.replace('実績_', '').replace('予測_', '');
@@ -154,34 +143,36 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         if (normalizedKey.startsWith('実績_')) item.actual = rawValue;
         if (normalizedKey.startsWith('予測_')) item.forecast = rawValue;
       } else {
-        // 実績_ や 予測_ がついていない純粋な独立項目（数字をそのまま出す）
-        singleItems.push({ title: rawKey, value: rawValue });
+        // 「社員人数」や「スタッフ在籍者数」など、実績・予測のつかない独立項目
+        singleItems.push({ title: headerName, value: rawValue });
       }
     });
 
     return { compareItems: Array.from(compareMap.values()), singleItems };
-  }, [data, selectedCenter, selectedMonth]);
+  }, [data, selectedMonth]);
 
-  // 拠点リスト（重複排除）
-  const centerOptions = useMemo(() => {
-    if (!data || !data.monthlyRawData) return [];
-    return [...new Set(data.monthlyRawData.slice(1).map((r: any) => r[0]))].filter(Boolean);
+  // 月（年月）の選択肢を2行目以降から自動抽出（例：2026_04）
+  const monthOptions = useMemo(() => {
+    if (!data || !data.monthlyRawData || data.monthlyRawData.length < 2) return [];
+    return [...new Set(data.monthlyRawData.slice(1).map((r: any) => r && r[0]?.toString()))].filter(Boolean);
   }, [data]);
 
-  // 月次シート内にある「月」の選択肢（例：4月、5月...をそのまま重複なしで抽出）
-  const monthOptions = useMemo(() => {
-    if (!data || !selectedCenter || !data.monthlyRawData) return [];
-    return [...new Set(data.monthlyRawData.filter((r: any) => r[0] === selectedCenter).map((r: any) => r[1]))].filter(Boolean);
-  }, [data, selectedCenter]);
-
-  // フォーマット関数
   const formatDisplay = (valStr, title) => {
-    if (!valStr) return "0";
-    if (valStr.toString().includes('%')) return valStr; // すでに%表記ならそのまま
+    if (valStr === undefined || valStr === null || valStr === "") return "0";
+    if (valStr.toString().includes('%')) return valStr;
     const parsed = n(valStr);
+    
     const isRatio = title.includes('%') || title.includes('率') || title.includes('生産性');
-    if (isRatio) return parsed.toFixed(1) + (valStr.toString().includes('%') ? '' : '%');
-    return parsed > 100 ? `¥${Math.round(parsed).toLocaleString()}` : parsed.toString();
+    if (isRatio) {
+      // 生産性などで値が100以下、または小数点を含む場合はそのまま%をつける
+      return parsed.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%';
+    }
+    
+    // 金額系（売上、原価、労務費など）は3桁区切りの「¥」を付与
+    if (parsed > 1000) {
+      return `¥${Math.round(parsed).toLocaleString()}`;
+    }
+    return parsed.toLocaleString();
   };
 
   return (
@@ -220,24 +211,15 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
         {activeTab === 'monthly' && dynamicMonthlyData ? (
           <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
-            
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
               <div>
                 <h2 className="text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
                   <span className="w-2 h-6 bg-blue-500 rounded-full inline-block"></span> 月次データコックピット
                 </h2>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Direct Spreadsheet Mirroring</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Horizontal Matrix Mirroring</p>
               </div>
               
               <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">拠点:</span>
-                  <select value={selectedCenter} onChange={(e) => setSelectedCenter(e.target.value)} className="px-4 py-2 rounded-xl border border-white/20 bg-slate-900 text-white font-bold text-xs cursor-pointer backdrop-blur-md outline-none">
-                    {centerOptions.map(c => <option key={c} value={c} className="bg-slate-800">{c}</option>)}
-                  </select>
-                </div>
-
-                {/* 📊 月が増えたら自動で並ぶ動的月切り替えタブ（無加工ストレート連動） */}
                 <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1 overflow-x-auto max-w-full">
                   {monthOptions.length > 0 ? (
                     monthOptions.map(m => (
@@ -256,14 +238,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            {/* ① 予測・実績の比較カードブロック */}
+            {/* ① 予算（予測）と実績のペア比較カード */}
             {dynamicMonthlyData.compareItems.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予測実績比較</h3>
+                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予算実績比較</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {dynamicMonthlyData.compareItems.map((item, idx) => {
-                    const actVal = n(item.actual);
-                    const fctVal = n(item.forecast);
+                    const actVal = n(item.actual); const fctVal = n(item.forecast);
                     const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
                     const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
                     const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal);
@@ -272,20 +253,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       <div key={idx} className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] shadow-lg flex flex-col justify-between group">
                         <div>
                           <span className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-2">{item.title}</span>
-                          <div className="text-3xl font-black font-mono tracking-tighter text-white my-1">
-                            {formatDisplay(item.actual, item.title)}
-                          </div>
+                          <div className="text-2xl font-black font-mono tracking-tighter text-white my-1">{formatDisplay(item.actual, item.title)}</div>
                         </div>
                         <div className="mt-4 pt-3 border-t border-white/5 flex flex-col gap-2">
                           <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-slate-400 font-bold">予測: {formatDisplay(item.forecast, item.title)}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>
-                              比率: {ratio.toFixed(1)}%
-                            </span>
+                            <span className="text-slate-400 font-bold">予算: {formatDisplay(item.forecast, item.title)}</span>
+                            <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>比率: {ratio.toFixed(1)}%</span>
                           </div>
-                          <p className="text-[10px] text-slate-500 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">
-                            {evalData.comment}
-                          </p>
+                          <p className="text-[10px] text-slate-500 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">{evalData.comment}</p>
                         </div>
                       </div>
                     );
@@ -294,7 +269,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
-            {/* ② それ以外の単一数字表示項目ブロック */}
+            {/* ② 単一数値（社員人数、スタッフ在籍数、事故金額など） */}
             {dynamicMonthlyData.singleItems.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 その他シート数値インジケータ</h3>
@@ -302,9 +277,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   {dynamicMonthlyData.singleItems.map((item, idx) => (
                     <div key={idx} className="bg-slate-900/50 backdrop-blur-[10px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[100px]">
                       <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
-                      <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">
-                        {formatDisplay(item.value, item.title)}
-                      </div>
+                      <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">{formatDisplay(item.value, item.title)}</div>
                     </div>
                   ))}
                 </div>
@@ -314,7 +287,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
               <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
               <p>
-                <strong>【無加工シートダイレクトミラー表示】</strong> スプレッドシート側で集計済みの数値を100%そのままストレートに画面に投影しています。無駄な再計算ロジックを通さないため、完璧にシートの計算結果と完全同期しています。
+                <strong>【マトリクス完全マッピング表示】</strong> スプレッドシートの1行目のヘッダー項目と2行目の数値を1本化して綺麗に投影しています。これで実際のシートデータと完全に完全同期しました！
               </p>
             </div>
           </div>
