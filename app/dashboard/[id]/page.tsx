@@ -12,7 +12,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
 
   const [selectedCenter, setSelectedCenter] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>(''); // 👈 ここが選択中タブの月になるよ！
+  const [selectedMonth, setSelectedMonth] = useState<string>(''); // 👈 シートに書かれている「4月」などの文字列がそのまま入るよ！
 
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
@@ -38,7 +38,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             setSelectedCenter(centers[0]);
             const months = [...new Set(mItems.filter((r: any) => r[0] === centers[0]).map((r: any) => r[1]))].filter(Boolean);
             if (months.length > 0) {
-              setSelectedMonth(months[0]);
+              setSelectedMonth(months[0]); // 最初の月（例：「4月」）を初期セット
             }
           }
         }
@@ -108,29 +108,32 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal) => {
+  const getAiCorporateEvaluation = (title, actual, forecast) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
-    const modeText = mode === 'daily' ? '直近' : `当週${isTotal ? '合計' : '平均'}`;
     let comment = "";
     let color = 'text-slate-700 bg-slate-50 border-slate-200';
 
     if (isLowBetter) {
-      if (ratio <= 92) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は${modeText}で予測比${ratio.toFixed(1)}%と大幅なコスト抑制に成功しています。`; }
-      else if (ratio > 103) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の${modeText}が計画比${(ratio - 100).toFixed(1)}%超過し利益圧迫要因となっています。`; }
-      else { comment = `【経営財務診断】『${title}』は${modeText}の執行率${ratio.toFixed(1)}%と適正な予測枠内で着地。計画通りです。`; }
+      if (ratio <= 92) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は予測比${ratio.toFixed(1)}%と大幅なコスト抑制に成功しています。`; }
+      else if (ratio > 103) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の月次着地が計画比${(ratio - 100).toFixed(1)}%超過し利益圧迫要因となっています。`; }
+      else { comment = `【経営財務診断】『${title}』は執行率${ratio.toFixed(1)}%と適正な予測枠内で着地。計画通りです。`; }
     } else {
-      if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は${modeText}で目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
-      else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の${modeText}が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
-      else { comment = `【経営財務診断】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
+      if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
+      else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
+      else { comment = `【経営財務診断】『${title}』は達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
     }
-    return { color, comment, ratio: ratio.toFixed(1) };
+    return { color, comment };
   };
 
+  // 💥 【無加工ストレート抽出】シートの計算結果の行をそのまま表示するシンプル・軽量エンジン
   const dynamicMonthlyData = useMemo(() => {
     if (!data || !data.monthlyRawData) return { compareItems: [], singleItems: [] };
     const rows = data.monthlyRawData || [];
+    
+    // 選択された「拠点」と「月（例：4月）」に100%一致する行だけを抽出
     const filteredRows = rows.filter(r => r[0] === selectedCenter && r[1] === selectedMonth);
+
     const compareMap = new Map();
     const singleItems = [];
 
@@ -139,47 +142,46 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       if (!rawKey) return;
       const normalizedKey = rawKey.replace('＿', '_');
 
+      // 3列目の値をそのまま画面の表示用にする（シート側で集計済みのrow[3]を使用）
+      const rawValue = row[3] || "0"; 
+
       if (normalizedKey.startsWith('実績_') || normalizedKey.startsWith('予測_')) {
         const cleanTitle = normalizedKey.replace('実績_', '').replace('予測_', '');
         if (!compareMap.has(cleanTitle)) {
-          compareMap.set(cleanTitle, { title: cleanTitle, actualRow: null, forecastRow: null });
+          compareMap.set(cleanTitle, { title: cleanTitle, actual: "0", forecast: "0" });
         }
         const item = compareMap.get(cleanTitle);
-        if (normalizedKey.startsWith('実績_')) item.actualRow = row;
-        if (normalizedKey.startsWith('予測_')) item.forecastRow = row;
+        if (normalizedKey.startsWith('実績_')) item.actual = rawValue;
+        if (normalizedKey.startsWith('予測_')) item.forecast = rawValue;
       } else {
-        singleItems.push({
-          title: rawKey,
-          val3: row[3], val4: row[4], val5: row[5], val6: row[6], val7: row[7], val8: row[8], val9: row[9]
-        });
+        // 実績_ や 予測_ がついていない純粋な独立項目（数字をそのまま出す）
+        singleItems.push({ title: rawKey, value: rawValue });
       }
     });
 
-    const compareItems = Array.from(compareMap.values()).map(item => {
-      const actRow = item.actualRow || []; const fctRow = item.forecastRow || [];
-      return { title: item.title, actual: actRow[3] || "0", forecast: fctRow[3] || "0" };
-    });
-
-    return { compareItems, singleItems };
+    return { compareItems: Array.from(compareMap.values()), singleItems };
   }, [data, selectedCenter, selectedMonth]);
 
+  // 拠点リスト（重複排除）
   const centerOptions = useMemo(() => {
     if (!data || !data.monthlyRawData) return [];
     return [...new Set(data.monthlyRawData.slice(1).map((r: any) => r[0]))].filter(Boolean);
   }, [data]);
 
-  // 💥 シートに存在する月データを重複なしで全自動抽出するエンジン
+  // 月次シート内にある「月」の選択肢（例：4月、5月...をそのまま重複なしで抽出）
   const monthOptions = useMemo(() => {
     if (!data || !selectedCenter || !data.monthlyRawData) return [];
     return [...new Set(data.monthlyRawData.filter((r: any) => r[0] === selectedCenter).map((r: any) => r[1]))].filter(Boolean);
   }, [data, selectedCenter]);
 
-  const getValueClass = (id, act, bud, type) => {
-    let classes = (id === 'hours' || id === 'wage') ? 'text-2xl lg:text-3xl font-black font-mono tracking-tight text-white ' : 'text-4xl font-black font-mono tracking-tighter text-white ';
-    if (type === 'none') return classes;
-    const aVal = n(act); const bVal = n(bud);
-    if (type === 'more') return classes + (aVal >= bVal ? 'text-blue-400' : 'text-rose-400');
-    else return classes + (aVal <= bVal ? 'text-blue-400' : 'text-rose-400');
+  // フォーマット関数
+  const formatDisplay = (valStr, title) => {
+    if (!valStr) return "0";
+    if (valStr.toString().includes('%')) return valStr; // すでに%表記ならそのまま
+    const parsed = n(valStr);
+    const isRatio = title.includes('%') || title.includes('率') || title.includes('生産性');
+    if (isRatio) return parsed.toFixed(1) + (valStr.toString().includes('%') ? '' : '%');
+    return parsed > 100 ? `¥${Math.round(parsed).toLocaleString()}` : parsed.toString();
   };
 
   return (
@@ -224,10 +226,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 <h2 className="text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
                   <span className="w-2 h-6 bg-blue-500 rounded-full inline-block"></span> 月次データコックピット
                 </h2>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Dynamic Spreadsheet Matrix Review</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Direct Spreadsheet Mirroring</p>
               </div>
               
-              {/* 💥 拠点セレクト ＆ 【新開発】動的な月切り替えタブ型のハイブリッド配置 */}
               <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">拠点:</span>
@@ -236,7 +237,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   </select>
                 </div>
 
-                {/* 💥 🌟 お兄ちゃんリクエスト：今後月が増えても1タップでパチパチ切り替えられる「動的月選択タブ」 */}
+                {/* 📊 月が増えたら自動で並ぶ動的月切り替えタブ（無加工ストレート連動） */}
                 <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1 overflow-x-auto max-w-full">
                   {monthOptions.length > 0 ? (
                     monthOptions.map(m => (
@@ -255,33 +256,36 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            {/* ① 予測と実績の比較項目ブロック */}
+            {/* ① 予測・実績の比較カードブロック */}
             {dynamicMonthlyData.compareItems.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ 予測・実績 比較マトリクス</h3>
+                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予測実績比較</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {dynamicMonthlyData.compareItems.map((item, idx) => {
-                    const actVal = n(item.actual); const fctVal = n(item.forecast);
+                    const actVal = n(item.actual);
+                    const fctVal = n(item.forecast);
                     const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
                     const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
-                    const formatVal = (v, valStr) => {
-                      if (valStr.toString().includes('%')) return valStr;
-                      return typeof v === 'number' && v > 100 ? `¥${v.toLocaleString()}` : valStr;
-                    };
-                    const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal, 'monthly', true);
+                    const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal);
 
                     return (
                       <div key={idx} className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] shadow-lg flex flex-col justify-between group">
                         <div>
                           <span className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-2">{item.title}</span>
-                          <div className="text-3xl font-black font-mono tracking-tighter text-white my-1">{formatVal(actVal, item.actual)}</div>
+                          <div className="text-3xl font-black font-mono tracking-tighter text-white my-1">
+                            {formatDisplay(item.actual, item.title)}
+                          </div>
                         </div>
                         <div className="mt-4 pt-3 border-t border-white/5 flex flex-col gap-2">
                           <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-slate-400 font-bold">予測: {formatVal(fctVal, item.forecast)}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>比率: {ratio.toFixed(1)}%</span>
+                            <span className="text-slate-400 font-bold">予測: {formatDisplay(item.forecast, item.title)}</span>
+                            <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>
+                              比率: {ratio.toFixed(1)}%
+                            </span>
                           </div>
-                          <p className="text-[10px] text-slate-500 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">{evalData.comment}</p>
+                          <p className="text-[10px] text-slate-500 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">
+                            {evalData.comment}
+                          </p>
                         </div>
                       </div>
                     );
@@ -293,18 +297,16 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             {/* ② それ以外の単一数字表示項目ブロック */}
             {dynamicMonthlyData.singleItems.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-white/5">
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 シート集計データ・インジケータ</h3>
+                <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 その他シート数値インジケータ</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
-                  {dynamicMonthlyData.singleItems.map((item, idx) => {
-                    const rawVal = item.val3; const parsed = n(rawVal); const isRatio = rawVal?.toString().includes('%');
-                    const displayString = (typeof parsed === 'number' && parsed > 100 && !isRatio) ? `¥${parsed.toLocaleString()}` : rawVal;
-                    return (
-                      <div key={idx} className="bg-slate-900/50 backdrop-blur-[10px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[100px]">
-                        <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
-                        <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">{displayString || "0"}</div>
+                  {dynamicMonthlyData.singleItems.map((item, idx) => (
+                    <div key={idx} className="bg-slate-900/50 backdrop-blur-[10px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[100px]">
+                      <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
+                      <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">
+                        {formatDisplay(item.value, item.title)}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -312,7 +314,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
               <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
               <p>
-                <strong>【月次動的タイムラインタブ連動中】</strong> スプレッドシートから検出された最新の月タイムラインをタブとしてレンダリングしました。現在、お兄ちゃんが選択した『{selectedMonth}』のデータをリアルタイム集計しています。
+                <strong>【無加工シートダイレクトミラー表示】</strong> スプレッドシート側で集計済みの数値を100%そのままストレートに画面に投影しています。無駄な再計算ロジックを通さないため、完璧にシートの計算結果と完全同期しています。
               </p>
             </div>
           </div>
@@ -334,7 +336,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
               }
 
-              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType);
+              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct);
               const ratio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
 
               return (
