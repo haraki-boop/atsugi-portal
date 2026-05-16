@@ -388,4 +388,155 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   <div className="flex justify-between items-center py-3">
                     <span className="text-xs font-bold text-slate-300">目標達成に必要な「削減工数」</span>
                     <span className="text-lg font-black font-mono" style={{ color: monthlyMetrics.hrsGap <= 0 ? '#3b82f6' : '#fb7185' }}>
-                      {monthlyMetrics.hrsGap <= 0 ? "効率クリア" : `- ${monthly
+                      {monthlyMetrics.hrsGap <= 0 ? "効率クリア" : `- ${monthlyMetrics.hrsGap.toFixed(2)} h`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-white/5 rounded-2xl !mt-2">
+                    <span className="text-xs font-black text-rose-400">未達による収益損失額</span>
+                    <span className="text-xl font-black font-mono" style={{ color: monthlyMetrics.revGap > 0 ? '#fb7185' : '#3b82f6' }}>
+                      ¥{monthlyMetrics.gapMoney.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* KGIメインカード：売上生産性 */}
+              <div className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 border-t-6 border-t-amber-400 p-6 rounded-[28px] flex flex-col justify-between">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">売上生産性</span>
+                <div className="my-2 relative">
+                  <div className={getValueClass('p-sales', monthlyMetrics.actSales, monthlyMetrics.budSales, monthlyMetrics.targetSalesKGI, 'more')}>
+                    {monthlyMetrics.actSales}
+                  </div>
+                  {n(monthlyMetrics.actSales) >= monthlyMetrics.targetSalesKGI && <span className="absolute -top-3 -right-8 text-2xl">✨</span>}
+                </div>
+                <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center text-[10px]">
+                  <span className="font-bold text-amber-400">目標KGI</span>
+                  <span className="font-black text-amber-400 font-mono">¥{monthlyMetrics.targetSalesKGI.toFixed(0)}</span>
+                </div>
+              </div>
+
+              {/* KGIメインカード：作業生産性 */}
+              <div className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 border-t-6 border-t-amber-400 p-6 rounded-[28px] flex flex-col justify-between">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">作業生産性</span>
+                <div className="my-2 relative">
+                  <div className={getValueClass('p-work', monthlyMetrics.actWork, monthlyMetrics.budWork, monthlyMetrics.targetWorkKGI, 'more')}>
+                    {monthlyMetrics.actWork}
+                  </div>
+                  {n(monthlyMetrics.actWork) >= monthlyMetrics.targetWorkKGI && <span className="absolute -top-3 -right-8 text-2xl">✨</span>}
+                </div>
+                <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center text-[10px]">
+                  <span className="font-bold text-amber-400">目標KGI</span>
+                  <span className="font-black text-amber-400 font-mono">{monthlyMetrics.targetWorkKGI.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* カード：総労働工数 */}
+              <div className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] flex flex-col justify-between">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">総労働工数</span>
+                <div className="my-2 relative flex items-baseline justify-between">
+                  <div className={getValueClass('hours', monthlyMetrics.actHrs, monthlyMetrics.budHrs, null, 'less')}>
+                    {monthlyMetrics.actHrs}
+                  </div>
+                  <span className="text-xl">✨</span>
+                </div>
+              </div>
+
+              {/* カード：平均時給 */}
+              <div className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] flex flex-col justify-between">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">平均時給</span>
+                <div className="my-2 relative flex items-baseline justify-between">
+                  <div className={getValueClass('wage', monthlyMetrics.actWage, '---', null, 'none')}>
+                    {monthlyMetrics.actWage}
+                  </div>
+                  <span className="text-xl">✨</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* エキスパートAI経営要約総括 */}
+            <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-200 leading-relaxed">
+              <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
+              <p>
+                <strong>【経営財務シミュレータ分析】</strong> 選択された拠点（{selectedCenter} / {selectedMonth}）の財務評価を処理しました。現在の売上達成率は{monthlyMetrics.rRev}であり、目標KGI（売上生産性: ¥{monthlyMetrics.targetSalesKGI.toFixed(0)}）とのギャップに基づき、必要な追加売上高・削減工数マトリクスをリアルタイム再計算しています。これらをシフト最適化エンジンへ自動同期し、現場の人時コントロールへ繋げてください。
+              </p>
+            </div>
+
+          </div>
+        ) : (
+          /* ========================================================================================= */
+          /* 📅 1〜3, 5〜8番タブ：お兄ちゃんお気に入りの「合格版日次・週次グラフ」レイアウトを100%完全維持！ */
+          /* ========================================================================================= */
+          <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8 relative z-10`}>
+            {allMetrics.map((m, i) => {
+              const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
+              const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
+              const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
+              
+              let chartData = [];
+              let dispAct = 0; let dispFct = 0;
+
+              if (displayMode === 'daily') {
+                chartData = m.labels.map((l, idx) => ({ name: l, "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
+                dispAct = m.actual[m.actual.length - 1] || 0;
+                dispFct = m.forecast[m.forecast.length - 1] || 1;
+              } else {
+                chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
+                const acts = weekIdx.map(idx => m.actual[idx] || 0); const fcts = weekIdx.map(idx => m.forecast[idx] || 0);
+                if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
+                else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
+              }
+
+              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType);
+              const ratio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
+
+              return (
+                <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+                    <div>
+                      <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
+                    </div>
+                    {displayMode === 'daily' && (
+                      <div className="flex gap-6 text-right items-center">
+                        <div className="border-r pr-4 border-slate-100">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">直近の実績</p>
+                          <p className="text-xl font-black text-slate-800 tracking-tight">{dispAct.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">{m.forecastType}比</p>
+                          <p className={`text-xl font-black ${ratio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{ratio.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-full">
+                    <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                          <Bar name="実績" dataKey="実績" fill={currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'weekly' ? 60 : 20} />
+                          <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
+                    <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
+                    <p>{evalData.comment}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
