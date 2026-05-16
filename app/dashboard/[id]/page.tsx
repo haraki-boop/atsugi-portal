@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend } from 'recharts';
 
@@ -10,6 +10,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('logistics');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
+
+  const [selectedCenter, setSelectedCenter] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>(''); // 👈 ここが選択中タブの月になるよ！
 
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
@@ -24,16 +27,44 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const gasUrl = "https://script.google.com/macros/s/AKfycbyosyzeCglI2Pz2GWh_dbZXAgDslEV5DZrws5ulw24GrkI-fShocaWUdOLMfaNh_m0_/exec";
-    fetch(gasUrl).then(res => res.json()).then(json => setData(json));
+    fetch(gasUrl)
+      .then(res => res.json())
+      .then(json => {
+        setData(json);
+        const mItems = json?.monthlyRawData || [];
+        if (mItems.length > 1) {
+          const centers = [...new Set(mItems.slice(1).map((r: any) => r[0]))].filter(Boolean);
+          if (centers.length > 0) {
+            setSelectedCenter(centers[0]);
+            const months = [...new Set(mItems.filter((r: any) => r[0] === centers[0]).map((r: any) => r[1]))].filter(Boolean);
+            if (months.length > 0) {
+              setSelectedMonth(months[0]);
+            }
+          }
+        }
+      }).catch(e => console.error(e));
   }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    const mItems = data.monthlyRawData || [];
+    const months = [...new Set(mItems.filter((r: any) => r[0] === selectedCenter).map((r: any) => r[1]))].filter(Boolean);
+    if (months.length > 0 && !months.includes(selectedMonth)) {
+      setSelectedMonth(months[0]);
+    }
+  }, [selectedCenter, data]);
 
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
-  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
+  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "原価"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
-  // 週のグルーピングロジック
+  const n = (val) => {
+    if (!val) return 0;
+    return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
+  };
+
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -81,92 +112,85 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
     const modeText = mode === 'daily' ? '直近' : `当週${isTotal ? '合計' : '平均'}`;
-
     let comment = "";
     let color = 'text-slate-700 bg-slate-50 border-slate-200';
-    let icon = <Bot size={14} className="text-slate-600" />;
 
     if (isLowBetter) {
-      if (ratio <= 92) {
-        color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-        icon = <CheckCircle2 size={14} className="text-emerald-600" />;
-        comment = `【経営財務診断】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。ROI向上に貢献しています。`;
-      } else if (ratio > 103) {
-        color = 'text-rose-700 bg-rose-50 border-rose-200';
-        icon = <ShieldAlert size={14} className="text-rose-600" />;
-        comment = `【経営財務診断】『${title}』の${modeText}が計画比${(ratio - 100).toFixed(1)}%超過し利益圧迫要因となっています。`;
-      } else {
-        comment = `【経営財務診断】『${title}』は${modeText}の執行率${ratio.toFixed(1)}%と適正な予算枠内で着地。財務計画通りです。`;
-      }
+      if (ratio <= 92) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は${modeText}で予測比${ratio.toFixed(1)}%と大幅なコスト抑制に成功しています。`; }
+      else if (ratio > 103) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の${modeText}が計画比${(ratio - 100).toFixed(1)}%超過し利益圧迫要因となっています。`; }
+      else { comment = `【経営財務診断】『${title}』は${modeText}の執行率${ratio.toFixed(1)}%と適正な予測枠内で着地。計画通りです。`; }
     } else {
-      if (ratio >= 105) {
-        color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-        icon = <ThumbsUp size={14} className="text-emerald-600" />;
-        comment = `【経営財務診断】『${title}』は${modeText}で目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`;
-      } else if (ratio < 95) {
-        color = 'text-rose-700 bg-rose-50 border-rose-200';
-        icon = <AlertTriangle size={14} className="text-rose-600" />;
-        comment = `【経営財務診断】『${title}』の${modeText}が計画の${ratio.toFixed(1)}%に留まり赤信号。即座のテコ入れが必要です。`;
-      } else {
-        comment = `【経営財務診断】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`;
-      }
+      if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は${modeText}で目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
+      else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の${modeText}が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
+      else { comment = `【経営財務診断】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
     }
-    return { color, icon, comment, ratio: ratio.toFixed(1) };
+    return { color, comment, ratio: ratio.toFixed(1) };
   };
 
-  // 💥 【月次専用のデータ集計＆シミュレーション解析エンジン】
-  const getMonthlyAggregates = () => {
-    // 4.月次用の生データをGASから取得、なければ他のタブから擬似抽出
-    const monthlyItems = data.monthlyData || [];
-    const getSum = (key) => {
-      const item = monthlyItems.find(i => i.title.includes(key));
-      return item ? item.values.reduce((a, b) => a + b, 0) : 0;
-    };
-    const getLatest = (key) => {
-      const item = monthlyItems.find(i => i.title.includes(key));
-      return item ? item.values[item.values.length - 1] : 0;
-    };
+  const dynamicMonthlyData = useMemo(() => {
+    if (!data || !data.monthlyRawData) return { compareItems: [], singleItems: [] };
+    const rows = data.monthlyRawData || [];
+    const filteredRows = rows.filter(r => r[0] === selectedCenter && r[1] === selectedMonth);
+    const compareMap = new Map();
+    const singleItems = [];
 
-    // 仮の当月計算マスタ（データが空なら日次の合算や初期値から綺麗にマッピング）
-    const vRev = getSum('実績_売上') || 53290000;
-    const bRev = getSum('予算_売上') || 55000000;
-    const rRev = bRev > 0 ? ((vRev / bRev) * 100).toFixed(1) + '%' : '96.9%';
+    filteredRows.forEach(row => {
+      const rawKey = row[2] || '';
+      if (!rawKey) return;
+      const normalizedKey = rawKey.replace('＿', '_');
 
-    const vCost = getSum('実績_原価') || 21400000;
-    const bCost = getSum('予算_原価') || 23000000;
+      if (normalizedKey.startsWith('実績_') || normalizedKey.startsWith('予測_')) {
+        const cleanTitle = normalizedKey.replace('実績_', '').replace('予測_', '');
+        if (!compareMap.has(cleanTitle)) {
+          compareMap.set(cleanTitle, { title: cleanTitle, actualRow: null, forecastRow: null });
+        }
+        const item = compareMap.get(cleanTitle);
+        if (normalizedKey.startsWith('実績_')) item.actualRow = row;
+        if (normalizedKey.startsWith('予測_')) item.forecastRow = row;
+      } else {
+        singleItems.push({
+          title: rawKey,
+          val3: row[3], val4: row[4], val5: row[5], val6: row[6], val7: row[7], val8: row[8], val9: row[9]
+        });
+      }
+    });
 
-    const totalLabor = getSum('実績_労務費') || 13200000;
-    const vRatio = vRev > 0 ? Math.round((totalLabor / vRev) * 100) : 25;
-    const tRatio = '23%';
+    const compareItems = Array.from(compareMap.values()).map(item => {
+      const actRow = item.actualRow || []; const fctRow = item.forecastRow || [];
+      return { title: item.title, actual: actRow[3] || "0", forecast: fctRow[3] || "0" };
+    });
 
-    const vPSales = getLatest('実績_売上生産性') || 14500;
-    const kgiPSales = getLatest('目標_売上生産性') || 15000;
+    return { compareItems, singleItems };
+  }, [data, selectedCenter, selectedMonth]);
 
-    const vPWork = getLatest('実績_作業生産性') || 48;
-    const kgiPWork = getLatest('目標_作業生産性') || 50;
+  const centerOptions = useMemo(() => {
+    if (!data || !data.monthlyRawData) return [];
+    return [...new Set(data.monthlyRawData.slice(1).map((r: any) => r[0]))].filter(Boolean);
+  }, [data]);
 
-    const vHours = getSum('実績_総労働工数') || 2840;
-    const vWage = getLatest('実績_平均時給') || 1250;
+  // 💥 シートに存在する月データを重複なしで全自動抽出するエンジン
+  const monthOptions = useMemo(() => {
+    if (!data || !selectedCenter || !data.monthlyRawData) return [];
+    return [...new Set(data.monthlyRawData.filter((r: any) => r[0] === selectedCenter).map((r: any) => r[1]))].filter(Boolean);
+  }, [data, selectedCenter]);
 
-    // 逆算シミュレーション計算
-    const gapRev = bRev > vRev ? bRev - vRev : 0;
-    const gapHours = gapRev > 0 && vPSales > 0 ? Math.round(gapRev / vPSales) : 0;
-    const gapMoney = gapRev;
-
-    return { vRev, bRev, rRev, vCost, bCost, vRatio, tRatio, vPSales, kgiPSales, vPWork, kgiPWork, vHours, vWage, gapRev, gapHours, gapMoney };
+  const getValueClass = (id, act, bud, type) => {
+    let classes = (id === 'hours' || id === 'wage') ? 'text-2xl lg:text-3xl font-black font-mono tracking-tight text-white ' : 'text-4xl font-black font-mono tracking-tighter text-white ';
+    if (type === 'none') return classes;
+    const aVal = n(act); const bVal = n(bud);
+    if (type === 'more') return classes + (aVal >= bVal ? 'text-blue-400' : 'text-rose-400');
+    else return classes + (aVal <= bVal ? 'text-blue-400' : 'text-rose-400');
   };
-
-  const m = getMonthlyAggregates();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 relative">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
         <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600">
           <ArrowLeft size={16} /> <span className="text-xs">ポータルへ戻る</span>
         </Link>
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
-          <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">{activeTab === 'monthly' ? 'MONTHLY MATRIX' : 'DAILY & WEEKLY'} ANALYTICS</p>
+          <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">{displayMode === 'daily' ? 'DAILY' : 'WEEKLY'} ANALYTICS</p>
         </div>
         {activeTab !== 'monthly' && (
           <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 gap-1">
@@ -176,15 +200,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         )}
       </header>
 
-      <main className="p-10 max-w-[1800px] mx-auto space-y-8">
-        {/* タブエリア */}
+      <main className="p-10 max-w-[1800px] mx-auto space-y-8 relative z-10">
         <div className="flex flex-wrap gap-2.5">
           {tabs.map((t) => (
             <button key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === 'monthly') setDisplayMode('daily'); }} className={`px-6 py-3 rounded-2xl transition-all font-black text-xs ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
           ))}
         </div>
 
-        {/* 📅 週次モードのフィルター（月次の時は非表示） */}
         {displayMode === 'weekly' && activeTab !== 'monthly' && (
           <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">週選択:</span>
@@ -194,170 +216,117 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ========================================================================================= */}
-        {/* 🌟 4. 月次タブが選ばれた時：CodePenの「実績ダッシュボード」デザインを完全再現して統合展開！ */}
-        {/* ========================================================================================= */}
-        {activeTab === 'monthly' ? (
-          <div className="bg-slate-950 p-8 rounded-[3rem] border border-slate-800 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
+        {activeTab === 'monthly' && dynamicMonthlyData ? (
+          <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
             
-            {/* トップヘッダー */}
-            <div className="flex justify-between items-center border-b border-slate-800 pb-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
               <div>
                 <h2 className="text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
-                  <span className="w-2 h-6 bg-amber-500 rounded-full inline-block"></span> 月次実績ダッシュボード
+                  <span className="w-2 h-6 bg-blue-500 rounded-full inline-block"></span> 月次データコックピット
                 </h2>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Monthly Strategic Performance KGI Matrix</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Dynamic Spreadsheet Matrix Review</p>
               </div>
-              <div className="flex gap-3">
-                <div className="bg-slate-900 px-5 py-2 rounded-xl border border-slate-800 text-xs font-bold text-amber-500">2026年度</div>
-                <div className="bg-slate-900 px-5 py-2 rounded-xl border border-slate-800 text-xs font-bold text-blue-400">4月度</div>
-              </div>
-            </div>
-
-            {/* CodePen完全移植のインテリジェントグリッドレイアウト */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               
-              {/* カード：売上高 */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between hover:border-slate-700 transition-all group">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">売上高</span>
-                <div className="my-4 flex items-baseline justify-between">
-                  <div className="text-4xl font-black tracking-tighter text-white">¥{m.vRev.toLocaleString()}</div>
-                  <span className="text-xl animate-bounce">✨</span>
+              {/* 💥 拠点セレクト ＆ 【新開発】動的な月切り替えタブ型のハイブリッド配置 */}
+              <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">拠点:</span>
+                  <select value={selectedCenter} onChange={(e) => setSelectedCenter(e.target.value)} className="px-4 py-2 rounded-xl border border-white/20 bg-slate-900 text-white font-bold text-xs cursor-pointer backdrop-blur-md outline-none">
+                    {centerOptions.map(c => <option key={c} value={c} className="bg-slate-800">{c}</option>)}
+                  </select>
                 </div>
-                <div className="flex gap-2 border-t border-slate-800/60 pt-3">
-                  <div className="bg-slate-950 px-3 py-1.5 rounded-lg text-[10px] text-slate-400 font-bold">予算: ¥{m.bRev.toLocaleString()}</div>
-                  <div className="bg-emerald-950/50 border border-emerald-900/40 px-3 py-1.5 rounded-lg text-[10px] text-emerald-400 font-black">達成率: {m.rRev}</div>
+
+                {/* 💥 🌟 お兄ちゃんリクエスト：今後月が増えても1タップでパチパチ切り替えられる「動的月選択タブ」 */}
+                <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1 overflow-x-auto max-w-full">
+                  {monthOptions.length > 0 ? (
+                    monthOptions.map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setSelectedMonth(m)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                      >
+                        {m}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="text-xs text-slate-500 px-3 py-1.5 font-bold">月データ未検出</span>
+                  )}
                 </div>
               </div>
-
-              {/* 中央パネルカード：労務比率 (リングメーター動的描写) */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col items-center justify-center text-center row-span-1 xl:row-span-2 bg-gradient-to-b from-slate-900 to-slate-950">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4 block w-full text-left">労務比率</span>
-                <div className="relative w-44 h-44 my-2">
-                  <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-                    <circle className="stroke-slate-800 fill-none" cx="100" cy="100" r="90" strokeWidth="12" />
-                    <circle 
-                      className="stroke-amber-500 fill-none transition-all duration-1000 ease-out" 
-                      cx="100" cy="100" r="90" 
-                      strokeWidth="14" 
-                      strokeLinecap="round"
-                      strokeDasharray={2 * Math.PI * 90}
-                      strokeDashoffset={2 * Math.PI * 90 * (1 - m.vRatio / 100)}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-3xl font-black tracking-tighter text-white">{m.vRatio}%</div>
-                    <div className="text-[10px] text-slate-500 font-bold mt-0.5">目標: {m.tRatio}</div>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-400 font-medium mt-4 leading-relaxed max-w-[200px]">売上に対する総人件費の投下比率をリアルタイム計測中</p>
-              </div>
-
-              {/* カード：原価 */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between hover:border-slate-700 transition-all">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">原価</span>
-                <div className="my-4 flex items-baseline justify-between">
-                  <div className="text-4xl font-black tracking-tighter text-white">¥{m.vCost.toLocaleString()}</div>
-                  <span className="text-xl">✨</span>
-                </div>
-                <div className="border-t border-slate-800/60 pt-3">
-                  <div className="bg-slate-950 px-3 py-1.5 rounded-lg text-[10px] text-slate-400 font-bold inline-block">予算: ¥{m.bCost.toLocaleString()}</div>
-                </div>
-              </div>
-
-              {/* 🌟 大注目：KGIギャップ分析・目標への逆算シミュレーション */}
-              <div className="bg-slate-900/40 border border-dashed border-slate-800 p-6 rounded-3xl xl:col-span-2 space-y-4">
-                <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Bot size={14} /> KGIギャップ分析・目標への逆算シミュレーション
-                </span>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-900">
-                    <span className="text-[10px] font-bold text-slate-500 block">目標達成に必要な「追加売上」</span>
-                    <span className="text-lg font-black tracking-tight text-white block mt-2">¥{m.gapRev.toLocaleString()}</span>
-                  </div>
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-900">
-                    <span className="text-[10px] font-bold text-slate-500 block">目標達成に必要な「削減工数」</span>
-                    <span className="text-lg font-black tracking-tight text-white block mt-2">{m.gapHours.toLocaleString()} MH</span>
-                  </div>
-                  <div className="bg-rose-950/30 p-4 rounded-2xl border border-rose-900/40">
-                    <span className="text-[10px] font-black text-rose-400 block">未達による収益損失額</span>
-                    <span className="text-xl font-black tracking-tighter text-rose-400 block mt-2">¥{m.gapMoney.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* KGIメインカード：売上生産性 */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">売上生産性</span>
-                <div className="my-4 flex items-baseline justify-between">
-                  <div className="text-4xl font-black tracking-tighter text-white">¥{m.vPSales.toLocaleString()}</div>
-                  <span className="text-xl">✨</span>
-                </div>
-                <div className="bg-slate-950 px-4 py-2 rounded-xl flex justify-between items-center text-[10px]">
-                  <span className="font-bold text-slate-500">目標KGI</span>
-                  <span className="font-black text-blue-400">¥{m.kgiPSales.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* KGIメインカード：作業生産性 */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">作業生産性</span>
-                <div className="my-4 flex items-baseline justify-between">
-                  <div className="text-4xl font-black tracking-tighter text-white">{m.vPWork} <span className="text-xs font-medium text-slate-500">ケース/MH</span></div>
-                  <span className="text-xl">✨</span>
-                </div>
-                <div className="bg-slate-950 px-4 py-2 rounded-xl flex justify-between items-center text-[10px]">
-                  <span className="font-bold text-slate-500">目標KGI</span>
-                  <span className="font-black text-blue-400">{m.kgiPWork} ケース/MH</span>
-                </div>
-              </div>
-
-              {/* カード：総労働工数 */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">総労働工数</span>
-                <div className="my-4 flex items-baseline justify-between">
-                  <div className="text-3xl font-black tracking-tight text-slate-200">{m.vHours.toLocaleString()} <span className="text-xs font-medium text-slate-500">MH</span></div>
-                  <span className="text-xl">✨</span>
-                </div>
-              </div>
-
-              {/* カード：平均時給 */}
-              <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">平均時給</span>
-                <div className="my-4 flex items-baseline justify-between">
-                  <div className="text-3xl font-black tracking-tight text-slate-200">¥{m.vWage.toLocaleString()}</div>
-                  <span className="text-xl">✨</span>
-                </div>
-              </div>
-
             </div>
 
-            {/* 経営エキスパートAIによる、当月度マクロ財務評価 */}
-            <div className="p-5 bg-blue-950/20 border border-blue-900/40 rounded-3xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
+            {/* ① 予測と実績の比較項目ブロック */}
+            {dynamicMonthlyData.compareItems.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ 予測・実績 比較マトリクス</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {dynamicMonthlyData.compareItems.map((item, idx) => {
+                    const actVal = n(item.actual); const fctVal = n(item.forecast);
+                    const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
+                    const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
+                    const formatVal = (v, valStr) => {
+                      if (valStr.toString().includes('%')) return valStr;
+                      return typeof v === 'number' && v > 100 ? `¥${v.toLocaleString()}` : valStr;
+                    };
+                    const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal, 'monthly', true);
+
+                    return (
+                      <div key={idx} className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] shadow-lg flex flex-col justify-between group">
+                        <div>
+                          <span className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-2">{item.title}</span>
+                          <div className="text-3xl font-black font-mono tracking-tighter text-white my-1">{formatVal(actVal, item.actual)}</div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-white/5 flex flex-col gap-2">
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400 font-bold">予測: {formatVal(fctVal, item.forecast)}</span>
+                            <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>比率: {ratio.toFixed(1)}%</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">{evalData.comment}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ② それ以外の単一数字表示項目ブロック */}
+            {dynamicMonthlyData.singleItems.length > 0 && (
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 シート集計データ・インジケータ</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
+                  {dynamicMonthlyData.singleItems.map((item, idx) => {
+                    const rawVal = item.val3; const parsed = n(rawVal); const isRatio = rawVal?.toString().includes('%');
+                    const displayString = (typeof parsed === 'number' && parsed > 100 && !isRatio) ? `¥${parsed.toLocaleString()}` : rawVal;
+                    return (
+                      <div key={idx} className="bg-slate-900/50 backdrop-blur-[10px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[100px]">
+                        <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
+                        <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">{displayString || "0"}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
               <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
               <p>
-                <strong>【経営財務総括】</strong> 当月の売上高は予算に対して96.9%と僅かに下振れ（ギャップ：¥{(m.gapRev).toLocaleString()}）を記録したものの、コア指標である労務比率を{m.vRatio}%に抑え込んだことで、営業限界利益は当初のシミュレーション通り適正範囲を確保しています。次期へ向け、作業生産性を目標KGIである【{m.kgiPWork}ケース/MH】へ引き上げることで、収益損失リスクの完全な払拭が可能です。
+                <strong>【月次動的タイムラインタブ連動中】</strong> スプレッドシートから検出された最新の月タイムラインをタブとしてレンダリングしました。現在、お兄ちゃんが選択した『{selectedMonth}』のデータをリアルタイム集計しています。
               </p>
             </div>
-
           </div>
         ) : (
-          /* ========================================================================================= */
-          /* 📅 1〜3, 5〜8番タブ：お兄ちゃんお気に入りの「合格版日次・週次グラフ」レイアウトを100%完全維持！ */
-          /* ========================================================================================= */
-          <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
+          <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8 relative z-10`}>
             {allMetrics.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
               const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
-              
-              let chartData = [];
-              let dispAct = 0; let dispFct = 0;
+              let chartData = []; let dispAct = 0; let dispFct = 0;
 
               if (displayMode === 'daily') {
                 chartData = m.labels.map((l, idx) => ({ name: l, "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
-                dispAct = m.actual[m.actual.length - 1] || 0;
-                dispFct = m.forecast[m.forecast.length - 1] || 1;
+                dispAct = m.actual[m.actual.length - 1] || 0; dispFct = m.forecast[m.forecast.length - 1] || 1;
               } else {
                 chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
                 const acts = weekIdx.map(idx => m.actual[idx] || 0); const fcts = weekIdx.map(idx => m.forecast[idx] || 0);
@@ -388,7 +357,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </div>
                     )}
                   </div>
-
                   <div className="w-full">
                     <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
                       <ResponsiveContainer width="100%" height="100%">
@@ -404,9 +372,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </ResponsiveContainer>
                     </div>
                   </div>
-
                   <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
-                    <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
                     <p>{evalData.comment}</p>
                   </div>
                 </div>
