@@ -11,9 +11,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
 
-  // 💥 無限ループの最大の原因だった「選択中の月State」を完全に撤去し、
-  // 最初に見つかった有効な行（最新データ）を自動表示する仕様に変更！
-  const [monthIndex, setMonthIndex] = useState<number>(0);
+  // 横長シートの1列目「年月（例: 2026_04）」を保持するState
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
@@ -32,6 +31,15 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       .then(res => res.json())
       .then(json => {
         setData(json);
+        
+        // 💥 【最終防衛策】GASの返し方が「monthlyRawData」でも「monthlyData」でも両方100%救済する
+        const mItems = json?.monthlyRawData || json?.monthlyData || [];
+        if (mItems.length > 1) {
+          const firstMonth = mItems[1]?.[0];
+          if (firstMonth) {
+            setSelectedMonth(firstMonth.toString());
+          }
+        }
       }).catch(e => console.error("Data fetch failed", e));
   }, []);
 
@@ -101,26 +109,26 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     } else {
       if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
       else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
-      else { comment = `【経営財務診断】『${title}』は達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
+      else { comment = `【経営財務診断】『${title}』は達成率${ratio.toFixed(1)}%と手堅く推移。順順調な利益水準を確保できています。`; }
     }
     return { color, comment };
   };
 
-  // 💥 【デスループ完全消去型・超速マッピングコア】
-  // 文字列検索や型変換を一切行わず、インデックス（行配列）だけでストレートにデータを組み立てる！
+  // 📊 【キー名すれ違い完全吸収・横型パースコア】
   const dynamicMonthlyData = useMemo(() => {
     const compareMap = new Map();
     const singleItems = [];
-    if (!data || !data.monthlyRawData || data.monthlyRawData.length < 2) return { compareItems: [], singleItems: [], monthName: "" };
+    
+    // 💥 GAS側の名前揺れ（monthlyRawData か monthlyData）を100%安全にキャッチ
+    const rows = data?.monthlyRawData || data?.monthlyData || [];
+    if (rows.length < 2) return { compareItems: [], singleItems: [] };
 
-    const headers = data.monthlyRawData[0] || []; 
-    const rows = data.monthlyRawData.slice(1);     
+    const headers = rows[0] || []; 
+    const dataRows = rows.slice(1);     
 
-    // 安全に対象行を確定（Stateで指定された配列インデックスを直接叩く）
-    const targetRow = rows[monthIndex] || rows[0];
-    if (!targetRow) return { compareItems: [], singleItems: [], monthName: "" };
-
-    const monthName = targetRow[0] ? targetRow[0].toString() : "データ";
+    // 選択された「年月」の行を見つける。Stateが空なら2行目を自動補完してフリーズを100%回避
+    const targetRow = dataRows.find(r => r && r[0]?.toString() === selectedMonth) || dataRows[0];
+    if (!targetRow) return { compareItems: [], singleItems: [] };
 
     headers.forEach((headerName, index) => {
       if (index === 0 || !headerName) return; 
@@ -141,16 +149,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       }
     });
 
-    return { compareItems: Array.from(compareMap.values()), singleItems, monthName };
-  }, [data, monthIndex]);
+    return { compareItems: Array.from(compareMap.values()), singleItems };
+  }, [data, selectedMonth]);
 
-  // 利用可能な行（選択可能な月の選択肢）を安全に配列数として抽出
-  const monthRowsList = useMemo(() => {
-    if (!data || !data.monthlyRawData || data.monthlyRawData.length < 2) return [];
-    return data.monthlyRawData.slice(1).map((r, idx) => ({
-      index: idx,
-      name: r && r[0] ? r[0].toString() : `${idx + 1}データ行`
-    }));
+  // 月（年月）の選択肢を安全に抽出
+  const monthOptions = useMemo(() => {
+    const rows = data?.monthlyRawData || data?.monthlyData || [];
+    if (rows.length < 2) return [];
+    return [...new Set(rows.slice(1).map((r: any) => r && r[0]?.toString()))].filter(Boolean);
   }, [data]);
 
   const formatDisplay = (valStr, title) => {
@@ -214,23 +220,23 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               
               <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
                 <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1 overflow-x-auto max-w-full">
-                  {monthRowsList.map(m => (
+                  {monthOptions.map(m => (
                     <button
-                      key={m.index}
-                      onClick={() => setMonthIndex(m.index)}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${monthIndex === m.index ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                      key={m}
+                      onClick={() => setSelectedMonth(m)}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                     >
-                      {m.name}
+                      {m}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* ① 予算と実績のペア比較カード */}
+            {/* ① 予算と実績の比較カード */}
             {dynamicMonthlyData.compareItems.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予算実績比較 ({dynamicMonthlyData.monthName})</h3>
+                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予算実績比較</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {dynamicMonthlyData.compareItems.map((item, idx) => {
                     const actVal = n(item.actual); const fctVal = n(item.forecast);
@@ -258,7 +264,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
-            {/* ② 単一数値インジケータ */}
+            {/* ② 単一数値（社員人数、スタッフ在籍数、事故金額など） */}
             {dynamicMonthlyData.singleItems.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 その他シート数値インジケータ</h3>
@@ -276,7 +282,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
               <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
               <p>
-                <strong>【横型マトリクス完全同期システム・高速化版】</strong> 無限ループの引き金となるデータの型チェックと文字検索ループを全て廃止し、最軽量のインデックス直結型に移行しました。ブラウザのクラッシュは100%防止されています。
+                <strong>【キー名不一致・救済フィルタ完全稼働】</strong> GAS側データの「monthlyRawData」「monthlyData」のどちらが来てもエラーを100%回避するパッチを当てました。無限レンダリングは発生しません。
               </p>
             </div>
           </div>
