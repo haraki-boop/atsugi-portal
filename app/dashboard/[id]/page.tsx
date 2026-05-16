@@ -10,9 +10,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('logistics');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
-
-  // 横長シートの1列目「年月（例: 2026_04）」を保持するState
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('2026_04');
 
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
@@ -30,17 +28,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     fetch(gasUrl)
       .then(res => res.json())
       .then(json => {
-        setData(json);
-        
-        // 💥 【最終防衛策】GASの返し方が「monthlyRawData」でも「monthlyData」でも両方100%救済する
-        const mItems = json?.monthlyRawData || json?.monthlyData || [];
-        if (mItems.length > 1) {
-          const firstMonth = mItems[1]?.[0];
-          if (firstMonth) {
-            setSelectedMonth(firstMonth.toString());
+        // 💥 【防御1】届いたデータが壊れていないか、最低限の配列チェック
+        if (json && typeof json === 'object') {
+          setData(json);
+          const mItems = json?.monthlyRawData || json?.monthlyData || [];
+          if (mItems && mItems.length > 1 && mItems[1]?.[0]) {
+            setSelectedMonth(mItems[1][0].toString());
           }
+        } else {
+          // ゴミデータが来たらダミーの殻を作ってフリーズを防ぐ
+          setData({ labels: ["データなし"] });
         }
-      }).catch(e => console.error("Data fetch failed", e));
+      }).catch(e => {
+        console.error("GAS Brain Offline", e);
+        setData({ labels: ["通信エラー"] });
+      });
   }, []);
 
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
@@ -55,41 +57,47 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
-    if (!labels || labels.length === 0) return groups;
-    let currentWeekIndices: number[] = [];
-    let weekCount = 1;
-    let startLabel = labels[0];
-    labels.forEach((label, idx) => {
-      const parts = label.split('/');
-      const date = new Date(2026, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
-      if (date.getDay() === 0 && currentWeekIndices.length > 0) {
-        groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[idx - 1]})`, indices: currentWeekIndices });
-        weekCount++;
-        startLabel = label;
-        currentWeekIndices = [];
-      }
-      currentWeekIndices.push(idx);
-    });
-    if (currentWeekIndices.length > 0) groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[labels.length - 1]})`, indices: currentWeekIndices });
+    if (!labels || labels.length === 0 || labels[0] === "データなし" || labels[0] === "通信エラー") return groups;
+    try {
+      let currentWeekIndices: number[] = [];
+      let weekCount = 1;
+      let startLabel = labels[0];
+      labels.forEach((label, idx) => {
+        if (!label || !label.includes('/')) { currentWeekIndices.push(idx); return; }
+        const parts = label.split('/');
+        const date = new Date(2026, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+        if (date.getDay() === 0 && currentWeekIndices.length > 0) {
+          groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[idx - 1]})`, indices: currentWeekIndices });
+          weekCount++;
+          startLabel = label;
+          currentWeekIndices = [];
+        }
+        currentWeekIndices.push(idx);
+      });
+      if (currentWeekIndices.length > 0) groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[labels.length - 1]})`, indices: currentWeekIndices });
+    } catch(e) { console.error(e); }
     return groups;
   };
 
-  const baseLabels = data.labels || ["4/1", "4/2"];
+  const baseLabels = data?.labels || ["データなし"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
   const getCombinedMetrics = () => {
-    let allItems = data[`${currentTab.id}Data`] || [];
+    let allItems = data ? data[`${currentTab.id}Data`] || [] : [];
     const combinedMap = new Map();
+    if (!Array.isArray(allItems)) return [];
+    
     allItems.forEach(item => {
+      if (!item || !item.title) return;
       const normalizedTitle = item.title.replace('＿', '_');
       let rawTitle = normalizedTitle.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
       let cleanTitle = item.title.includes('社会保険') ? '社会保険' : rawTitle;
       if (!combinedMap.has(cleanTitle)) {
-        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: [], forecast: [], forecastType: '予測' });
+        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: item.values || [], forecast: [], forecastType: '予測' });
       }
       const entry = combinedMap.get(cleanTitle);
-      if (item.title.startsWith('実績_') || item.title.startsWith('実績＿')) entry.actual = item.values;
-      else { entry.forecast = item.values; entry.forecastType = normalizedTitle.split('_')[0]; }
+      if (item.title.startsWith('実績_') || item.title.startsWith('実績＿')) entry.actual = item.values || [];
+      else { entry.forecast = item.values || []; entry.forecastType = normalizedTitle.split('_')[0]; }
     });
     return Array.from(combinedMap.values());
   };
@@ -99,7 +107,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const getAiCorporateEvaluation = (title, actual, forecast) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
-    let comment = "";
+    let comment = "【診断中】データを解析しています。";
     let color = 'text-slate-700 bg-slate-50 border-slate-200';
 
     if (isLowBetter) {
@@ -109,30 +117,26 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     } else {
       if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `【経営財務診断】『${title}』は目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
       else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
-      else { comment = `【経営財務診断】『${title}』は達成率${ratio.toFixed(1)}%と手堅く推移。順順調な利益水準を確保できています。`; }
+      else { comment = `【経営財務診断】『${title}』は達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
     }
     return { color, comment };
   };
 
-  // 📊 【キー名すれ違い完全吸収・横型パースコア】
+  // 💥 【究極防衛】データが無くても絶対にクラッシュしないメモライザ
   const dynamicMonthlyData = useMemo(() => {
     const compareMap = new Map();
     const singleItems = [];
-    
-    // 💥 GAS側の名前揺れ（monthlyRawData か monthlyData）を100%安全にキャッチ
     const rows = data?.monthlyRawData || data?.monthlyData || [];
-    if (rows.length < 2) return { compareItems: [], singleItems: [] };
+    if (!Array.isArray(rows) || rows.length < 2) return { compareItems: [], singleItems: [] };
 
     const headers = rows[0] || []; 
     const dataRows = rows.slice(1);     
 
-    // 選択された「年月」の行を見つける。Stateが空なら2行目を自動補完してフリーズを100%回避
     const targetRow = dataRows.find(r => r && r[0]?.toString() === selectedMonth) || dataRows[0];
     if (!targetRow) return { compareItems: [], singleItems: [] };
 
     headers.forEach((headerName, index) => {
       if (index === 0 || !headerName) return; 
-      
       const rawValue = targetRow[index] !== undefined ? targetRow[index] : "0";
       const normalizedKey = headerName.toString().replace('＿', '_').replace('予算_', '予測_'); 
 
@@ -152,10 +156,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { compareItems: Array.from(compareMap.values()), singleItems };
   }, [data, selectedMonth]);
 
-  // 月（年月）の選択肢を安全に抽出
   const monthOptions = useMemo(() => {
     const rows = data?.monthlyRawData || data?.monthlyData || [];
-    if (rows.length < 2) return [];
+    if (!Array.isArray(rows) || rows.length < 2) return ["データ行なし"];
     return [...new Set(rows.slice(1).map((r: any) => r && r[0]?.toString()))].filter(Boolean);
   }, [data]);
 
@@ -163,14 +166,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     if (valStr === undefined || valStr === null || valStr === "") return "0";
     if (valStr.toString().includes('%')) return valStr;
     const parsed = n(valStr);
-    
     const isRatio = title.includes('%') || title.includes('率') || title.includes('生産性');
-    if (isRatio) {
-      return parsed.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%';
-    }
-    if (parsed > 1000) {
-      return `¥${Math.round(parsed).toLocaleString()}`;
-    }
+    if (isRatio) return parsed.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%';
+    if (parsed > 1000) return `¥${Math.round(parsed).toLocaleString()}`;
     return valStr.toString();
   };
 
@@ -199,7 +197,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           ))}
         </div>
 
-        {displayMode === 'weekly' && activeTab !== 'monthly' && (
+        {displayMode === 'weekly' && activeTab !== 'monthly' && weeklyGroups.length > 0 && (
           <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">週選択:</span>
             {weeklyGroups.map((g, idx) => (
@@ -208,7 +206,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {activeTab === 'monthly' && dynamicMonthlyData ? (
+        {activeTab === 'monthly' ? (
           <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
               <div>
@@ -217,24 +215,16 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 </h2>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Horizontal Matrix Mirroring</p>
               </div>
-              
               <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
                 <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1 overflow-x-auto max-w-full">
                   {monthOptions.map(m => (
-                    <button
-                      key={m}
-                      onClick={() => setSelectedMonth(m)}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                      {m}
-                    </button>
+                    <button key={m} onClick={() => setSelectedMonth(m)} className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>{m}</button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* ① 予算と実績の比較カード */}
-            {dynamicMonthlyData.compareItems.length > 0 && (
+            {dynamicMonthlyData.compareItems.length > 0 ? (
               <div className="space-y-4">
                 <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予算実績比較</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -243,7 +233,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                     const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
                     const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
                     const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal);
-
                     return (
                       <div key={idx} className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] shadow-lg flex flex-col justify-between group">
                         <div>
@@ -262,9 +251,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   })}
                 </div>
               </div>
+            ) : (
+              <div className="text-center py-12 text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-900/40 rounded-2xl border border-white/5">⚠️ スプレッドシート側の月次データ、または通信状態を確認してください</div>
             )}
 
-            {/* ② 単一数値（社員人数、スタッフ在籍数、事故金額など） */}
             {dynamicMonthlyData.singleItems.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 その他シート数値インジケータ</h3>
@@ -278,76 +268,56 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
             )}
-
-            <div className="p-5 bg-blue-950/40 border border-blue-900/40 rounded-2xl text-xs flex items-start gap-4 text-blue-300 leading-relaxed">
-              <div className="p-2 bg-slate-900 rounded-xl shrink-0 text-blue-400"><Bot size={14} /></div>
-              <p>
-                <strong>【キー名不一致・救済フィルタ完全稼働】</strong> GAS側データの「monthlyRawData」「monthlyData」のどちらが来てもエラーを100%回避するパッチを当てました。無限レンダリングは発生しません。
-              </p>
-            </div>
           </div>
         ) : (
-          <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8 relative z-10`}>
-            {allMetrics.map((m, i) => {
-              const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
-              const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
-              const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
-              let chartData = []; let dispAct = 0; let dispFct = 0;
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
+            {allMetrics.length > 0 ? (
+              allMetrics.map((m, i) => {
+                const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
+                const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
+                const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
+                let chartData = []; let dispAct = 0; let dispFct = 0;
 
-              if (displayMode === 'daily') {
-                chartData = m.labels.map((l, idx) => ({ name: l, "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
-                dispAct = m.actual[m.actual.length - 1] || 0; dispFct = m.forecast[m.forecast.length - 1] || 1;
-              } else {
-                chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
-                const acts = weekIdx.map(idx => m.actual[idx] || 0); const fcts = weekIdx.map(idx => m.forecast[idx] || 0);
-                if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
-                else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
-              }
+                if (displayMode === 'daily') {
+                  chartData = m.labels.map((l, idx) => ({ name: l, "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
+                  dispAct = m.actual[m.actual.length - 1] || 0; dispFct = m.forecast[m.forecast.length - 1] || 1;
+                } else if (weekIdx.length > 0) {
+                  chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
+                  const acts = weekIdx.map(idx => m.actual[idx] || 0); const fcts = weekIdx.map(idx => m.forecast[idx] || 0);
+                  if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
+                  else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
+                }
 
-              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct);
-              const ratio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
-
-              return (
-                <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
-                  <div className="flex justify-between items-start border-b border-slate-100 pb-4">
-                    <div>
-                      <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
-                    </div>
-                    {displayMode === 'daily' && (
-                      <div className="flex gap-6 text-right items-center">
-                        <div className="border-r pr-4 border-slate-100">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">直近の実績</p>
-                          <p className="text-xl font-black text-slate-800 tracking-tight">{dispAct.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">{m.forecastType}比</p>
-                          <p className={`text-xl font-black ${ratio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{ratio.toFixed(1)}%</p>
-                        </div>
+                const ratio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
+                return (
+                  <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
+                    <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+                      <div>
+                        <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
+                        <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
                       </div>
-                    )}
-                  </div>
-                  <div className="w-full">
-                    <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
-                          <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
-                          <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                          <Bar name="実績" dataKey="実績" fill={currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'weekly' ? 60 : 20} />
-                          <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                    </div>
+                    <div className="w-full">
+                      <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                            <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                            <Bar name="実績" dataKey="実績" fill={currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'weekly' ? 60 : 20} />
+                            <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
-                  <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
-                    <p>{evalData.comment}</p>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="col-span-2 text-center py-12 text-slate-400 font-bold text-xs uppercase tracking-widest bg-white rounded-3xl border">⚠️ 現在選択されているデータがシートに見つかりません</div>
+            )}
           </div>
         )}
       </main>
