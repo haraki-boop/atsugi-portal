@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
-import { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend } from 'recharts';
 
@@ -10,8 +10,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('logistics');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026_04');
 
+  // 🌟 タブのボタンだけは「4. 月次」をそのまま残してあります！
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
@@ -46,7 +46,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // 💥 【100%完全固定】完璧な週次グループ計算（絶対不変）
+  // 💥 週次グループ計算（完全に元通り）
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -72,7 +72,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
-  // 💥 【100%完全固定】日次・週次グラフデータ結合（月次横長データを完全にシャットアウト）
+  // 💥 データ結合ロジック（月次を一切無視して日次・週次だけをきれいにパースする元通りのコード）
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
@@ -80,8 +80,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
     allItems.forEach(item => {
       if (!item || !item.title) return;
-      // 月次の横長データが迷い込んできたら100%無視して日次・週次を守る
-      if (!item.values || !Array.isArray(item.values)) return;
+      if (!item.values || !Array.isArray(item.values)) return; // 念のための安全ガード
 
       const normalizedTitle = item.title.replace('＿', '_');
       let rawTitle = normalizedTitle.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
@@ -98,7 +97,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 【100%完全固定】完璧なAI経営診断コメント生成（絶対不変）
+  // 💥 AI経営診断コメント生成（元通り）
   const getAiCorporateEvaluation = (title: string, actual: number, forecast: number, mode: string, isTotal: boolean) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
@@ -117,94 +116,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     }
     return { color, comment };
   };
-
-  // 💎 【完全オリジナル月次デザインコックピット】
-  // 既存のオブジェクトを一切壊さず、月次専用のデータ配列として100%独立して処理
-  const monthlyDashboardEngine = useMemo(() => {
-    const compareCards: any[] = [];
-    const directNumberCards: any[] = [];
-    let monthLabel = "2026_04";
-
-    try {
-      const rows = data?.monthlyRawData || data?.monthlyData || [];
-      if (!Array.isArray(rows) || rows.length < 2) return { compareCards, directNumberCards, monthLabel };
-
-      const headers = rows[0] || [];
-      const dataRows = rows.slice(1);
-
-      const targetRow = dataRows.find(r => r && r[0] && r[0].toString().trim() === selectedMonth.trim()) || dataRows[0];
-      if (!targetRow || !Array.isArray(targetRow)) return { compareCards, directNumberCards, monthLabel };
-
-      monthLabel = targetRow[0] ? targetRow[0].toString() : "2026_04";
-
-      // 実績と予測（予算）を自動ペアリングするためのマップ
-      constペア用マップ = new Map();
-
-      headers.forEach((titleName, index) => {
-        if (index === 0 || !titleName) return;
-        if (index >= targetRow.length) return;
-
-        const cellValue = targetRow[index] !== undefined && targetRow[index] !== null ? targetRow[index] : "0";
-        const cleanTitle = titleName.toString().replace('＿', '_').replace('予算_', '予測_');
-
-        if (cleanTitle.startsWith('実績_') || cleanTitle.startsWith('予測_')) {
-          const coreTitle = cleanTitle.replace('実績_', '').replace('予測_', '');
-          if (!ペア用マップ.has(coreTitle)) {
-            ペア用マップ.set(coreTitle, { title: coreTitle, actual: "0", forecast: "0" });
-          }
-          const item =ペア用マップ.get(coreTitle);
-          if (cleanTitle.startsWith('実績_')) item.actual = cellValue;
-          if (cleanTitle.startsWith('予測_')) item.forecast = cellValue;
-        } else {
-          // 実績_、予測_ がついていない項目は純粋な数字カード
-          directNumberCards.push({ title: titleName.toString(), value: cellValue });
-        }
-      });
-
-      compareCards.push(...Array.from(ペア用マップ.values()));
-
-    } catch (e) {
-      console.error("Monthly dashboard engine exception:", e);
-    }
-
-    return { compareCards, directNumberCards, monthLabel };
-  }, [data, selectedMonth]);
-
-  const monthOptions = useMemo(() => {
-    const rows = data?.monthlyRawData || data?.monthlyData || [];
-    if (!Array.isArray(rows) || rows.length < 2) return ["2026_04"];
-    const ext = rows.slice(1).map((r: any) => r && r[0] && r[0].toString().trim()).filter(Boolean);
-    return ext.length > 0 ? [...new Set(ext)] : ["2026_04"];
-  }, [data]);
-
-  const formatDisplay = (valStr: any, title: string) => {
-    if (valStr === undefined || valStr === null || valStr === "") return "0";
-    if (valStr.toString().includes('%')) return valStr;
-    const parsed = n(valStr);
-    const isRatio = title.includes('%') || title.includes('率') || title.includes('生産性');
-    if (isRatio) return parsed.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%';
-    if (parsed > 1000) return `¥${Math.round(parsed).toLocaleString()}`;
-    return valStr.toString();
-  };
-
-  // お兄ちゃんの1枚目の画像（VS Code）に写っていたオリジナルシミュレーターの変数定義
-  // どんなデータが入ってきても安全に動くように数値キャスト（n()）を徹底
-  constシミュレーターデータ = useMemo(() => {
-    const cards = monthlyDashboardEngine.compareCards;
-    const singles = monthlyDashboardEngine.directNumberCards;
-
-    const 売上実績 = n(cards.find(c => c.title === '売上高')?.actual);
-    const 総労働工数 = n(singles.find(s => s.title === '総工数' || s.title === '総労働工数')?.value);
-    
-    // VS Codeに写っていたお兄ちゃんの数式を完全再現
-    const 目標売上高KGI = 5100; 
-    const 追加必要売上高 = (目標売上高KGI * 総労働工数) - 売上実績;
-    
-    return {
-      追加必要売上高: 追加必要売上高 > 0 ? 追加必要売上高 : 0,
-      総労働工数
-    };
-  }, [monthlyDashboardEngine]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 relative">
@@ -240,94 +151,11 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 🌟 4. 月次専用：完全オリジナル隔離デザインコックピット */}
+        {/* 🌟 4. 月次タブが選ばれた時は、中身を一旦完全にカラにして安全を確保 */}
         {activeTab === 'monthly' ? (
-          <div className="bg-slate-950/95 backdrop-filter backdrop-blur-[30px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
-              <div>
-                <h2 className="text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
-                  <span className="w-2 h-6 bg-amber-500 rounded-full inline-block"></span> 月次統括オリジナルダッシュボード
-                </h2>
-                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">Isolated Matrix Simulator</p>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-                <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1 overflow-x-auto max-w-full">
-                  {monthOptions.map(m => (
-                    <button
-                      key={m}
-                      onClick={() => setSelectedMonth(m)}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 📈 お兄ちゃん特別設計：KGI動的シミュレーションエリア */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-500/20 p-6 rounded-[2.5rem]">
-              <div>
-                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block mb-1">👑 目標達成シミュレーション（KGI: ¥5,100基準）</span>
-                <p className="text-2xl font-black tracking-tight text-white mt-1">目標達成に必要な追加売上高</p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">スプレッドシートの総工数（現在: {シミュレーターデータ.総労働工数.toLocaleString()}h）をベースに自動算出</p>
-              </div>
-              <div className="flex items-center justify-end">
-                <div className="text-right">
-                  <span className="text-[10px] font-black text-slate-400 block">KGI GAP AMOUNT</span>
-                  <p className="text-4xl font-black font-mono tracking-tighter text-amber-400 mt-1">
-                    {シミュレーターデータ.追加必要売上高 > 0 ? `¥${Math.round(シミュレーターデータ.追加必要売上高).toLocaleString()}` : "目標達成中！"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* ① 予測・実績の比較カードブロック */}
-            {monthlyDashboardEngine.compareCards.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ 月次 予測実績マトリクス ({monthlyDashboardEngine.monthLabel})</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {monthlyDashboardEngine.compareCards.map((item: any, idx: number) => {
-                    const actVal = n(item.actual); const fctVal = n(item.forecast);
-                    const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
-                    const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
-                    const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal, 'monthly', true);
-
-                    return (
-                      <div key={idx} className="bg-slate-900/60 backdrop-blur-[10px] border border-white/5 p-6 rounded-[28px] shadow-lg flex flex-col justify-between">
-                        <div>
-                          <span className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-2">{item.title}</span>
-                          <div className="text-2xl font-black font-mono tracking-tighter text-white my-1">{formatDisplay(item.actual, item.title)}</div>
-                        </div>
-                        <div className="mt-4 pt-3 border-t border-white/5 flex flex-col gap-2">
-                          <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-slate-400 font-bold">予算: {formatDisplay(item.forecast, item.title)}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>比率: {ratio.toFixed(1)}%</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">{evalData.comment}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ② 単一数値（数字をそのまま並べるインジケータ） */}
-            {monthlyDashboardEngine.directNumberCards.length > 0 && (
-              <div className="space-y-4 pt-4 border-t border-white/5">
-                <h3 className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">🔢 月次 スタッフ・稼働指標サマリー</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
-                  {monthlyDashboardEngine.directNumberCards.map((item: any, idx: number) => (
-                    <div key={idx} className="bg-slate-900/40 backdrop-blur-[5px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[90px]">
-                      <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
-                      <div className="text-xl font-black font-mono tracking-tight text-emerald-400 mt-2">{formatDisplay(item.value, item.title)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="bg-slate-950 p-12 rounded-[3rem] border border-white/10 text-center text-slate-400 space-y-4">
+            <p className="text-xl font-black text-amber-400 tracking-wider">🛠️ 月次データ表示エリア（指示待ち調整中）</p>
+            <p className="text-xs text-slate-500">日次・週次の安全確認のため、月次のパースロジックは一度完全に停止しています。</p>
           </div>
         ) : (
           /* 📅 1〜3, 5〜8番タブ（完璧な合格版日次・週次グラフエリア） */
