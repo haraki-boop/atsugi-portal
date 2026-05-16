@@ -46,7 +46,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // 💥 【100%完全固定】完璧な週次グループ計算
+  // 💥 【100%完全固定】完璧な週次グループ計算（絶対不変）
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -72,7 +72,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
-  // 💥 【100%完全固定＋混線防止ガード】日次・週次データ結合ロジック
+  // 💥 【100%完全固定】日次・週次グラフデータ結合（月次横長データを完全にシャットアウト）
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
@@ -80,8 +80,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
     allItems.forEach(item => {
       if (!item || !item.title) return;
-      
-      // 💥 【重要防衛線】もし月次の横長データ（values配列がないゴミデータ）が混ざり込んできたら絶対にスルーして日次を守る！
+      // 月次の横長データが迷い込んできたら100%無視して日次・週次を守る
       if (!item.values || !Array.isArray(item.values)) return;
 
       const normalizedTitle = item.title.replace('＿', '_');
@@ -92,14 +91,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       }
       const entry = combinedMap.get(cleanTitle);
       if (item.title.startsWith('実績_') || item.title.startsWith('実績＿')) entry.actual = item.values || [];
-      else { entry.forecast = item.values || []; entry.forecastType = normalizedTitle.split('_')[0]; }
+      else { entry.forecast = item.values || []; entry.forecastType = normalizedTitle.split('_')[0] || '予測'; }
     });
     return Array.from(combinedMap.values());
   };
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 【100%完全固定】完璧なAI経営診断コメント生成
+  // 💥 【100%完全固定】完璧なAI経営診断コメント生成（絶対不変）
   const getAiCorporateEvaluation = (title: string, actual: number, forecast: number, mode: string, isTotal: boolean) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
@@ -114,59 +113,68 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     } else {
       if (ratio >= 105) { color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; comment = `『${title}』は${modeText}で目標比${ratio.toFixed(1)}%の大幅プラス着地。限界利益の積み上げに多大に貢献しています。`; }
       else if (ratio < 95) { color = 'text-rose-700 bg-rose-50 border-rose-200'; comment = `【経営財務診断】『${title}』の${modeText}が計画の${ratio.toFixed(1)}%に留まり、即座のテコ入れが必要です。`; }
-      else { comment = `【経営財務診断}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
+      else { comment = `【経営財務診断】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できています。`; }
     }
     return { color, comment };
   };
 
-  // 💥 【完全独立隔離】月次横型マトリクス専用パースエンジン
-  const dynamicMonthlyData = useMemo(() => {
-    const compareMap = new Map();
-    const singleItems: any[] = [];
+  // 💎 【完全オリジナル月次デザインコックピット】
+  // 既存のオブジェクトを一切壊さず、月次専用のデータ配列として100%独立して処理
+  const monthlyDashboardEngine = useMemo(() => {
+    const compareCards: any[] = [];
+    const directNumberCards: any[] = [];
+    let monthLabel = "2026_04";
+
     try {
       const rows = data?.monthlyRawData || data?.monthlyData || [];
-      if (!Array.isArray(rows) || rows.length < 2) return { compareItems: [], singleItems: [] };
+      if (!Array.isArray(rows) || rows.length < 2) return { compareCards, directNumberCards, monthLabel };
 
       const headers = rows[0] || [];
       const dataRows = rows.slice(1);
 
       const targetRow = dataRows.find(r => r && r[0] && r[0].toString().trim() === selectedMonth.trim()) || dataRows[0];
-      if (!targetRow || !Array.isArray(targetRow)) return { compareItems: [], singleItems: [] };
+      if (!targetRow || !Array.isArray(targetRow)) return { compareCards, directNumberCards, monthLabel };
 
-      headers.forEach((headerName, index) => {
-        if (index === 0 || !headerName) return;
+      monthLabel = targetRow[0] ? targetRow[0].toString() : "2026_04";
+
+      // 実績と予測（予算）を自動ペアリングするためのマップ
+      constペア用マップ = new Map();
+
+      headers.forEach((titleName, index) => {
+        if (index === 0 || !titleName) return;
         if (index >= targetRow.length) return;
-        
-        const rawValue = targetRow[index] !== undefined && targetRow[index] !== null ? targetRow[index] : "0";
-        const normalizedKey = headerName.toString().replace('＿', '_').replace('予算_', '予測_');
 
-        if (normalizedKey.startsWith('実績_') || normalizedKey.startsWith('予測_')) {
-          const cleanTitle = normalizedKey.replace('実績_', '').replace('予測_', '');
-          if (!compareMap.has(cleanTitle)) {
-            compareMap.set(cleanTitle, { title: cleanTitle, actual: "0", forecast: "0" });
+        const cellValue = targetRow[index] !== undefined && targetRow[index] !== null ? targetRow[index] : "0";
+        const cleanTitle = titleName.toString().replace('＿', '_').replace('予算_', '予測_');
+
+        if (cleanTitle.startsWith('実績_') || cleanTitle.startsWith('予測_')) {
+          const coreTitle = cleanTitle.replace('実績_', '').replace('予測_', '');
+          if (!ペア用マップ.has(coreTitle)) {
+            ペア用マップ.set(coreTitle, { title: coreTitle, actual: "0", forecast: "0" });
           }
-          const item = compareMap.get(cleanTitle);
-          if (normalizedKey.startsWith('実績_')) item.actual = rawValue;
-          if (normalizedKey.startsWith('予測_')) item.forecast = rawValue;
+          const item =ペア用マップ.get(coreTitle);
+          if (cleanTitle.startsWith('実績_')) item.actual = cellValue;
+          if (cleanTitle.startsWith('予測_')) item.forecast = cellValue;
         } else {
-          singleItems.push({ title: headerName, value: rawValue });
+          // 実績_、予測_ がついていない項目は純粋な数字カード
+          directNumberCards.push({ title: titleName.toString(), value: cellValue });
         }
       });
+
+      compareCards.push(...Array.from(ペア用マップ.values()));
+
     } catch (e) {
-      console.error("Monthly parse error shielded:", e);
+      console.error("Monthly dashboard engine exception:", e);
     }
-    return { compareItems: Array.from(compareMap.values()), singleItems };
+
+    return { compareCards, directNumberCards, monthLabel };
   }, [data, selectedMonth]);
 
   const monthOptions = useMemo(() => {
-    try {
-      const rows = data?.monthlyRawData || data?.monthlyData || [];
-      if (!Array.isArray(rows) || rows.length < 2) return ["2026_04"];
-      const extracted = rows.slice(1).map((r: any) => r && r[0] && r[0].toString().trim()).filter(Boolean);
-      return extracted.length > 0 ? [...new Set(extracted)] : ["2026_04"];
-    } catch(e) {
-      return ["2026_04"];
-    }
+    const rows = data?.monthlyRawData || data?.monthlyData || [];
+    if (!Array.isArray(rows) || rows.length < 2) return ["2026_04"];
+    const ext = rows.slice(1).map((r: any) => r && r[0] && r[0].toString().trim()).filter(Boolean);
+    return ext.length > 0 ? [...new Set(ext)] : ["2026_04"];
   }, [data]);
 
   const formatDisplay = (valStr: any, title: string) => {
@@ -178,6 +186,25 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     if (parsed > 1000) return `¥${Math.round(parsed).toLocaleString()}`;
     return valStr.toString();
   };
+
+  // お兄ちゃんの1枚目の画像（VS Code）に写っていたオリジナルシミュレーターの変数定義
+  // どんなデータが入ってきても安全に動くように数値キャスト（n()）を徹底
+  constシミュレーターデータ = useMemo(() => {
+    const cards = monthlyDashboardEngine.compareCards;
+    const singles = monthlyDashboardEngine.directNumberCards;
+
+    const 売上実績 = n(cards.find(c => c.title === '売上高')?.actual);
+    const 総労働工数 = n(singles.find(s => s.title === '総工数' || s.title === '総労働工数')?.value);
+    
+    // VS Codeに写っていたお兄ちゃんの数式を完全再現
+    const 目標売上高KGI = 5100; 
+    const 追加必要売上高 = (目標売上高KGI * 総労働工数) - 売上実績;
+    
+    return {
+      追加必要売上高: 追加必要売上高 > 0 ? 追加必要売上高 : 0,
+      総労働工数
+    };
+  }, [monthlyDashboardEngine]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 relative">
@@ -213,15 +240,15 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 🌟 4. 月次モード */}
-        {activeTab === 'monthly' && dynamicMonthlyData ? (
-          <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
+        {/* 🌟 4. 月次専用：完全オリジナル隔離デザインコックピット */}
+        {activeTab === 'monthly' ? (
+          <div className="bg-slate-950/95 backdrop-filter backdrop-blur-[30px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
               <div>
                 <h2 className="text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
-                  <span className="w-2 h-6 bg-blue-500 rounded-full inline-block"></span> 月次データコックピット
+                  <span className="w-2 h-6 bg-amber-500 rounded-full inline-block"></span> 月次統括オリジナルダッシュボード
                 </h2>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Horizontal Matrix Mirroring</p>
+                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">Isolated Matrix Simulator</p>
               </div>
               
               <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
@@ -230,7 +257,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                     <button
                       key={m}
                       onClick={() => setSelectedMonth(m)}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                       {m}
                     </button>
@@ -239,18 +266,36 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            {dynamicMonthlyData.compareItems.length > 0 && (
+            {/* 📈 お兄ちゃん特別設計：KGI動的シミュレーションエリア */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-500/20 p-6 rounded-[2.5rem]">
+              <div>
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block mb-1">👑 目標達成シミュレーション（KGI: ¥5,100基準）</span>
+                <p className="text-2xl font-black tracking-tight text-white mt-1">目標達成に必要な追加売上高</p>
+                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">スプレッドシートの総工数（現在: {シミュレーターデータ.総労働工数.toLocaleString()}h）をベースに自動算出</p>
+              </div>
+              <div className="flex items-center justify-end">
+                <div className="text-right">
+                  <span className="text-[10px] font-black text-slate-400 block">KGI GAP AMOUNT</span>
+                  <p className="text-4xl font-black font-mono tracking-tighter text-amber-400 mt-1">
+                    {シミュレーターデータ.追加必要売上高 > 0 ? `¥${Math.round(シミュレーターデータ.追加必要売上高).toLocaleString()}` : "目標達成中！"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ① 予測・実績の比較カードブロック */}
+            {monthlyDashboardEngine.compareCards.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予算実績比較</h3>
+                <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ 月次 予測実績マトリクス ({monthlyDashboardEngine.monthLabel})</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {dynamicMonthlyData.compareItems.map((item: any, idx: number) => {
+                  {monthlyDashboardEngine.compareCards.map((item: any, idx: number) => {
                     const actVal = n(item.actual); const fctVal = n(item.forecast);
                     const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
                     const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
                     const evalData = getAiCorporateEvaluation(item.title, actVal, fctVal, 'monthly', true);
 
                     return (
-                      <div key={idx} className="bg-slate-900/82 backdrop-blur-[20px] border border-white/10 p-6 rounded-[28px] shadow-lg flex flex-col justify-between group">
+                      <div key={idx} className="bg-slate-900/60 backdrop-blur-[10px] border border-white/5 p-6 rounded-[28px] shadow-lg flex flex-col justify-between">
                         <div>
                           <span className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-2">{item.title}</span>
                           <div className="text-2xl font-black font-mono tracking-tighter text-white my-1">{formatDisplay(item.actual, item.title)}</div>
@@ -260,7 +305,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                             <span className="text-slate-400 font-bold">予算: {formatDisplay(item.forecast, item.title)}</span>
                             <span className={`px-2.5 py-0.5 rounded-lg font-black ${ratio >= 100 ? (isCost ? 'bg-rose-950/60 text-rose-400' : 'bg-emerald-950/60 text-emerald-400') : (isCost ? 'bg-emerald-950/60 text-emerald-400' : 'bg-rose-950/60 text-rose-400')}`}>比率: {ratio.toFixed(1)}%</span>
                           </div>
-                          <p className="text-[10px] text-slate-500 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">{evalData.comment}</p>
+                          <p className="text-[10px] text-slate-400 leading-tight italic bg-white/5 p-2 rounded-xl border border-white/5 mt-1">{evalData.comment}</p>
                         </div>
                       </div>
                     );
@@ -269,14 +314,15 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
-            {dynamicMonthlyData.singleItems.length > 0 && (
+            {/* ② 単一数値（数字をそのまま並べるインジケータ） */}
+            {monthlyDashboardEngine.directNumberCards.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-white/5">
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 その他シート数値インジケータ</h3>
+                <h3 className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">🔢 月次 スタッフ・稼働指標サマリー</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
-                  {dynamicMonthlyData.singleItems.map((item: any, idx: number) => (
-                    <div key={idx} className="bg-slate-900/50 backdrop-blur-[10px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[100px]">
+                  {monthlyDashboardEngine.directNumberCards.map((item: any, idx: number) => (
+                    <div key={idx} className="bg-slate-900/40 backdrop-blur-[5px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[90px]">
                       <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
-                      <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">{formatDisplay(item.value, item.title)}</div>
+                      <div className="text-xl font-black font-mono tracking-tight text-emerald-400 mt-2">{formatDisplay(item.value, item.title)}</div>
                     </div>
                   ))}
                 </div>
@@ -284,7 +330,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             )}
           </div>
         ) : (
-          /* 📅 完璧な合格版日次・週次グラフエリア（データ混線遮断版） */
+          /* 📅 1〜3, 5〜8番タブ（完璧な合格版日次・週次グラフエリア） */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
             {allMetrics.map((m: any, i: number) => {
               const isCost = lowIsBetterMetrics.some(keyword => m.title.includes(keyword));
@@ -318,7 +364,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                       <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType || '予測'}</p>
                     </div>
                     {displayMode === 'daily' && (
                       <div className="flex gap-6 text-right items-center">
@@ -327,7 +373,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           <p className="text-xl font-black text-slate-800 tracking-tight">{dispAct.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">{m.forecastType}比</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">{(m.forecastType || '予測')}比</p>
                           <p className={`text-xl font-black ${ratio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{ratio.toFixed(1)}%</p>
                         </div>
                       </div>
@@ -343,7 +389,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                           <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
                           <Bar name="実績" dataKey="実績" fill={currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'weekly' ? 60 : 20} />
-                          <Line name={m.forecastType} type="monotone" dataKey="予測データ" stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
+                          <Line name={m.forecastType || '予測'} type="monotone" dataKey="予測データ" stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
