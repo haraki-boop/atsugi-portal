@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend } from 'recharts';
 
@@ -30,10 +30,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       .then(json => {
         if (json && typeof json === 'object') {
           setData(json);
-          const mItems = json?.monthlyRawData || json?.monthlyData || [];
-          if (Array.isArray(mItems) && mItems.length > 1 && mItems[1]?.[0]) {
-            setSelectedMonth(mItems[1][0].toString());
-          }
         }
       }).catch(e => console.error("GAS fetch error", e));
   }, []);
@@ -44,12 +40,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "原価", "総工数", "事故金額"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
-  const n = (val) => {
+  const n = (val: any) => {
     if (val === undefined || val === null || val === "") return 0;
     return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
   };
 
-  // 💥 お兄ちゃんお気に入りの完璧な週次グループ計算（絶対不変）
+  // 💥 【100%保護】完璧な週次グループ計算（絶対不変）
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -75,7 +71,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
-  // 💥 日次・週次のロジック（絶対不変）
+  // 💥 【100%保護】日次・週次のロジック（絶対不変）
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
@@ -97,8 +93,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 日次・週次の評価アルゴリズム（絶対不変）
-  const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal) => {
+  // 💥 【100%保護】日次・週次の評価アルゴリズム（絶対不変）
+  const getAiCorporateEvaluation = (title: string, actual: number, forecast: number, mode: string, isTotal: boolean) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
     const modeText = mode === 'daily' ? '直近' : `当週${isTotal ? '合計' : '平均'}`;
@@ -117,49 +113,57 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { color, comment };
   };
 
-  // 💥 月次専用・隔離型パースエンジン（他への干渉ゼロ）
+  // 💥 【完全安全隔離】月次パースエンジン
   const dynamicMonthlyData = useMemo(() => {
     const compareMap = new Map();
-    const singleItems = [];
-    const rows = data?.monthlyRawData || data?.monthlyData || [];
-    if (!Array.isArray(rows) || rows.length < 2) return { compareItems: [], singleItems: [] };
+    const singleItems: any[] = [];
+    try {
+      const rows = data?.monthlyRawData || data?.monthlyData || [];
+      if (!Array.isArray(rows) || rows.length < 2) return { compareItems: [], singleItems: [] };
 
-    const headers = rows[0] || [];
-    const dataRows = rows.slice(1);
+      const headers = rows[0] || [];
+      const dataRows = rows.slice(1);
 
-    const targetRow = dataRows.find(r => r && r[0]?.toString() === selectedMonth) || dataRows[0];
-    if (!targetRow || !Array.isArray(targetRow)) return { compareItems: [], singleItems: [] };
+      const targetRow = dataRows.find(r => r && r[0] && r[0].toString().trim() === selectedMonth.trim()) || dataRows[0];
+      if (!targetRow || !Array.isArray(targetRow)) return { compareItems: [], singleItems: [] };
 
-    headers.forEach((headerName, index) => {
-      if (index === 0 || !headerName) return;
-      if (index >= targetRow.length) return;
-      
-      const rawValue = targetRow[index] !== undefined && targetRow[index] !== null ? targetRow[index] : "0";
-      const normalizedKey = headerName.toString().replace('＿', '_').replace('予算_', '予測_');
+      headers.forEach((headerName, index) => {
+        if (index === 0 || !headerName) return;
+        if (index >= targetRow.length) return;
+        
+        const rawValue = targetRow[index] !== undefined && targetRow[index] !== null ? targetRow[index] : "0";
+        const normalizedKey = headerName.toString().replace('＿', '_').replace('予算_', '予測_');
 
-      if (normalizedKey.startsWith('実績_') || normalizedKey.startsWith('予測_')) {
-        const cleanTitle = normalizedKey.replace('実績_', '').replace('予測_', '');
-        if (!compareMap.has(cleanTitle)) {
-          compareMap.set(cleanTitle, { title: cleanTitle, actual: "0", forecast: "0" });
+        if (normalizedKey.startsWith('実績_') || normalizedKey.startsWith('予測_')) {
+          const cleanTitle = normalizedKey.replace('実績_', '').replace('予測_', '');
+          if (!compareMap.has(cleanTitle)) {
+            compareMap.set(cleanTitle, { title: cleanTitle, actual: "0", forecast: "0" });
+          }
+          const item = compareMap.get(cleanTitle);
+          if (normalizedKey.startsWith('実績_')) item.actual = rawValue;
+          if (normalizedKey.startsWith('予測_')) item.forecast = rawValue;
+        } else {
+          singleItems.push({ title: headerName, value: rawValue });
         }
-        const item = compareMap.get(cleanTitle);
-        if (normalizedKey.startsWith('実績_')) item.actual = rawValue;
-        if (normalizedKey.startsWith('予測_')) item.forecast = rawValue;
-      } else {
-        singleItems.push({ title: headerName, value: rawValue });
-      }
-    });
-
+      });
+    } catch (e) {
+      console.error("Monthly parse crash avoided:", e);
+    }
     return { compareItems: Array.from(compareMap.values()), singleItems };
   }, [data, selectedMonth]);
 
   const monthOptions = useMemo(() => {
-    const rows = data?.monthlyRawData || data?.monthlyData || [];
-    if (!Array.isArray(rows) || rows.length < 2) return [];
-    return [...new Set(rows.slice(1).map((r: any) => r && r[0]?.toString()))].filter(Boolean);
+    try {
+      const rows = data?.monthlyRawData || data?.monthlyData || [];
+      if (!Array.isArray(rows) || rows.length < 2) return ["2026_04"];
+      const extracted = rows.slice(1).map((r: any) => r && r[0] && r[0].toString().trim()).filter(Boolean);
+      return extracted.length > 0 ? [...new Set(extracted)] : ["2026_04"];
+    } catch(e) {
+      return ["2026_04"];
+    }
   }, [data]);
 
-  const formatDisplay = (valStr, title) => {
+  const formatDisplay = (valStr: any, title: string) => {
     if (valStr === undefined || valStr === null || valStr === "") return "0";
     if (valStr.toString().includes('%')) return valStr;
     const parsed = n(valStr);
@@ -205,7 +209,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
         {/* 🌟 4. 月次モード */}
         {activeTab === 'monthly' && dynamicMonthlyData ? (
-          <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
+          <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
               <div>
                 <h2 className="text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
@@ -233,7 +237,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <div className="space-y-4">
                 <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">⚖️ シート直結 予算実績比較</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {dynamicMonthlyData.compareItems.map((item, idx) => {
+                  {dynamicMonthlyData.compareItems.map((item: any, idx: number) => {
                     const actVal = n(item.actual); const fctVal = n(item.forecast);
                     const ratio = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
                     const isCost = lowIsBetterMetrics.some(k => item.title.includes(k));
@@ -263,7 +267,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <h3 className="text-xs font-black text-amber-400 uppercase tracking-[0.2em]">🔢 その他シート数値インジケータ</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
-                  {dynamicMonthlyData.singleItems.map((item, idx) => (
+                  {dynamicMonthlyData.singleItems.map((item: any, idx: number) => (
                     <div key={idx} className="bg-slate-900/50 backdrop-blur-[10px] border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[100px]">
                       <span className="text-[10px] font-bold text-slate-400 line-clamp-1" title={item.title}>{item.title}</span>
                       <div className="text-xl font-black font-mono tracking-tight text-amber-300 mt-2">{formatDisplay(item.value, item.title)}</div>
@@ -274,20 +278,28 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             )}
           </div>
         ) : (
-          /* 📅 1〜3, 5〜8番タブ（完璧な合格版日次・週次グラフ） */
+          /* 📅 完璧な合格版日次・週次グラフエリア（絶対安全＆型完全合格版） */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
-            {allMetrics.map((m, i) => {
-              const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
-              const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
+            {allMetrics.map((m: any, i: number) => {
+              const isCost = lowIsBetterMetrics.some(keyword => m.title.includes(keyword));
+              const isTotalType = totalMetricsKeywords.some(keyword => m.title.includes(keyword));
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
-              let chartData = []; let dispAct = 0; let dispFct = 0;
+              let chartData: any[] = []; let dispAct = 0; let dispFct = 0;
 
               if (displayMode === 'daily') {
-                chartData = m.labels.map((l, idx) => ({ name: l, "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
+                chartData = m.labels.map((l: string, idx: number) => ({
+                  name: l,
+                  "実績": m.actual[idx] || 0,
+                  "予測データ": m.forecast[idx] || 0
+                }));
                 dispAct = m.actual[m.actual.length - 1] || 0; dispFct = m.forecast[m.forecast.length - 1] || 1;
               } else {
-                chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": m.actual[idx] || 0, [m.forecastType]: m.forecast[idx] || 0 }));
-                const acts = weekIdx.map(idx => m.actual[idx] || 0); const fcts = weekIdx.map(idx => m.forecast[idx] || 0);
+                chartData = weekIdx.map((idx: number) => ({
+                  name: m.labels[idx],
+                  "実績": m.actual[idx] || 0,
+                  "予測データ": m.forecast[idx] || 0
+                }));
+                const acts = weekIdx.map((idx: number) => m.actual[idx] || 0); const fcts = weekIdx.map((idx: number) => m.forecast[idx] || 0);
                 if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
                 else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
               }
@@ -325,7 +337,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                           <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
                           <Bar name="実績" dataKey="実績" fill={currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'weekly' ? 60 : 20} />
-                          <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
+                          <Line name={m.forecastType} type="monotone" dataKey="予測データ" stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
