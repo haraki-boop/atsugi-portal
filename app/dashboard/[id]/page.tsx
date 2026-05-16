@@ -49,7 +49,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
   };
 
-  // 💥 お兄ちゃんお気に入りの完璧な週次グループ計算を100%保護
+  // 💥 お兄ちゃんお気に入りの完璧な週次グループ計算（絶対不変）
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -75,6 +75,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
+  // 💥 日次・週次のロジック（絶対不変）
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
@@ -96,6 +97,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
+  // 💥 日次・週次の評価アルゴリズム（絶対不変）
   const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
@@ -115,7 +117,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { color, comment };
   };
 
-  // 💥 【型エラー徹底ガード仕様】横型マトリクスの安全マッピングエンジン
+  // 💥 月次専用・隔離型パースエンジン（他への干渉ゼロ）
   const dynamicMonthlyData = useMemo(() => {
     const compareMap = new Map();
     const singleItems = [];
@@ -130,8 +132,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
     headers.forEach((headerName, index) => {
       if (index === 0 || !headerName) return;
-      
-      // 💥 【修正箇所】配列の長さを超えてデータを読みに行かないように安全ガードを設置
       if (index >= targetRow.length) return;
       
       const rawValue = targetRow[index] !== undefined && targetRow[index] !== null ? targetRow[index] : "0";
@@ -203,6 +203,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
+        {/* 🌟 4. 月次モード */}
         {activeTab === 'monthly' && dynamicMonthlyData ? (
           <div className="bg-slate-950/90 backdrop-filter backdrop-blur-[20px] p-8 rounded-[3rem] border border-white/10 text-white shadow-2xl space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-white/10 pb-6 gap-6">
@@ -273,6 +274,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             )}
           </div>
         ) : (
+          /* 📅 1〜3, 5〜8番タブ（完璧な合格版日次・週次グラフ） */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
             {allMetrics.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
