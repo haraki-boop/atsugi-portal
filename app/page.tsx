@@ -27,12 +27,44 @@ export default function PortalPage() {
   const [mounted, setMounted] = useState(false);
   const [L, setL] = useState<any>(null);
 
-  // 4拠点の正確な日本の緯度・経度
+  // お兄ちゃんが教えてくれた超正確な4拠点データ（住所・緯度経度）
   const centers = [
-    { id: 'SHOWA', name: '昭和冷蔵', lat: 35.426, lng: 139.352, active: true, addr: '神奈川県厚木市上依知', tier: 'Main Node' },
-    { id: 'AFS_MINAMI', name: 'AFS南関東', lat: 35.430, lng: 139.355, active: false, addr: '神奈川県厚木市', tier: 'Sub Node' },
-    { id: 'MEDI', name: 'メディエントランス', lat: 35.676, lng: 139.772, active: false, addr: '東京都中央区京橋', tier: 'Tier 4 Emergency' },
-    { id: 'OIE', name: '尾家産業', lat: 34.759, lng: 135.516, active: false, addr: '大阪府吹田市芳野町', tier: 'Kansai Hub' },
+    { 
+      id: 'SHOWA', 
+      name: '昭和冷蔵（株式会社昭和）厚木センター', 
+      lat: 35.517879, 
+      lng: 139.354149, 
+      active: true, 
+      addr: '〒243-0801 神奈川県厚木市上依知字上ノ原3007-9', 
+      tier: 'Main Node' 
+    },
+    { 
+      id: 'AFS_MINAMI', 
+      name: 'イオンフードサプライ（AFS）南関東センター', 
+      lat: 35.669, 
+      lng: 140.009, 
+      active: false, 
+      addr: '〒273-0014 千葉県船橋市高瀬町24-12（または習志野市芝園2-2-5）', 
+      tier: 'Sub Node' 
+    },
+    { 
+      id: 'MEDI', 
+      name: 'メディエントランス株式会社', 
+      lat: 34.822208, 
+      lng: 135.48918, 
+      active: false, 
+      addr: '〒562-0036 大阪府箕面市船場西2丁目1-1（エリモビル4階）', 
+      tier: 'Tier 4 Emergency' 
+    },
+    { 
+      id: 'OIE', 
+      name: '尾家産業株式会社 阪南支店', 
+      lat: 34.454641, 
+      lng: 135.344908, 
+      active: false, 
+      addr: '〒597-0093 大阪府貝塚市二色中町5-1', 
+      tier: 'Kansai Hub' 
+    },
   ];
 
   useEffect(() => {
@@ -55,10 +87,9 @@ export default function PortalPage() {
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white font-sans overflow-hidden flex flex-col relative">
-      {/* 💥【超重要】真っ黒バグを直すためのLeaflet公式スタイルシートを強制注入 */}
+      {/* 真っ黒バグを直すためのLeaflet公式スタイルシートを強制注入 */}
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
       
-      {/* 地図がはみ出さないようにするための追加スタイル */}
       <style>{`
         .leaflet-container {
           width: 100%;
@@ -68,7 +99,7 @@ export default function PortalPage() {
         .leaflet-popup-content-wrapper {
           background: #ffffff !important;
           border-radius: 1.5rem !important;
-          padding: 6px !important;
+          padding: 8px !important;
         }
         .leaflet-popup-tip {
           background: #ffffff !important;
@@ -89,32 +120,32 @@ export default function PortalPage() {
         <div className="flex items-center gap-8">
           <div className="text-right border-l border-white/10 pl-8">
             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Map Engine</p>
-            <p className="text-xs font-black text-emerald-400 uppercase tracking-tight">LEAFLET_LIVE_SYNC</p>
+            <p className="text-xs font-black text-emerald-400 uppercase tracking-tight">LEAFLET_GPS_SYNC</p>
           </div>
         </div>
       </header>
 
-      {/* メイン地図：画面全体に表示 */}
+      {/* メイン地図 */}
       <div className="w-full h-full pt-24 relative z-0">
         <MapContainer 
-          center={[35.6, 137.5]} // 日本の真ん中あたり
-          zoom={7} // 本州がきれいに収まる絶妙な倍率
-          zoomControl={false} // サイバー感を出すために余計な[+/-]ボタンは非表示
+          center={[35.2, 137.8]} // 関東と関西の拠点がバランスよく綺麗に入る初期位置
+          zoom={7} // 全拠点を俯瞰するのに最適なズーム
+          zoomControl={false}
         >
-          {/* 🌑 地図のデザイン：視認性が最高なスタイリッシュ・ダークマップ */}
+          {/* 地図のデザイン：スタイリッシュなダークマップ */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
 
-          {/* 4拠点を正確に配置 */}
+          {/* 正確な住所・緯度経度で4拠点を配置 */}
           {centers.map((center) => (
             <Marker key={center.id} position={[center.lat, center.lng]}>
               <Popup>
-                <div className="p-2 text-slate-900 font-sans" style={{ minWidth: '160px' }}>
+                <div className="p-2 text-slate-900 font-sans" style={{ maxWidth: '240px' }}>
                   <p className="text-[9px] font-black text-blue-600 uppercase tracking-wider m-0">{center.tier}</p>
-                  <h3 className="text-sm font-black m-0 mt-0.5 mb-1">{center.name}</h3>
-                  <p className="text-[10px] text-slate-500 m-0 mb-3">{center.addr}</p>
+                  <h3 className="text-xs font-black m-0 mt-0.5 mb-1 leading-tight">{center.name}</h3>
+                  <p className="text-[9px] text-slate-500 m-0 mb-3 leading-normal">{center.addr}</p>
                   
                   {center.active ? (
                     <a 
@@ -135,18 +166,18 @@ export default function PortalPage() {
         </MapContainer>
 
         {/* 左下に浮かぶステータスパネル */}
-        <div className="absolute bottom-8 left-8 z-[1000] p-6 bg-slate-950/90 border border-white/10 rounded-3xl backdrop-blur-md w-80 shadow-2xl pointer-events-auto">
+        <div className="absolute bottom-8 left-8 z-[1000] p-6 bg-slate-950/90 border border-white/10 rounded-3xl backdrop-blur-md w-[22rem] shadow-2xl pointer-events-auto">
           <h2 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
             <Globe size={14} className="text-blue-400" /> 拠点管制ステータス
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {centers.map(c => (
-              <div key={c.id} className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black text-white">{c.name}</p>
-                  <p className="text-[9px] text-slate-500 font-medium">{c.addr}</p>
+              <div key={c.id} className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-black text-white leading-tight">{c.name.split('（')[0].split('株式会社')[0]}</p>
+                  <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-1">{c.addr}</p>
                 </div>
-                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${c.active ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-500'}`}>
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md shrink-0 ${c.active ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-500'}`}>
                   {c.active ? 'ACTIVE' : 'STANDBY'}
                 </span>
               </div>
