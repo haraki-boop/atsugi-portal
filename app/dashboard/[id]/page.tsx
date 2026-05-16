@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend } from 'recharts';
 
 export default function DashboardPage({ params }: { params: { id: string } }) {
   const [data, setData] = useState<any>(null);
@@ -35,7 +35,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     const combinedMap = new Map();
 
     allItems.forEach(item => {
-      const cleanTitle = item.title.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
+      // 先頭の文字を削る
+      const rawTitle = item.title.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
+      
+      // ①【お兄ちゃん救済】もしシートの打ち間違え等で「ソ」になっていたら「社会保険」に自動補正する
+      const cleanTitle = rawTitle === 'ソ' ? '社会保険' : rawTitle;
+
       if (!combinedMap.has(cleanTitle)) {
         combinedMap.set(cleanTitle, { 
           title: cleanTitle, 
@@ -58,7 +63,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const metrics = getCombinedMetrics();
 
-  // 📈 経営エキスパートAIによる、数字と財務インパクトに特化した評価ロジック
+  // ② AI診断：経営のエキスパートとして、純粋に数字と財務・予算管理の評価に特化
   const getAiCorporateEvaluation = (metric) => {
     const latestActual = metric.actual[metric.actual.length - 1] || 0;
     const latestForecast = metric.forecast[metric.forecast.length - 1] || 1;
@@ -71,7 +76,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     let comment = "";
 
     if (isLowBetter) {
-      // 💸 【コスト・工数：低いほうが経営的に優良】
       if (ratio <= 92) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
@@ -81,7 +85,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         status = 'STABLE';
         color = 'text-blue-700 bg-blue-50 border-blue-200';
         icon = <Bot size={14} className="text-blue-600" />;
-        comment = `【経営財務診断：予算内推移】『${metric.title}』は執行率${ratio.toFixed(1)}%と極めて適正な予算枠内で着地。財務計画との乖離はなく、事業計画上のシミュレーション通りにキャッシュフローが推移しています。現状の投資配分のまま次節へ移行可能です。`;
+        comment = `【経営財務診断：予算内推移】『${metric.title}』は執行率${ratio.toFixed(1)}%と適正な予算枠内で着地。財務計画との乖離はなく、事業計画上のシミュレーション通りにキャッシュフローが推移しています。現状の投資配分のまま次節へ移行可能です。`;
       } else {
         status = 'WARNING';
         color = 'text-rose-700 bg-rose-50 border-rose-200';
@@ -89,7 +93,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         comment = `【経営財務診断：予算超過アラート】『${metric.title}』が計画比${(ratio - 100).toFixed(1)}%超過し、利益圧迫要因となっています。投下コストに対するリターン（生産性）が損なわれている可能性があるため、緊急のコスト構造の見直しとリソース再配分を要します。`;
       }
     } else {
-      // 📊 【売上・生産性：高いほうが経営的に優良】
       if (ratio >= 105) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
@@ -135,13 +138,11 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           ))}
         </div>
 
-        {/* 洗練されたComposedChartグリッド */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {metrics.map((m, i) => {
             const evalData = getAiCorporateEvaluation(m);
             const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
 
-            // グラフ描画用データ成形
             const chartData = m.labels.map((l, idx) => ({
               name: l,
               "実績": m.actual[idx] || 0,
@@ -151,7 +152,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             return (
               <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
                 
-                {/* ① グラフのタイトル表示＆対比数値を完全固定 */}
+                {/* グラフのタイトル＆右側KPI対比（完全固定） */}
                 <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                   <div>
                     <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
@@ -169,7 +170,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
 
-                {/* ② 丸みを帯びた棒 ＆ カッコいい線グラフのコンポーネントエリア */}
+                {/* グラフ描写エリア */}
                 <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -178,7 +179,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
                       
-                      {/* 実績：先端を10px丸く削ったスタイリッシュなカプセルバー */}
+                      {/* ②【名前判明！】「実績」と「予測」をパッと判別させるための「凡例（Legend）」を完全復活！ */}
+                      <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                      
+                      {/* 実績：先端を丸くしたスタイリッシュなカプセルバー */}
                       <Bar 
                         name="実績" 
                         dataKey="実績" 
@@ -187,21 +191,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         barSize={20} 
                       />
                       
-                      {/* 予測・目標：情熱のネオンオレンジの滑らかな曲線 */}
+                      {/* ③ 予測・目標：〇（ドット）を完全消去した、シャープで知的な「高貴なパープル線」 */}
                       <Line 
                         name={m.forecastType} 
                         type="monotone" 
                         dataKey={m.forecastType} 
-                        stroke="#ff4d00" 
-                        strokeWidth={3.5} 
-                        dot={{ r: 4, fill: '#fff', stroke: '#ff4d00', strokeWidth: 2 }} 
-                        activeDot={{ r: 7, stroke: '#ff4d00', strokeWidth: 3 }}
+                        stroke="#7c3aed" /* 知的なパープル */
+                        strokeWidth={3} 
+                        dot={false} /* 〇はいらん！を完全実現 */
+                        activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} /* ホバー時だけ丸が出る親切設計 */
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* ③ 経営のプロフェッショナルとしての財務・数値評価スタック */}
+                {/* AI自動評価：経営・財務特化パネル */}
                 <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
                   <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
                   <p>{evalData.comment}</p>
