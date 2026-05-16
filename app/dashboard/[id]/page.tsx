@@ -77,21 +77,45 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  const getAiCorporateEvaluation = (title, actual, forecast) => {
+  // 📈 経営エキスパートAI（数字・財務特化評価 ＋ 週次連動版）
+  const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
+    const modeText = mode === 'daily' ? '直近' : `当週${isTotal ? '合計' : '平均'}`;
+
     let status = 'STABLE';
     let color = 'text-slate-700 bg-slate-50 border-slate-200';
     let icon = <Bot size={14} className="text-slate-600" />;
     let comment = "";
+
     if (isLowBetter) {
-      if (ratio <= 92) { status = 'EXCELLENT'; color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; icon = <CheckCircle2 size={14} className="text-emerald-600" />; comment = `【経営財務診断：利益上振れ】『${title}』は予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。ROI向上に貢献しています。`; }
-      else if (ratio > 103) { status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />; comment = `【経営財務診断：予算超過】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過。利益圧迫要因のため、構造の見直しが必要です。`; }
-      else { comment = `【経営財務診断：予算内推移】『${title}』は執行率${ratio.toFixed(1)}%と適正な予算枠内で着地。計画通りです。`; }
+      if (ratio <= 92) {
+        status = 'EXCELLENT';
+        color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        icon = <CheckCircle2 size={14} className="text-emerald-600" />;
+        comment = `【経営財務診断：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。ROI向上に貢献しています。このままコントロールを維持してください。`;
+      } else if (ratio > 103) {
+        status = 'WARNING';
+        color = 'text-rose-700 bg-rose-50 border-rose-200';
+        icon = <ShieldAlert size={14} className="text-rose-600" />;
+        comment = `【経営財務診断：予算超過】『${title}』の${modeText}が計画比${(ratio - 100).toFixed(1)}%超過し利益圧迫要因となっています。緊急のコスト構造見直しを推奨します。`;
+      } else {
+        comment = `【経営財務診断：予算内推移】『${title}』は${modeText}の執行率${ratio.toFixed(1)}%と適正な予算枠内で着地。財務計画との乖離はなくシミュレーション通りです。`;
+      }
     } else {
-      if (ratio >= 105) { status = 'EXCELLENT'; color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; icon = <ThumbsUp size={14} className="text-emerald-600" />; comment = `【経営財務診断：収益拡大】『${title}』は目標比${ratio.toFixed(1)}%の上振れ。限界利益の積み上げに大きく貢献しています。`; }
-      else if (ratio < 95) { status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <AlertTriangle size={14} className="text-rose-600" />; comment = `【経営財務診断：未達アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まっています。収益確保に向けた対策が急務です。`; }
-      else { comment = `【経営財務診断：計画達成】『${title}』は達成率${ratio.toFixed(1)}%と手堅く推移。マイルストーン通りに稼働しています。`; }
+      if (ratio >= 105) {
+        status = 'EXCELLENT';
+        color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        icon = <ThumbsUp size={14} className="text-emerald-600" />;
+        comment = `【経営財務診断：収益拡大】『${title}』は${modeText}で目標比${ratio.toFixed(1)}%の大幅プラス着地。売上損分岐を超え、限界利益の積み上げに多大に貢献しています。`;
+      } else if (ratio < 95) {
+        status = 'WARNING';
+        color = 'text-rose-700 bg-rose-50 border-rose-200';
+        icon = <AlertTriangle size={14} className="text-rose-600" />;
+        comment = `【経営財務診断：未達アラート】『${title}』の${modeText}が計画の${ratio.toFixed(1)}%に留まり赤信号。長期化は業績リスクに直結するため、即座のテコ入れが必要です。`;
+      } else {
+        comment = `【経営財務診断：計画達成】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。経営計画に想定された順調な利益水準を確保できています。`;
+      }
     }
     return { status, color, icon, comment, ratio: ratio.toFixed(1) };
   };
@@ -100,11 +124,11 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
         <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600">
-          <ArrowLeft size={16} /> <span className="text-xs">PORTAL</span>
+          <ArrowLeft size={16} /> <span className="text-xs">ポータルへ戻る</span>
         </Link>
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
-          <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">{displayMode} Analytics Mode</p>
+          <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">{displayMode === 'daily' ? 'DAILY' : 'WEEKLY'} ANALYTICS MODE</p>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 gap-1">
           <button onClick={() => setDisplayMode('daily')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'daily' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>日次</button>
@@ -128,7 +152,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-8">
+        {/* 🌟 ①日次表示の時は2列（grid-cols-2）、週次表示の時は1列（grid-cols-1）に動的切り替え！ */}
+        <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
           {allMetrics.map((m, i) => {
             const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
             const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
@@ -148,19 +173,20 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
             }
 
-            const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct);
+            // 🌟 ②週次のAI評価用に、ここで算出した週集計データ（dispAct, dispFct）を直接AIに渡して診断させる！
+            const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType);
             const ratio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
 
             return (
               <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
                 
-                {/* 1. タイトルヘッダー (日次はここに数字を出す合格スタイル) */}
+                {/* 1. タイトルヘッダー */}
                 <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                   <div>
                     <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
                     <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
                   </div>
-                  {/* ✨ 日次モードの時だけこの横に実績と比率を出す (合格デザイン復活) */}
+                  {/* 日次モードの時だけこの横に直近実績を出す（合格スタイル） */}
                   {displayMode === 'daily' && (
                     <div className="flex gap-6 text-right items-center">
                       <div className="border-r pr-4 border-slate-100">
@@ -175,10 +201,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   )}
                 </div>
 
-                {/* 2. グラフ＆週次用パネルの条件付きレイアウト */}
+                {/* 2. グラフ＆週次用パネルの出し分け */}
                 <div className={displayMode === 'weekly' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start' : 'w-full'}>
                   
-                  <div className={displayMode === 'weekly' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100' : 'h-[300px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100'}>
+                  <div className={displayMode === 'weekly' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100'}>
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -187,16 +213,16 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                         <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
                         
-                        {/* 📈 棒グラフの太さ調整：日次はスマート(20)、週次は極太(60)で迫力を出す */}
+                        {/* 📈 棒グラフの太さ調整：日次はシャープな2列用(20)、週次は極太(60)で大迫力！ */}
                         <Bar name="実績" dataKey="実績" fill={currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'weekly' ? 60 : 20} />
                         <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
 
-                  {/* 🌟 週次モードの時だけ「右側に数字パネル」を出現させる */}
+                  {/* 週次モードの時だけ「右側に数字パネル」を出現させる */}
                   {displayMode === 'weekly' && (
-                    <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between animate-in fade-in slide-in-from-right-4 duration-500">
+                    <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
                       <div className="border-b border-slate-800 pb-2">
                         <p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">当週{isTotalType ? '合計' : '平均'}確認パネル</p>
                       </div>
@@ -219,7 +245,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   )}
                 </div>
 
-                {/* AI診断 */}
+                {/* 3. AI診断 (週次の時は選択した週の成績に基づいてテキストが変わります) */}
                 <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
                   <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
                   <p>{evalData.comment}</p>
