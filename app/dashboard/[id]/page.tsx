@@ -28,6 +28,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
+  
+  // 下振れ（低い方）が経営的に「好調」とみなすコスト系キーワード
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
 
   const getCombinedMetrics = () => {
@@ -35,11 +37,20 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     const combinedMap = new Map();
 
     allItems.forEach(item => {
-      // 先頭の文字を削る
-      const rawTitle = item.title.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
+      // 全角の「＿」を半角の「_」に統一してプレフィックスを削る（「ソ」のバグ対策）
+      const normalizedTitle = item.title.replace('＿', '_');
       
-      // ①【お兄ちゃん救済】もしシートの打ち間違え等で「ソ」になっていたら「社会保険」に自動補正する
-      const cleanTitle = rawTitle === 'ソ' ? '社会保険' : rawTitle;
+      let rawTitle = normalizedTitle
+        .replace('実績_', '')
+        .replace('予測_', '')
+        .replace('予算_', '')
+        .replace('目標_', '');
+      
+      // 文字列のどこかに「社会保険」が含まれていたらタイトルを固定
+      let cleanTitle = rawTitle;
+      if (item.title.includes('社会保険')) {
+        cleanTitle = '社会保険';
+      }
 
       if (!combinedMap.has(cleanTitle)) {
         combinedMap.set(cleanTitle, { 
@@ -51,10 +62,11 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         });
       }
       const entry = combinedMap.get(cleanTitle);
-      if (item.title.startsWith('実績_')) entry.actual = item.values;
-      else {
+      if (item.title.startsWith('実績_') || item.title.startsWith('実績＿')) {
+        entry.actual = item.values;
+      } else {
         entry.forecast = item.values;
-        entry.forecastType = item.title.split('_')[0];
+        entry.forecastType = normalizedTitle.split('_')[0]; // 「予算」「予測」「目標」を動的に取得
       }
     });
 
@@ -63,11 +75,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const metrics = getCombinedMetrics();
 
-  // ② AI診断：経営のエキスパートとして、純粋に数字と財務・予算管理の評価に特化
+  // 📈 経営エキスパートAI（数字・財務特化評価 ＋ お兄ちゃんルール比率対応）
   const getAiCorporateEvaluation = (metric) => {
     const latestActual = metric.actual[metric.actual.length - 1] || 0;
     const latestForecast = metric.forecast[metric.forecast.length - 1] || 1;
     const isLowBetter = lowIsBetterMetrics.some(keyword => metric.title.includes(keyword));
+    
+    // 比率はすべて一律で「実績 ÷ 予測 × 100」のストレート計算
     const ratio = (latestActual / latestForecast) * 100;
 
     let status = 'STABLE';
@@ -76,6 +90,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     let comment = "";
 
     if (isLowBetter) {
+      // 💸 【コスト・工数系：低いほうが経営的に優良】
       if (ratio <= 92) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
@@ -93,6 +108,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         comment = `【経営財務診断：予算超過アラート】『${metric.title}』が計画比${(ratio - 100).toFixed(1)}%超過し、利益圧迫要因となっています。投下コストに対するリターン（生産性）が損なわれている可能性があるため、緊急のコスト構造の見直しとリソース再配分を要します。`;
       }
     } else {
+      // 📊 【売上・生産性系：高いほうが経営的に優良】
       if (ratio >= 105) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
@@ -118,14 +134,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
         <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600 transition-all">
-          <ArrowLeft size={16} /> <span className="text-xs">PORTAL</span>
+          <ArrowLeft size={16} /> <span className="text-xs">ポータルへ戻る</span>
         </Link>
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">Daily Management Analytics Stream</p>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
-          <span className="px-6 py-2 bg-white shadow-sm rounded-xl text-[10px] font-black text-blue-600">DAILY MODE</span>
+          <span className="px-6 py-2 bg-white shadow-sm rounded-xl text-[10px] font-black text-blue-600">日次モード</span>
         </div>
       </header>
 
@@ -152,7 +168,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             return (
               <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
                 
-                {/* グラフのタイトル＆右側KPI対比（完全固定） */}
+                {/* グラフのタイトル ＆ 分かりやすい日本語KPI対比 */}
                 <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                   <div>
                     <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
@@ -160,17 +176,17 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   </div>
                   <div className="flex gap-6 text-right items-center">
                     <div className="border-r pr-4 border-slate-100">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Latest Actual</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">直近の実績</p>
                       <p className="text-xl font-black text-slate-800 tracking-tight">{evalData.latestActual.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Ratio</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">{m.forecastType}比</p>
                       <p className={`text-xl font-black ${Number(evalData.ratio) >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{evalData.ratio}%</p>
                     </div>
                   </div>
                 </div>
 
-                {/* グラフ描写エリア */}
+                {/* グラフエリア */}
                 <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -179,10 +195,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
                       
-                      {/* ②【名前判明！】「実績」と「予測」をパッと判別させるための「凡例（Legend）」を完全復活！ */}
+                      {/* 凡例（Legend） */}
                       <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
                       
-                      {/* 実績：先端を丸くしたスタイリッシュなカプセルバー */}
+                      {/* 実績（先端に丸みのあるカプセル風バー） */}
                       <Bar 
                         name="実績" 
                         dataKey="実績" 
@@ -191,21 +207,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         barSize={20} 
                       />
                       
-                      {/* ③ 予測・目標：〇（ドット）を完全消去した、シャープで知的な「高貴なパープル線」 */}
+                      {/* 予測・目標（ドットなし紫のシャープな一本線） */}
                       <Line 
                         name={m.forecastType} 
                         type="monotone" 
                         dataKey={m.forecastType} 
-                        stroke="#7c3aed" /* 知的なパープル */
+                        stroke="#7c3aed" 
                         strokeWidth={3} 
-                        dot={false} /* 〇はいらん！を完全実現 */
-                        activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} /* ホバー時だけ丸が出る親切設計 */
+                        dot={false} 
+                        activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} 
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* AI自動評価：経営・財務特化パネル */}
+                {/* 経営エキスパートAI診断パネル */}
                 <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
                   <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
                   <p>{evalData.comment}</p>
