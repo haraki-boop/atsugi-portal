@@ -11,7 +11,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   
-  // 🌟 安全ガード：初期値は「4月」で固定し、データから安全に拾えるように変更
+  // 🌟 安全最優先：初期値をあらかじめ固定しておき、エラーの引き金を完全排除
   const [selectedDailyMonth, setSelectedDailyMonth] = useState<string>('4月');
 
   const tabs = [
@@ -30,19 +30,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     fetch(gasUrl).then(res => res.json()).then(json => {
       if (json && typeof json === 'object') {
         setData(json);
-        // 安全に最初の有効な月を判別して初期セット
-        const firstLabel = json.labels?.find(l => l && l.includes('/'));
-        if (firstLabel) {
-          setSelectedDailyMonth(firstLabel.split('/')[0] + '月');
+        // 安全に最初の有効な月を判別してセット
+        if (Array.isArray(json.labels)) {
+          const firstValid = json.labels.find(l => l && typeof l === 'string' && l.includes('/'));
+          if (firstValid) {
+            setSelectedDailyMonth(firstValid.split('/')[0] + '月');
+          }
         }
       }
-    });
+    }).catch(e => console.error("GAS fetch error", e));
   }, []);
 
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
-  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
+  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用婚", "有給", "交通費", "工数"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
   const n = (val: any) => {
@@ -50,61 +52,71 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
   };
 
-  // 💥 【完全固定】お兄ちゃんの完璧な週次グルーピングロジック
-  const getWeeklyGroups = (labels: string[]) => {
+  // 💥 【完全固定】お兄ちゃんの完璧な週次グルーピングロジック（安全ガード強化）
+  const weeklyGroups = useMemo(() => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
-    if (!labels || labels.length === 0) return groups;
+    const labels = data?.labels;
+    if (!Array.isArray(labels) || labels.length === 0) return groups;
+    
     let currentWeekIndices: number[] = [];
     let weekCount = 1;
-    let startLabel = labels[0];
+    let startLabel = labels[0] || "4/1";
+
     labels.forEach((label, idx) => {
-      if (!label || !label.includes('/')) { currentWeekIndices.push(idx); return; }
-      const parts = label.split('/');
-      const date = new Date(2026, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
-      if (date.getDay() === 0 && currentWeekIndices.length > 0) {
-        groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[idx - 1]})`, indices: currentWeekIndices });
-        weekCount++;
-        startLabel = label;
-        currentWeekIndices = [];
+      if (!label || typeof label !== 'string' || !label.includes('/')) {
+        currentWeekIndices.push(idx);
+        return;
+      }
+      try {
+        const parts = label.split('/');
+        const date = new Date(2026, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+        if (date.getDay() === 0 && currentWeekIndices.length > 0) {
+          groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[idx - 1] || label})`, indices: currentWeekIndices });
+          weekCount++;
+          startLabel = label;
+          currentWeekIndices = [];
+        }
+      } catch (e) {
+        console.error(e);
       }
       currentWeekIndices.push(idx);
     });
-    if (currentWeekIndices.length > 0) groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[labels.length - 1]})`, indices: currentWeekIndices });
+
+    if (currentWeekIndices.length > 0) {
+      groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${labels[labels.length - 1] || startLabel})`, indices: currentWeekIndices });
+    }
     return groups;
-  };
+  }, [data]);
 
-  const baseLabels = data.labels || ["4/1", "4/2"];
-  const weeklyGroups = getWeeklyGroups(baseLabels);
-
-  // 💥 日次の月選択用の選択肢を安全に抽出（落ちないガード付き）
+  // 日次の月選択用の選択肢を安全に抽出
   const dailyMonthOptions = useMemo(() => {
-    const labels = data.labels || [];
-    const months = labels.map(l => (l && l.includes('/')) ? l.split('/')[0] + '月' : null).filter(Boolean);
+    const labels = data?.labels || [];
+    const months = labels.map(l => (l && typeof l === 'string' && l.includes('/')) ? l.split('/')[0] + '月' : null).filter(Boolean);
     return [...new Set(months)];
   }, [data]);
 
   // 💥 【完全固定】お兄ちゃんの完璧なデータ結合ロジック
-  const getCombinedMetrics = () => {
-    let allItems = data[`${currentTab.id}Data`] || [];
+  const allMetrics = useMemo(() => {
+    let allItems = data?.[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
+    if (!Array.isArray(allItems)) return [];
+
     allItems.forEach(item => {
       if (!item || !item.title || !item.values || !Array.isArray(item.values)) return;
       const normalizedTitle = item.title.replace('＿', '_');
       let rawTitle = normalizedTitle.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
       let cleanTitle = item.title.includes('社会保険') ? '社会保険' : rawTitle;
       if (!combinedMap.has(cleanTitle)) {
-        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: [], forecast: [], forecastType: '予測' });
+        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || data.labels || ["4/1"], actual: [], forecast: [], forecastType: '予測' });
       }
       const entry = combinedMap.get(cleanTitle);
       if (item.title.startsWith('実績_') || item.title.startsWith('実績＿')) entry.actual = item.values;
       else { entry.forecast = item.values; entry.forecastType = normalizedTitle.split('_')[0] || '予測'; }
     });
     return Array.from(combinedMap.values());
-  };
+  }, [data, currentTab]);
 
-  const allMetrics = getCombinedMetrics();
-
-  // 💥 【完全固定】お兄ちゃんお気に入りの経営エキスパートAIコメント
+  // 💥 【完全固定】お兄ちゃんお気に入りの経営エキスパートAI評価
   const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
@@ -170,7 +182,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           ))}
         </div>
 
-        {/* 🌟 日次モード用：5月6月データ増殖対策月フィルターボタン */}
+        {/* 🌟 日次モード：5月6月対策月選択フィルター */}
         {displayMode === 'daily' && activeTab !== 'monthly' && dailyMonthOptions.length > 1 && (
           <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">表示月選択:</span>
@@ -180,7 +192,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 週次モード用：週選択フィルターボタン */}
+        {/* 週次モード：週選択フィルター */}
         {displayMode === 'weekly' && activeTab !== 'monthly' && (
           <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">週選択:</span>
@@ -197,7 +209,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             <p className="text-xs text-slate-500">日次・週次が直り次第、ここをお兄ちゃんの指示通りに組み上げます。</p>
           </div>
         ) : (
-          /* 💥 【完全固定】お兄ちゃんお気に入りの完璧な日次2列・週次1列自動切り替え配置 */
+          /* 💥 【完全固定】お兄ちゃんが合格をくれた、最強の日次2列・週次1列自動切り替え配置 */
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
@@ -208,12 +220,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               let dispAct = 0; let dispFct = 0;
 
               if (displayMode === 'daily') {
-                rawChartData = m.labels.map((l, idx) => ({ name: l, "実績": m.actual[idx] || 0, "予測データ": m.forecast[idx] || 0, rawMonth: (l && l.includes('/')) ? l.split('/')[0] + '月' : '4月' }));
-                dispAct = m.actual[m.actual.length - 1] || 0;
-                dispFct = m.forecast[m.forecast.length - 1] || 1;
+                rawChartData = m.labels.map((l, idx) => ({ name: l, "実績": n(m.actual[idx]), "予測データ": n(m.forecast[idx]), rawMonth: (l && typeof l === 'string' && l.includes('/')) ? l.split('/')[0] + '月' : '4月' }));
+                dispAct = n(m.actual[m.actual.length - 1]);
+                dispFct = n(m.forecast[m.forecast.length - 1]) || 1;
               } else {
-                rawChartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": m.actual[idx] || 0, "予測データ": m.forecast[idx] || 0 }));
-                const acts = weekIdx.map(idx => m.actual[idx] || 0); const fcts = weekIdx.map(idx => m.forecast[idx] || 0);
+                rawChartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), "予測データ": n(m.forecast[idx]) }));
+                const acts = weekIdx.map(idx => n(m.actual[idx])); const fcts = weekIdx.map(idx => n(m.forecast[idx]));
                 if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
                 else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
               }
@@ -223,7 +235,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 ? rawChartData.filter(d => d.rawMonth === selectedDailyMonth)
                 : rawChartData;
 
-              // 💥 【解決】選択された週データ（dispAct, dispFct）に基づいてガチリアルタイム計算！固定バグ粉砕！
+              // 💥 【105.3%固定バグを木っ端微塵に粉砕】現在の選択された週データ（dispAct, dispFct）から毎回100%リアルタイム計算！
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType);
 
@@ -233,16 +245,16 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                       <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType || '予測'} Matrix</p>
                     </div>
                     {displayMode === 'daily' && (
                       <div className="flex gap-6 text-right items-center">
                         <div className="border-r pr-4 border-slate-100">
                           <p className="text-[9px] font-bold text-slate-400 uppercase">直近の実績</p>
-                          <p className="text-xl font-black text-slate-800 tracking-tight">{dispAct.toLocaleString()}</p>
+                          <p className="text-xl font-black text-slate-800 tracking-tight">{Math.round(dispAct).toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">{m.forecastType}比</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">{(m.forecastType || '予測')}比</p>
                           <p className={`text-xl font-black ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</p>
                         </div>
                       </div>
@@ -280,7 +292,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           </div>
                           <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
                             <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType || '予測'}比)</span>
-                            {/* 💥 固定値バグを完全に破壊し、週ごとの正しい比率が連動して大迫力で動く！ */}
+                            {/* 💥 固定105.3%のバグが完全に消滅し、リアルタイムでガチ連動して％が動く大迫力表示 */}
                             <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                           </div>
                         </div>
