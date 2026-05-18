@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Plus, X, Building2 } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Plus, X, Building2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend, PieChart, Pie, Cell } from 'recharts';
 
@@ -12,10 +12,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
 
-  // 🔒 マニュアル入力データ保護のための「初期化完了フラグ」
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // ローカルストレージ（5, 6, 7番タブ）用ステート
+  // 🚀 Supabase用ステート（ローカルストレージからクラウドへ移行）
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
@@ -23,7 +20,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  // モーダル入力フォーム用ステート
   const [newItem, setNewItem] = useState({
     name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0,
     client: '', proposal: '', detail: '', result: '●'
@@ -40,52 +36,91 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
-  // 1️⃣ 起動時にローカルストレージからデータをロード
+  // 🚀 Supabaseへ直接リクエストを送る共通関数
+  const supabaseRequest = async (table: string, method: string, body?: any) => {
+    try {
+      const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
+      const headers: any = {
+        'apikey': 'sb_publishable_tFUeDqwtyM924ZEgXI94OQ_8g9sAV2q',
+        'Authorization': 'Bearer sb_publishable_tFUeDqwtyM924ZEgXI94OQ_8g9sAV2q',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      };
+
+      if (method === 'GET') {
+        const res = await fetch(`${url}?location_id=eq.${params.id}&order=id.asc`, { method: 'GET', headers });
+        return await res.json();
+      } else if (method === 'POST') {
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        return await res.json();
+      } else if (method === 'PATCH') {
+        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
+        return await res.json();
+      } else if (method === 'DELETE') {
+        await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
+        return true;
+      }
+    } catch (e) {
+      console.error("Supabase Sync Error:", e);
+    }
+    return null;
+  };
+
+  // 🚀 クラウドからリアルタイムデータを読み込み
+  const fetchSupabaseData = async () => {
+    const dxData = await supabaseRequest('dx_actions', 'GET');
+    if (dxData) setDxItems(dxData);
+    
+    const envData = await supabaseRequest('env_actions', 'GET');
+    if (envData) setEnvItems(envData);
+    
+    const historyData = await supabaseRequest('sales_history', 'GET');
+    if (historyData) setHistoryItems(historyData);
+  };
+
+  const n = (val: any) => {
+    if (val === undefined || val === null || val === "") return 0;
+    return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
+  };
+
+  const getAvailableMonths = (labels: string[]) => {
+    const monthsSet = new Set<string>();
+    labels.forEach(label => {
+      if (typeof label === 'string' && label.includes('/')) {
+        const month = label.split('/')[0];
+        if (month) monthsSet.add(month);
+      }
+    });
+    return Array.from(monthsSet).sort((a, b) => n(a) - n(b));
+  };
+
+  // 1️⃣ 起動時にデータ同期
   useEffect(() => {
-    const savedDx = localStorage.getItem(`dx_${params.id}`);
-    const savedEnv = localStorage.getItem(`env_${params.id}`);
-    const savedHistory = localStorage.getItem(`history_${params.id}`);
-    
-    if (savedDx) setDxItems(JSON.parse(savedDx));
-    if (savedEnv) setEnvItems(JSON.parse(savedEnv));
-    if (savedHistory) setHistoryItems(JSON.parse(savedHistory));
-    
-    setIsInitialized(true);
+    fetchSupabaseData();
 
     const gasUrl = "https://script.google.com/macros/s/AKfycbyosyzeCglI2Pz2GWh_dbZXAgDslEV5DZrws5ulw24GrkI-fShocaWUdOLMfaNh_m0_/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
       if (json && json.labels && json.labels.length > 0) {
-        const firstLabel = json.labels[0];
-        if (typeof firstLabel === 'string' && firstLabel.includes('/')) {
-          setGlobalSelectedMonth(firstLabel.split('/')[0]);
+        const months = getAvailableMonths(json.labels);
+        const today = new Date();
+        const currentMonth = (today.getMonth() + 1).toString();
+        
+        if (months.includes(currentMonth)) {
+          setGlobalSelectedMonth(currentMonth);
+        } else {
+          setGlobalSelectedMonth(months[0]);
         }
       }
     });
   }, [params.id]);
-
-  // 2️⃣ 救出完了後のみ自動保存を許可（デプロイ時のデータ消滅を防御）
-  useEffect(() => {
-    if (!isInitialized) return;
-    localStorage.setItem(`dx_${params.id}`, JSON.stringify(dxItems));
-  }, [dxItems, isInitialized, params.id]);
-
-  useEffect(() => {
-    if (!isInitialized) return;
-    localStorage.setItem(`env_${params.id}`, JSON.stringify(envItems));
-  }, [envItems, isInitialized, params.id]);
-
-  useEffect(() => {
-    if (!isInitialized) return;
-    localStorage.setItem(`history_${params.id}`, JSON.stringify(historyItems));
-  }, [historyItems, isInitialized, params.id]);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === 'monthly') {
       setDisplayMode('monthly');
     } else if (['dx', 'env', 'history', 'manhours'].includes(tabId)) {
-      // 特殊画面
+      // 特殊表示
     } else if (displayMode === 'monthly') {
       setDisplayMode('daily');
     }
@@ -110,68 +145,69 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       const item = targetList[index];
       setNewItem({
         name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''),
-        startDate: item.startDate ? item.startDate.replace(/\//g, '-') : '',
-        endDate: item.endDate ? item.endDate.replace(/\//g, '-') : '',
-        customerRelated: item.customerRelated === 'あり', ratio: item.ratio || 0
+        startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
+        endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '',
+        customerRelated: item.customer_related === 'あり', ratio: item.ratio || 0
       });
     }
     setIsModalOpen(true);
   };
 
-  const handleSaveItem = () => {
+  // 🚀 Supabaseクラウドへのデータ保存・上書き処理
+  const handleSaveItem = async () => {
     if (activeTab === 'history') {
       if (!newItem.client || !newItem.proposal) {
         alert("日付、誰に、何をは必須入力です！");
         return;
       }
-      const formattedHistory = {
+      const payload: any = {
+        location_id: params.id,
         date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result
       };
+
       if (editingIndex !== null) {
-        const updated = [...historyItems]; updated[editingIndex] = formattedHistory;
-        setHistoryItems(updated);
+        payload.id = historyItems[editingIndex].id;
+        await supabaseRequest('sales_history', 'PATCH', payload);
       } else {
-        setHistoryItems([...historyItems, formattedHistory]);
+        await supabaseRequest('sales_history', 'POST', payload);
       }
     } else {
       if (!newItem.name) {
         alert("項目名を入力してください！");
         return;
       }
-      const formattedItem = {
+      const payload: any = {
+        location_id: params.id,
         name: newItem.name, effect: newItem.effect || '未入力',
-        startDate: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
-        endDate: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
-        customerRelated: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio)
+        start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
+        end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
+        customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio)
       };
-      if (activeTab === 'dx') {
-        if (editingIndex !== null) {
-          const updated = [...dxItems]; updated[editingIndex] = formattedItem;
-          setDxItems(updated);
-        } else {
-          setDxItems([...dxItems, formattedItem]);
-        }
+
+      const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
+      if (editingIndex !== null) {
+        const targetList = activeTab === 'dx' ? dxItems : envItems;
+        payload.id = targetList[editingIndex].id;
+        await supabaseRequest(targetTable, 'PATCH', payload);
       } else {
-        if (editingIndex !== null) {
-          const updated = [...envItems]; updated[editingIndex] = formattedItem;
-          setEnvItems(updated);
-        } else {
-          setEnvItems([...envItems, formattedItem]);
-        }
+        await supabaseRequest(targetTable, 'POST', payload);
       }
     }
+    await fetchSupabaseData(); // リロードして全員の最新状態に完全同期
     setIsModalOpen(false);
   };
 
-  const handleDeleteItem = (indexToDelete: number) => {
+  // 🚀 Supabaseクラウドからのデータ抹消処理
+  const handleDeleteItem = async (indexToDelete: number) => {
     if (activeTab === 'history') {
-      setHistoryItems(historyItems.filter((_, idx) => idx !== indexToDelete));
+      await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
     } else if (activeTab === 'dx') {
-      setDxItems(dxItems.filter((_, idx) => idx !== indexToDelete));
+      await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
     } else {
-      setEnvItems(envItems.filter((_, idx) => idx !== indexToDelete));
+      await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
     }
+    await fetchSupabaseData(); // 最新状態に再同期
   };
 
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
@@ -180,23 +216,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
-  const n = (val: any) => {
-    if (val === undefined || val === null || val === "") return 0;
-    return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
-  };
-
   const baseLabels = data.labels || ["4/1", "4/2"];
-  const getAvailableMonths = (labels: string[]) => {
-    const monthsSet = new Set<string>();
-    labels.forEach(label => {
-      if (typeof label === 'string' && label.includes('/')) {
-        const month = label.split('/')[0];
-        if (month) monthsSet.add(month);
-      }
-    });
-    return Array.from(monthsSet).sort((a, b) => n(a) - n(b));
-  };
-
   const availableMonths = getAvailableMonths(baseLabels);
   const currentMonthIndices = baseLabels.map((l, idx) => (typeof l === 'string' && l.split('/')[0] === globalSelectedMonth) ? idx : -1).filter(idx => idx !== -1);
 
@@ -226,7 +246,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return groups;
   })();
 
-  // 💥 お兄ちゃんお気に入りのデータ抽出・マッピング（改変厳禁エリア・完全ホールド）
   const getCombinedMetrics = () => {
     const targetTabId = activeTab === 'monthly' ? 'sales' : currentTab.id;
     let allItems = data[`${targetTabId}Data`] || [];
@@ -238,25 +257,17 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         .replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '')
         .replace('実績', '').replace('予測', '').replace('予算', '').replace('目標', '');
       if (item.title.includes('社会保険')) cleanTitle = '社会保険';
-
       if (!combinedMap.has(cleanTitle)) {
         combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: new Array(baseLabels.length).fill(0), forecast: new Array(baseLabels.length).fill(0), forecastType: '予測' });
       }
       const entry = combinedMap.get(cleanTitle);
-      if (normalizedTitle.includes('実績')) {
-        entry.actual = item.values;
-      } else {
+      if (normalizedTitle.includes('実績')) { entry.actual = item.values; } else {
         entry.forecast = item.values;
         const detectedType = normalizedTitle.split('_')[0];
-        if (detectedType && detectedType !== normalizedTitle) {
-          entry.forecastType = detectedType;
-        } else if (normalizedTitle.includes('予算')) {
-          entry.forecastType = '予算';
-        } else if (normalizedTitle.includes('目標')) {
-          entry.forecastType = '目標';
-        } else {
-          entry.forecastType = '予測';
-        }
+        if (detectedType && detectedType !== normalizedTitle) { entry.forecastType = detectedType; } 
+        else if (normalizedTitle.includes('予算')) { entry.forecastType = '予算'; } 
+        else if (normalizedTitle.includes('目標')) { entry.forecastType = '目標'; } 
+        else { entry.forecastType = '予測'; }
       }
     });
     return Array.from(combinedMap.values());
@@ -272,7 +283,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     const projectedEndResult = totalMonthForecast * (ratio / 100);
     const deviationAmount = Math.abs(projectedEndResult - totalMonthForecast);
     const formatVal = (val) => title.includes("%") || title.includes("率") ? `${val.toFixed(1)}%` : `¥${Math.round(val).toLocaleString()}`;
-
     let status = 'STABLE', color = 'text-slate-700 bg-slate-50 border-slate-200', icon = <Bot size={14} className="text-slate-600" />, comment = "";
     if (isLowBetter) {
       if (ratio <= 92) {
@@ -280,9 +290,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。この推移を維持して着地できれば、当月末の総執行は予測枠より【${formatVal(deviationAmount)}】削減され、営業利益率の直接的な押し上げ要因となります。`;
       } else if (ratio > 103) {
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />;
-        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過の赤信号。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
+        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過 of 赤信号。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるしミュレーション結果です。`;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるシミュレーション結果です。`;
       }
     } else {
       if (ratio >= 105) {
@@ -298,40 +308,24 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { status, color, icon, comment, ratio: ratio.toFixed(1) };
   };
 
-  // 💥 【工数誤認バグ完全粉砕エンジン】物量（ケース数）の列を完全に排除し、「工数（時間・人工）」のタイトル名が含まれるオブジェクトのみを絶対厳選トレース！
   const generateStackedManhoursData = () => {
     const logisticsItems = data["logisticsData"] || [];
-    
-    // 物量列との誤認を完全に防ぐため、タイトル名に「工数」のキーワードが明示的に入っている実績データのみをピンポイント抽出！
     const colV_Total = logisticsItems.find(item => item && item.title && (item.title === "総工数" || item.title === "実績_総工数"));
     const colM_Lycos = logisticsItems.find(item => item && item.title && (item.title === "リコス工数" || item.title === "実績_リコス工数"));
     const colO_Ice = logisticsItems.find(item => item && item.title && (item.title === "リコスアイス工数" || item.title === "実績_リコスアイス工数"));
     const colQ_Bronco = logisticsItems.find(item => item && item.title && (item.title === "ブロンコビリー工数" || item.title === "実績_ブロンコビリー工数"));
     const colS_Genuse = logisticsItems.find(item => item && item.title && (item.title === "汎用工数" || item.title === "実績_汎用工数"));
     const colU_Ikkatsu = logisticsItems.find(item => item && item.title && (item.title === "一括工数" || item.title === "実績_一括工数"));
-
     return currentMonthIndices.map(idx => {
       const label = baseLabels[idx];
-      
       const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
       const lycosH = colM_Lycos && colM_Lycos.values ? n(colM_Lycos.values[idx]) : 0;
       const iceH = colO_Ice && colO_Ice.values ? n(colO_Ice.values[idx]) : 0;
       const broncoH = colQ_Bronco && colQ_Bronco.values ? n(colQ_Bronco.values[idx]) : 0;
       const genuseH = colS_Genuse && colS_Genuse.values ? n(colS_Genuse.values[idx]) : 0;
       const ikkatsuH = colU_Ikkatsu && colU_Ikkatsu.values ? n(colU_Ikkatsu.values[idx]) : 0;
-
       const directSum = lycosH + iceH + broncoH + genuseH + ikkatsuH;
-      const indirectH = Math.max(0, totalH - directSum);
-
-      return {
-        name: label,
-        'リコス': Math.round(lycosH),
-        'リコスアイス': Math.round(iceH),
-        'ブロンコビリー': Math.round(broncoH),
-        '汎用': Math.round(genuseH),
-        '一括': Math.round(ikkatsuH),
-        '間接工数': Math.round(indirectH)
-      };
+      return { name: label, 'リコス': Math.round(lycosH), 'リコスアイス': Math.round(iceH), 'ブロンコビリー': Math.round(broncoH), '汎用': Math.round(genuseH), '一括': Math.round(ikkatsuH), '間接工数': Math.round(Math.max(0, totalH - directSum)) };
     });
   };
 
@@ -347,7 +341,23 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             {['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
         </div>
+        
+        {/* 💥 右上の月切り替えフィルター（プルダウン形式） */}
         <div className="flex gap-3 items-center">
+          <div className="relative flex items-center group">
+            <Calendar size={14} className="absolute left-3 text-slate-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
+            <select 
+              value={globalSelectedMonth}
+              onChange={(e) => { setGlobalSelectedMonth(e.target.value); setSelectedWeek(0); }}
+              className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-black pl-9 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all cursor-pointer hover:border-slate-300"
+            >
+              {availableMonths.map((m, idx) => (
+                <option key={idx} value={m}>{m}月度を表示</option>
+              ))}
+            </select>
+            <ChevronDown size={12} className="absolute right-3 text-slate-400 pointer-events-none" />
+          </div>
+
           {['dx', 'env', 'history'].includes(activeTab) && (
             <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"><Plus size={14} /> 新規追加</button>
           )}
@@ -361,18 +371,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
       <main className="p-10 max-w-[1800px] mx-auto space-y-8">
         
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-[2rem] shadow-lg flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex items-center gap-2 ml-2">
-            <Calendar size={18} className="text-amber-400" />
-            <span className="text-xs font-black uppercase tracking-widest text-slate-300">表示対象月マスター選択 (A列自動解析) :</span>
-          </div>
-          <div className="flex gap-2">
-            {availableMonths.map((m, idx) => (
-              <button key={idx} onClick={() => { setGlobalSelectedMonth(m); setSelectedWeek(0); }} className={`px-6 py-2.5 rounded-xl font-black text-xs transition-all ${globalSelectedMonth === m ? 'bg-amber-500 text-slate-950 shadow-md transform scale-105' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>{m}月度を表示</button>
-            ))}
-          </div>
-        </div>
-
         <div className="flex flex-wrap gap-2.5">
           {tabs.map((t) => (
             <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-6 py-3 rounded-2xl transition-all font-black text-xs ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
@@ -399,8 +397,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
                 return (
-                  <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customerRelated === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
-                    {item.customerRelated === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
+                  <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
+                    {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
                     <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
                       <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
                       <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
@@ -410,7 +408,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         <PieChart>
                           <Pie data={chartPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} startAngle={90} endAngle={-270} dataKey="value">
                             <Cell fill={themeColor} />
-                            <Cell fill={item.customerRelated === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
+                            <Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
                           </Pie>
                         </PieChart>
                       </ResponsiveContainer>
@@ -423,7 +421,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-md text-white" style={{ backgroundColor: themeColor }}>施策 {index + 1}</span>
-                          {item.startDate && <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">📅 {item.startDate} ～ {item.endDate || '未定'}</span>}
+                          {item.start_date && <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">📅 {item.start_date} ～ {item.end_date || '未定'}</span>}
                         </div>
                         <h3 className="text-base font-black text-slate-900 tracking-tight pt-1 leading-snug">{item.name}</h3>
                       </div>
@@ -472,7 +470,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 8. 工数 (物量列を完全に排除した実時間・人工スタック分析) */}
+        {/* 8. 工数 */}
         {activeTab === 'manhours' && (
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -498,7 +496,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 1,2,3,4番タブ通常グラフ（完璧なオリジナルロジックを完全再現！） */}
+        {/* 1,2,3,4番タブ通常グラフ */}
         {!['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -508,7 +506,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               
               let chartData = []; let dispAct = 0; let dispFct = 0;
-
               if (displayMode === 'daily') {
                 chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
                 const today = new Date(); const todayMonth = today.getMonth() + 1; const todayDate = today.getDate();
@@ -541,10 +538,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0;
                 } else if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); } else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
               }
-
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast);
-
               return (
                 <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
                   <div className="flex justify-between items-start border-b border-slate-100 pb-4">
@@ -565,7 +560,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </div>
                     )}
                   </div>
-
                   <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start' : 'w-full'}>
                     <div className={displayMode !== 'daily' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100'}>
                       <ResponsiveContainer width="100%" height="100%">
@@ -580,7 +574,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
-
                     {displayMode !== 'daily' && (
                       <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
                         <div className="border-b border-slate-800 pb-2">
@@ -623,7 +616,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingIndex !== null ? '編集上書き' : '新規追加'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={18} /></button>
             </div>
-
             {activeTab === 'history' ? (
               <div className="space-y-4 text-xs font-bold text-slate-700">
                 <div className="space-y-1"><label className="text-slate-400">1. 日付 *必須</label><input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
@@ -660,7 +652,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
             )}
-
             <div className="flex gap-3 pt-2">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-700">キャンセル</button>
               <button onClick={handleSaveItem} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black shadow-md">データを安全に保存</button>
@@ -668,7 +659,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
