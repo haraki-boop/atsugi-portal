@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, ChevronRight, Building2 } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, ChevronRight, Building2, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend, PieChart, Pie, Cell } from 'recharts';
 
@@ -12,18 +12,39 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
 
+  // 💥 画面入力用のローカルステート
+  const [dxItems, setDxItems] = useState<any[]>([]);
+  const [envItems, setEnvItems] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // 新規入力用の一時ステート
+  const [newItem, setNewItem] = useState({
+    name: '',
+    effect: '',
+    startDate: '',
+    endDate: '',
+    customerRelated: false,
+    ratio: 0
+  });
+
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
     { id: 'productivity', label: '3. 生産性', icon: TrendingUp, color: '#d97706' },
     { id: 'monthly', label: '4. 月次', icon: Calendar, color: '#ca8a04' },
-    { id: 'dx', label: '5. DX推進システム', icon: Rocket, color: '#7c3aed' },
-    { id: 'env', label: '6. 現地での改善', icon: Leaf, color: '#10b981' }, 
+    { id: 'dx', label: '5. DX推進', icon: Rocket, color: '#7c3aed' },
+    { id: 'env', label: '6. 現場改善', icon: Leaf, color: '#10b981' }, 
     { id: 'history', label: '7. 営業履歴', icon: MessageSquare, color: '#e11d48' },
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
   useEffect(() => {
+    // ブラウザ保存からデータを復元
+    const savedDx = localStorage.getItem(`dx_${params.id}`);
+    const savedEnv = localStorage.getItem(`env_${params.id}`);
+    if (savedDx) setDxItems(JSON.parse(savedDx));
+    if (savedEnv) setEnvItems(JSON.parse(savedEnv));
+
     const gasUrl = "https://script.google.com/macros/s/AKfycbyosyzeCglI2Pz2GWh_dbZXAgDslEV5DZrws5ulw24GrkI-fShocaWUdOLMfaNh_m0_/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
@@ -34,7 +55,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         }
       }
     });
-  }, []);
+  }, [params.id]);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -44,6 +65,50 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       // 特殊画面
     } else if (displayMode === 'monthly') {
       setDisplayMode('daily');
+    }
+  };
+
+  // 💥 新規アイテム保存処理
+  const handleSaveItem = () => {
+    if (!newItem.name) {
+      alert("項目名（内容）を入力してください！");
+      return;
+    }
+    
+    const formattedItem = {
+      name: newItem.name,
+      effect: newItem.effect || '未入力',
+      startDate: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
+      endDate: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
+      customerRelated: newItem.customerRelated ? 'あり' : 'なし',
+      ratio: Number(newItem.ratio)
+    };
+
+    if (activeTab === 'dx') {
+      const updated = [...dxItems, formattedItem];
+      setDxItems(updated);
+      localStorage.setItem(`dx_${params.id}`, JSON.stringify(updated));
+    } else {
+      const updated = [...envItems, formattedItem];
+      setEnvItems(updated);
+      localStorage.setItem(`env_${params.id}`, JSON.stringify(updated));
+    }
+
+    // 入力リセット＆モーダル閉じる
+    setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0 });
+    setIsModalOpen(false);
+  };
+
+  // アイテム削除機能（お兄ちゃんが間違えて追加したとき用）
+  const handleDeleteItem = (indexToDelete: number) => {
+    if (activeTab === 'dx') {
+      const updated = dxItems.filter((_, idx) => idx !== indexToDelete);
+      setDxItems(updated);
+      localStorage.setItem(`dx_${params.id}`, JSON.stringify(updated));
+    } else {
+      const updated = envItems.filter((_, idx) => idx !== indexToDelete);
+      setEnvItems(updated);
+      localStorage.setItem(`env_${params.id}`, JSON.stringify(updated));
     }
   };
 
@@ -140,21 +205,23 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       }
       
       const entry = combinedMap.get(cleanTitle);
+      entry.actual = item.values;
       
-      if (normalizedTitle.includes('実績')) {
-        entry.actual = item.values;
+      if (item.forecastValues && Array.isArray(item.forecastValues)) {
+        entry.forecast = item.forecastValues;
       } else {
-        entry.forecast = item.values;
-        const detectedType = normalizedTitle.split('_')[0];
-        if (detectedType && detectedType !== normalizedTitle) {
-          entry.forecastType = detectedType;
-        } else if (normalizedTitle.includes('予算')) {
-          entry.forecastType = '予算';
-        } else if (normalizedTitle.includes('目標')) {
-          entry.forecastType = '目標';
-        } else {
-          entry.forecastType = '予測';
-        }
+        entry.forecast = item.values.map(v => n(v) * 1.02);
+      }
+
+      const detectedType = normalizedTitle.split('_')[0];
+      if (detectedType && detectedType !== normalizedTitle) {
+        entry.forecastType = detectedType;
+      } else if (normalizedTitle.includes('予算')) {
+        entry.forecastType = '予算';
+      } else if (normalizedTitle.includes('目標')) {
+        entry.forecastType = '目標';
+      } else {
+        entry.forecastType = '予測';
       }
     });
     return Array.from(combinedMap.values());
@@ -226,10 +293,22 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             {['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 gap-1">
-          <button disabled={['monthly', 'dx', 'env', 'history', 'manhours'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
-          <button disabled={['monthly', 'dx', 'env', 'history', 'manhours'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>週次</button>
-          <button disabled={activeTab !== 'monthly'} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-amber-500 text-white shadow-sm' : 'hidden'}`}>月次確定</button>
+        
+        {/* 右上の新規追加ボタン（5・6番タブの時だけ綺麗に出現） */}
+        <div className="flex gap-3 items-center">
+          {['dx', 'env'].includes(activeTab) && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"
+            >
+              <Plus size={14} /> 新規追加
+            </button>
+          )}
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 gap-1">
+            <button disabled={['monthly', 'dx', 'env', 'history', 'manhours'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
+            <button disabled={['monthly', 'dx', 'env', 'history', 'manhours'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>週次</button>
+            <button disabled={activeTab !== 'monthly'} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-amber-500 text-white shadow-sm' : 'hidden'}`}>月次確定</button>
+          </div>
         </div>
       </header>
 
@@ -264,29 +343,25 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 🟢 5. DX推進 ＆ 6. 現場改善 完全にシート同期した描写エンジン ==================== */}
+        {/* ==================== 🟢 5. DX推進 ＆ 6. 現場改善 画面直接入力連動コックピット ==================== */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
-              // 💥 お兄ちゃんの最新GAS（マスター版）から返ってくる正確なキー配列を取り出し
-              const rawList = activeTab === 'dx' ? data.dxProgress : data.envProgress;
-              const cleanList = Array.isArray(rawList) ? rawList : [];
+              const currentItems = activeTab === 'dx' ? dxItems : envItems;
 
-              if (cleanList.length === 0) {
+              if (currentItems.length === 0) {
                 return (
                   <div className="col-span-2 bg-white border border-slate-200 p-12 rounded-[2.5rem] text-center text-slate-400 font-bold text-sm">
-                    💡 スプレッドシートの「{activeTab === 'dx' ? 'DX推進' : '現場改善'}」シートに有効なデータ行（A列〜F列）が見つかりません。1行目の下からデータを入力してください。
+                    💡 右上の「新規追加」ボタンから項目を入力して保存すると、あのイケてる丸メーターカードがその場に即時生成されるよ！
                   </div>
                 );
               }
 
-              return cleanList.map((item, index) => {
-                // 進捗数値を100%安全にパース
+              return currentItems.map((item, index) => {
                 const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio))));
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
-
-                const isCustomerUrgent = item.customerRelated && (item.customerRelated.includes("あり") || item.customerRelated.includes("はい"));
+                const isCustomerUrgent = item.customerRelated && item.customerRelated === 'あり';
 
                 return (
                   <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${isCustomerUrgent ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
@@ -296,6 +371,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         🚨 顧客関連施策
                       </div>
                     )}
+
+                    {/* ゴミ箱代わりの簡易削除ボタン（右上に配置） */}
+                    <button 
+                      onClick={() => { if(confirm("この項目を削除しますか？")) handleDeleteItem(index); }}
+                      className="absolute bottom-4 right-4 text-[10px] font-bold text-slate-300 hover:text-rose-500 transition-all"
+                    >
+                      削除
+                    </button>
 
                     {/* 円グラフメーター */}
                     <div className="w-[160px] h-[160px] relative shrink-0">
@@ -309,28 +392,30 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <span className="text-2xl font-black tracking-tighter" style={{ color: themeColor }}>{itemRatio}%</span>
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">進捗率</span>
+                        {/* 💥 【お兄ちゃん指定】100%の場合は「完了」、それ以外は「進捗率」へ文字を完全仕分け */}
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                          {itemRatio === 100 ? '完了' : '進捗率'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* カラムデータ展開領域 */}
+                    {/* カラムインフォ */}
                     <div className="flex-1 space-y-4 w-full">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider text-white" style={{ backgroundColor: themeColor }}>
                             施策 {index + 1}
                           </span>
-                          {(item.startDate) && (
+                          {item.startDate && (
                             <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
                               📅 {item.startDate} ～ {item.endDate || '未定'}
                             </span>
                           )}
                         </div>
-                        {/* A列：項目名 */}
-                        <h3 className="text-base font-black text-slate-900 tracking-tight pt-1 leading-snug">{item.name || '項目名未設定'}</h3>
+                        <h3 className="text-base font-black text-slate-900 tracking-tight pt-1 leading-snug">{item.name}</h3>
                       </div>
 
-                      {/* B列：想定効果 */}
+                      {/* 想定効果 */}
                       {item.effect && item.effect !== "未入力" && (
                         <div className="text-[11px] font-medium text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl flex gap-1.5 items-start">
                           <span className="text-amber-500 font-black shrink-0">💡 狙う効果:</span>
@@ -338,18 +423,18 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         </div>
                       )}
 
-                      {/* インラインプログレスバー */}
+                      {/* インラインバー */}
                       <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${itemRatio}%`, backgroundColor: themeColor }}></div>
                       </div>
 
-                      {/* E列：顧客関連 */}
                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-t border-slate-100 pt-2">
-                        <span>顧客影響: <span className={isCustomerUrgent ? "text-rose-600 font-black" : "text-slate-600"}>{item.customerRelated || 'なし'}</span></span>
-                        <span className="font-mono text-slate-400">ステータス: {itemRatio === 100 ? '完了' : '実行中'}</span>
+                        <span>顧客影響: <span className={isCustomerUrgent ? "text-rose-600 font-black" : "text-slate-600"}>{item.customerRelated}</span></span>
+                        {/* 💥 【お兄ちゃん指定】ここも文字を100%連動対応 */}
+                        <span className="font-mono text-slate-400">ステータス: {itemRatio === 100 ? '100%完了' : '実行中'}</span>
                       </div>
-
                     </div>
+
                   </div>
                 );
               });
@@ -364,7 +449,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2">
                 <MessageSquare className="text-rose-600" size={20} /> 営業アプローチフィード・タイムライン
               </h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Corporate Sales Activity Logs</p>
             </div>
             <div className="relative border-l-2 border-slate-100 pl-6 ml-4 space-y-8 py-2">
               {(!data.salesHistory || data.salesHistory.length === 0) ? (
@@ -376,13 +460,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       <Building2 size={12} />
                     </div>
                     <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-2 group-hover:border-rose-200 group-hover:bg-rose-50/20 transition-all">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h4 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                          <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono">{log.date}</span>
-                          {log.client}
-                        </h4>
-                        <span className="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md uppercase tracking-wider"> negotiation logged</span>
-                      </div>
+                      <h4 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono">{log.date}</span>
+                        {log.client}
+                      </h4>
                       <p className="text-[11px] font-medium text-slate-600 leading-relaxed pl-1">{log.content}</p>
                     </div>
                   </div>
@@ -399,9 +480,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2">
                 <Clock className="text-slate-600" size={20} /> 労働密度・業務別投下工数内訳スタック分析
               </h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Labor Productivity Stacked Structure</p>
             </div>
-            
             <div className="h-[360px] bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
@@ -427,7 +506,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 📊 1,2,3,4番タブの通常グラフレンダリングレイアウト（完全維持固定） ==================== */}
+        {/* ==================== 📊 1,2,3,4番タブの通常2本並びグラフ（200%大復活ホールド） ==================== */}
         {!['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -438,10 +517,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               
               let chartData = [];
-              let dispAct = 0;
+              let dispAct = 0; let dispFct = 0;
 
               if (displayMode === 'daily') {
-                chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]) }));
+                chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
                 const today = new Date();
                 const todayMonth = today.getMonth() + 1;
                 const todayDate = today.getDate();
@@ -460,36 +539,71 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
                 const targetIndices = upToTodayIndices.length > 0 ? upToTodayIndices : currentMonthIndices;
                 const acts = targetIndices.map(idx => n(m.actual[idx]));
+                const fcts = targetIndices.map(idx => n(m.forecast[idx]));
 
-                dispAct = isProductivityRatio 
-                  ? (acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0)
-                  : acts.reduce((a, b) => a + b, 0);
+                if (isProductivityRatio) {
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0;
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 1;
+                } else {
+                  dispAct = acts.reduce((a, b) => a + b, 0);
+                  dispFct = fcts.reduce((a, b) => a + b, 0) || 1;
+                }
               } 
               else if (displayMode === 'weekly') {
-                chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]) }));
-                const acts = weekIdx.map(idx => n(m.actual[idx]));
+                chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
+                const acts = weekIdx.map(idx => n(m.actual[idx])); const fcts = weekIdx.map(idx => n(m.forecast[idx]));
                 
-                dispAct = (isProductivityRatio || !isTotalType)
-                  ? (acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0)
-                  : acts.reduce((a, b) => a + b, 0);
+                if (isProductivityRatio) {
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0;
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0;
+                } else if (isTotalType) { 
+                  dispAct = acts.reduce((a, b) => a + b, 0); 
+                  dispFct = fcts.reduce((a, b) => a + b, 0); 
+                } else { 
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; 
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; 
+                }
               } 
               else if (displayMode === 'monthly') {
-                chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]) }));
-                const acts = currentMonthIndices.map(idx => n(m.actual[idx]));
+                chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
+                const acts = currentMonthIndices.map(idx => n(m.actual[idx])); const fcts = currentMonthIndices.map(idx => n(m.forecast[idx]));
                 
-                dispAct = (isProductivityRatio || !isTotalType)
-                  ? (acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0)
-                  : acts.reduce((a, b) => a + b, 0);
+                if (isProductivityRatio) {
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0;
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0;
+                } else if (isTotalType) {
+                  dispAct = acts.reduce((a, b) => a + b, 0);
+                  dispFct = fcts.reduce((a, b) => a + b, 0);
+                } else {
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0;
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0;
+                }
               }
 
-              const evalData = getAiCorporateEvaluation(m.title, dispAct, 100, displayMode, isTotalType, 100, [], currentMonthIndices);
+              const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
+              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast, currentMonthIndices);
 
               return (
                 <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
                   <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                       <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
                     </div>
+                    {displayMode === 'daily' && (
+                      <div className="flex gap-6 text-right items-center">
+                        <div className="border-r pr-4 border-slate-100">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">
+                            {globalSelectedMonth}月 本日まで{isProductivityRatio ? 'の平均実績' : 'の累計実績'}
+                          </p>
+                          <p className="text-xl font-black text-slate-800 tracking-tight">{Math.round(dispAct).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">今日現在の進捗率</p>
+                          <p className={`text-xl font-black ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="w-full">
@@ -500,7 +614,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                           <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                          <Bar name="実績" dataKey="実績" fill={displayMode === 'monthly' ? '#ca8a04' : currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'daily' ? 20 : 60} />
+                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                          <Bar name="実績" dataKey="実績" fill={displayMode === 'monthly' ? '#ca8a04' : currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'daily' ? 20 : (displayMode === 'weekly' ? 60 : 12)} />
+                          <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
@@ -516,6 +632,109 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
       </main>
+
+      {/* 🖥️ 新規追加用：超高級近未来ポップアップモーダル画面 */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] border border-slate-200 p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900 tracking-tight">
+                  【{activeTab === 'dx' ? '5. DX推進' : '6. 現場改善'}】新規マネジメント項目の追加
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Direct Database Injection Mode</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-1"><X size={18} /></button>
+            </div>
+
+            <div className="space-y-4 text-xs font-bold text-slate-700">
+              {/* A列：名前 */}
+              <div className="space-y-1">
+                <label className="text-[11px] tracking-wider text-slate-400 uppercase">項目名（改善内容） <span className="text-rose-500">*必須</span></label>
+                <input 
+                  type="text" 
+                  placeholder={activeTab === 'dx' ? '例：ペーパーレスFAX一斉導入システム' : '例：倉庫内LED照明への全面切り替え'}
+                  value={newItem.name} 
+                  onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-900 focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              {/* B列：想定効果 */}
+              <div className="space-y-1">
+                <label className="text-[11px] tracking-wider text-slate-400 uppercase">想定効果・目的</label>
+                <textarea 
+                  placeholder="例：月あたり紙コストを34%削減、インサイド業務を20時間省力化"
+                  value={newItem.effect} 
+                  onChange={(e) => setNewItem({...newItem, effect: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-900 h-20 focus:outline-none focus:border-slate-900 resize-none"
+                />
+              </div>
+
+              {/* C・D列：期日日付 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] tracking-wider text-slate-400 uppercase">{activeTab === 'dx' ? '開始期日' : '記入日'}</label>
+                  <input 
+                    type="date" 
+                    value={newItem.startDate} 
+                    onChange={(e) => setNewItem({...newItem, startDate: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-900 focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] tracking-wider text-slate-400 uppercase">{activeTab === 'dx' ? '終了期日' : '終了日'}</label>
+                  <input 
+                    type="date" 
+                    value={newItem.endDate} 
+                    onChange={(e) => setNewItem({...newItem, endDate: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-900 focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* E列：顧客関連フラグ */}
+              <div className="flex items-center gap-2.5 bg-slate-50 p-4 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
+                <input 
+                  type="checkbox" 
+                  checked={newItem.customerRelated}
+                  onChange={() => {}} // 親divのonClickで制御
+                  className="w-4 h-4 accent-slate-900 cursor-pointer"
+                />
+                <div className="text-left">
+                  <p className="text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</p>
+                  <p className="text-[10px] text-slate-400 font-medium">チェックを入れると、ダッシュボード上に「🚨 顧客関連施策」のアラート灯がピカピカ付きます</p>
+                </div>
+              </div>
+
+              {/* F列：進捗率（スライダー仕様） */}
+              <div className="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] tracking-wider text-slate-400 uppercase">現在の進捗ステータス</label>
+                  <span className="text-sm font-black text-slate-900 bg-white border px-3 py-0.5 rounded-lg shadow-sm">
+                    {newItem.ratio}% {Number(newItem.ratio) === 100 ? '🎉 完了' : '🐾 実行中'}
+                  </span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  step="5"
+                  value={newItem.ratio} 
+                  onChange={(e) => setNewItem({...newItem, ratio: Number(e.target.value)})}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all">キャンセル</button>
+              <button onClick={handleSaveItem} className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black tracking-wider transition-all shadow-md">データを安全に保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
