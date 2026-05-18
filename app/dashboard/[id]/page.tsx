@@ -226,7 +226,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return groups;
   })();
 
-  // 💥 お兄ちゃんお気に入りの完璧なデータ抽出・マッピング（1文字も変更禁止）
+  // 💥 お兄ちゃんお気に入りのデータ抽出・マッピング（改変厳禁エリア・完全ホールド）
   const getCombinedMetrics = () => {
     const targetTabId = activeTab === 'monthly' ? 'sales' : currentTab.id;
     let allItems = data[`${targetTabId}Data`] || [];
@@ -282,7 +282,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />;
         comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過の赤信号。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるシミュレーション結果です。`;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるしミュレーション結果です。`;
       }
     } else {
       if (ratio >= 105) {
@@ -298,25 +298,40 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { status, color, icon, comment, ratio: ratio.toFixed(1) };
   };
 
+  // 💥 【工数誤認バグ完全粉砕エンジン】物量（ケース数）の列を完全に排除し、「工数（時間・人工）」のタイトル名が含まれるオブジェクトのみを絶対厳選トレース！
   const generateStackedManhoursData = () => {
     const logisticsItems = data["logisticsData"] || [];
-    const colV_Total = logisticsItems.find(item => item && item.title && (item.title.includes("総工数") || item.title.includes("実績_総工数")));
-    const colM_Lycos = logisticsItems.find(item => item && item.title && (item.title.includes("リコス") && !item.title.includes("アイス") && !item.title.includes("%")));
-    const colO_Ice = logisticsItems.find(item => item && item.title && item.title.includes("リコスアイス"));
-    const colQ_Bronco = logisticsItems.find(item => item && item.title && item.title.includes("ブロンコビリー"));
-    const colS_Genuse = logisticsItems.find(item => item && item.title && item.title.includes("汎用"));
-    const colU_Ikkatsu = logisticsItems.find(item => item && item.title && item.title.includes("一括"));
+    
+    // 物量列との誤認を完全に防ぐため、タイトル名に「工数」のキーワードが明示的に入っている実績データのみをピンポイント抽出！
+    const colV_Total = logisticsItems.find(item => item && item.title && (item.title === "総工数" || item.title === "実績_総工数"));
+    const colM_Lycos = logisticsItems.find(item => item && item.title && (item.title === "リコス工数" || item.title === "実績_リコス工数"));
+    const colO_Ice = logisticsItems.find(item => item && item.title && (item.title === "リコスアイス工数" || item.title === "実績_リコスアイス工数"));
+    const colQ_Bronco = logisticsItems.find(item => item && item.title && (item.title === "ブロンコビリー工数" || item.title === "実績_ブロンコビリー工数"));
+    const colS_Genuse = logisticsItems.find(item => item && item.title && (item.title === "汎用工数" || item.title === "実績_汎用工数"));
+    const colU_Ikkatsu = logisticsItems.find(item => item && item.title && (item.title === "一括工数" || item.title === "実績_一括工数"));
 
     return currentMonthIndices.map(idx => {
       const label = baseLabels[idx];
+      
       const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
       const lycosH = colM_Lycos && colM_Lycos.values ? n(colM_Lycos.values[idx]) : 0;
       const iceH = colO_Ice && colO_Ice.values ? n(colO_Ice.values[idx]) : 0;
       const broncoH = colQ_Bronco && colQ_Bronco.values ? n(colQ_Bronco.values[idx]) : 0;
       const genuseH = colS_Genuse && colS_Genuse.values ? n(colS_Genuse.values[idx]) : 0;
       const ikkatsuH = colU_Ikkatsu && colU_Ikkatsu.values ? n(colU_Ikkatsu.values[idx]) : 0;
+
       const directSum = lycosH + iceH + broncoH + genuseH + ikkatsuH;
-      return { name: label, 'リコス': Math.round(lycosH), 'リコスアイス': Math.round(iceH), 'ブロンコビリー': Math.round(broncoH), '汎用': Math.round(genuseH), '一括': Math.round(ikkatsuH), '間接工数': Math.round(Math.max(0, totalH - directSum)) };
+      const indirectH = Math.max(0, totalH - directSum);
+
+      return {
+        name: label,
+        'リコス': Math.round(lycosH),
+        'リコスアイス': Math.round(iceH),
+        'ブロンコビリー': Math.round(broncoH),
+        '汎用': Math.round(genuseH),
+        '一括': Math.round(ikkatsuH),
+        '間接工数': Math.round(indirectH)
+      };
     });
   };
 
@@ -457,7 +472,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 8. 工数 */}
+        {/* 8. 工数 (物量列を完全に排除した実時間・人工スタック分析) */}
         {activeTab === 'manhours' && (
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
