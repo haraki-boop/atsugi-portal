@@ -17,8 +17,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
     { id: 'productivity', label: '3. 生産性', icon: TrendingUp, color: '#d97706' },
     { id: 'monthly', label: '4. 月次', icon: Calendar, color: '#ca8a04' },
-    { id: 'dx', label: '5. DX推進', icon: Rocket, color: '#7c3aed' },
-    { id: 'env', label: '6. 現場改善', icon: Leaf, color: '#10b981' }, 
+    { id: 'dx', label: '5. DX推進システム', icon: Rocket, color: '#7c3aed' },
+    { id: 'env', label: '6. 現地での改善', icon: Leaf, color: '#10b981' }, 
     { id: 'history', label: '7. 営業履歴', icon: MessageSquare, color: '#e11d48' },
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
@@ -53,7 +53,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
-  // 💥 文字列から半角数字だけを確実にぶっこ抜いて「安全に数値化」する絶対安全ガード
+  // 💥 安全に数値をパースする防壁ロジック
   const n = (val: any) => {
     if (val === undefined || val === null || val === "") return 0;
     const clean = val.toString().replace(/[^0-9.-]/g, '');
@@ -202,7 +202,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
         icon = <ThumbsUp size={14} className="text-emerald-600" />;
-        comment = `【経営予測：収益ポテンシャル拡大】『${title}高は目標値を【${formatVal(deviationAmount)}】上振れ突破する見込みです。`;
+        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%の躍進。最終売上高は目標値を【${formatVal(deviationAmount)}】上振れ突破する見込みです。`;
       } else if (ratio < 95) {
         status = 'WARNING';
         color = 'text-rose-700 bg-rose-50 border-rose-200';
@@ -265,24 +265,30 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 🟢 5. DX推進 & 6. 現場改善 完全バグ修正・多カラム描写エンジン ==================== */}
+        {/* ==================== 🟢 5. DX推進 ＆ 6. 現地での改善 完全にシート同期した描写エンジン ==================== */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
-              // 💥 【3枚目エラー一撃粉砕！】GAS側から送られてくる `dxProgress` or `envProgress` を100%安全にパース
-              const rawList = activeTab === 'dx' ? data.dxProgress : data.envProgress;
-              const cleanList = Array.isArray(rawList) ? rawList : [];
+              // 💥 【シート名迷子を一発撃破！】GAS側からくる `dxProgress` と `envProgress` もしくは生シート名配列を完全フォールバック
+              const rawList = activeTab === 'dx' 
+                ? (data.dxProgress || data["DX推進"] || []) 
+                : (data.envProgress || data["現場改善"] || data["現地での改善"] || []);
+              
+              // 💥 ヘッダー行「項目」「効果」の文字が入っている行を絶対に排除する鉄壁フィルター
+              const cleanList = Array.isArray(rawList) 
+                ? rawList.filter(item => item && item.name !== "項目" && item.name !== "項目名" && item.name !== "施策名") 
+                : [];
 
               if (cleanList.length === 0) {
                 return (
                   <div className="col-span-2 bg-white border border-slate-200 p-12 rounded-[2.5rem] text-center text-slate-400 font-bold text-sm">
-                    💡 スプレッドシートの「{activeTab === 'dx' ? 'DX推進' : '現場改善'}」シートに有効なデータ行（A列〜F列）が見つかりません。
+                    💡 スプレッドシートの「{activeTab === 'dx' ? 'DX推進' : '現場改善'}」シートに有効なデータ行（A列〜F列）が見つかりません。1行目の下からデータを入力してください。
                   </div>
                 );
               }
 
               return cleanList.map((item, index) => {
-                // 💥 【2枚目NaN%を完全消滅！】n()関数を噛ませて文字混じりの進捗率を純粋な整数に100%変換
+                // 進捗率を安全に0〜100%の数値へ変換
                 const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio || item.progress))));
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
@@ -310,42 +316,44 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <span className="text-2xl font-black tracking-tighter" style={{ color: themeColor }}>{itemRatio}%</span>
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">PROGRESS</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">進捗率</span>
                       </div>
                     </div>
 
-                    {/* カラムインフォメーション */}
+                    {/* カラムデータ展開領域 */}
                     <div className="flex-1 space-y-4 w-full">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider text-white" style={{ backgroundColor: themeColor }}>
-                            INDEX {index + 1}
+                            施策 {index + 1}
                           </span>
-                          {item.startDate && (
+                          {(item.startDate || item.date || item.dueDate) && (
                             <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                              📅 {item.startDate} ～ {item.endDate || '未定'}
+                              📅 {item.startDate || item.date} ～ {item.endDate || item.dueDate || '未定'}
                             </span>
                           )}
                         </div>
+                        {/* A列：項目名 */}
                         <h3 className="text-base font-black text-slate-900 tracking-tight pt-1 leading-snug">{item.name || '項目名未設定'}</h3>
                       </div>
 
                       {/* B列：想定効果 */}
-                      {item.effect && item.effect !== "未入力" && (
+                      {item.effect && item.effect !== "未入力" && item.effect !== "効果" && (
                         <div className="text-[11px] font-medium text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl flex gap-1.5 items-start">
                           <span className="text-amber-500 font-black shrink-0">💡 狙う効果:</span>
                           <p className="leading-normal">{item.effect}</p>
                         </div>
                       )}
 
-                      {/* インラインバー */}
+                      {/* インラインプログレスバー */}
                       <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${itemRatio}%`, backgroundColor: themeColor }}></div>
                       </div>
 
+                      {/* E列：顧客関連 */}
                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-t border-slate-100 pt-2">
                         <span>顧客影響: <span className={isCustomerUrgent ? "text-rose-600 font-black" : "text-slate-600"}>{item.customerRelated || 'なし'}</span></span>
-                        <span className="font-mono text-slate-400">STATUS: {itemRatio === 100 ? 'COMPLETE' : 'RUNNING'}</span>
+                        <span className="font-mono text-slate-400">ステータス: {itemRatio === 100 ? '完了' : '実行中'}</span>
                       </div>
 
                     </div>
@@ -437,7 +445,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               
               let chartData = [];
-              let dispAct = 0; let dispFct = 0;
+              let dispAct = 0;
 
               if (displayMode === 'daily') {
                 chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]) }));
