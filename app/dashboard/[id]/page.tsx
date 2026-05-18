@@ -38,7 +38,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
   };
 
-  // 💥 【完全固定】週のグルーピングロジック（日曜日切り替え）
+  // 💥 週のグルーピングロジック（日曜日切り替え）
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -46,7 +46,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     let weekCount = 1;
     let startLabel = labels[0];
     labels.forEach((label, idx) => {
-      // 安全ガード：万が一、変なラベルが混ざってもループが即死しないようにスルー
       if (!label || typeof label !== 'string' || !label.includes('/')) {
         currentWeekIndices.push(idx);
         return;
@@ -68,12 +67,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1", "4/2"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
-  // 💥 【完全固定】本物のデータ結合ロジック
+  // 💥 データ結合ロジック
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
     allItems.forEach(item => {
-      if (!item || !item.title || !item.values || !Array.isArray(item.values)) return; // 混線遮断ガード
+      if (!item || !item.title || !item.values || !Array.isArray(item.values)) return;
       const normalizedTitle = item.title.replace('＿', '_');
       let rawTitle = normalizedTitle.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
       let cleanTitle = item.title.includes('社会保険') ? '社会保険' : rawTitle;
@@ -89,10 +88,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 【完全固定】お兄ちゃんお気に入りの経営エキスパートAI（数字・財務特化評価）
-  const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal) => {
+  // 💥 経営エキスパートAI（数字・財務特化評価用）
+  const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal, currentRatio) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
-    const ratio = forecast > 0 ? (actual / forecast) * 100 : 0;
+    const ratio = currentRatio; // 割り返したガチの比率をそのまま評価に使う
     const modeText = mode === 'daily' ? '直近' : `当週${isTotal ? '合計' : '平均'}`;
 
     let status = 'STABLE';
@@ -164,14 +163,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* 4. 月次タブ（調整用空スペース） */}
+        {/* 4. 月次タブ */}
         {activeTab === 'monthly' ? (
           <div className="bg-slate-950 p-12 rounded-[3rem] border border-white/10 text-center text-slate-400 space-y-4">
             <p className="text-xl font-black text-amber-400 tracking-wider">🛠️ 月次データ表示エリア（指示待ち調整中）</p>
             <p className="text-xs text-slate-500">日次・週次の安全確認のため、月次のパースロジックは一度完全に停止しています。</p>
           </div>
         ) : (
-          /* 📅 【完全固定】お兄ちゃんが合格をくれた、最強の日次2列・週次1列の自動切り替え配置 */
+          /* 📅 日次2列・週次1列の自動切り替え配置 */
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
@@ -188,14 +187,19 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               } else {
                 chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
                 const acts = weekIdx.map(idx => n(m.actual[idx])); const fcts = weekIdx.map(idx => n(m.forecast[idx]));
-                if (isTotalType) { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
-                else { dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; }
+                if (isTotalType) { 
+                  dispAct = acts.reduce((a, b) => a + b, 0); 
+                  dispFct = fcts.reduce((a, b) => a + b, 0); 
+                } else { 
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0; 
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0; 
+                }
               }
 
-              // 💥 【105.3%固定バグを木っ端微塵に粉砕】
-              // 表示部分で別物の「ratio」を参照していたバグを修正し、各グラフごとの「リアルタイム連動％」を表示！
+              // 💥 【お兄ちゃんの指示通りに完全一本化】
+              // 画面に表示するパネルの数字（dispAct, dispFct）をそのまま直接「割り算」して％を算出する仕組みに改造！
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
-              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType);
+              const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio);
 
               return (
                 <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
@@ -250,7 +254,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           </div>
                           <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
                             <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span>
-                            {/* 💥 固定値バグが完全に消滅。選んだ週にリアルタイム連動する大迫力％ */}
+                            {/* 💥 固定値バグ消滅！パネル内の表示用数値（dispAct と dispFct）から直接その場で算出したパーセンテージ */}
                             <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                           </div>
                         </div>
