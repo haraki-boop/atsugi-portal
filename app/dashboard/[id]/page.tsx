@@ -218,6 +218,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const weeklyGroups = getWeeklyGroupsForCurrentMonth(baseLabels, currentMonthIndices);
 
+  // 💥 【大復活】ダミー予測％を完全に消滅させ、スプレッドシートの本物予測列（forecastValues）を100%ダイレクトに結合！
   const getCombinedMetrics = () => {
     const targetTabId = activeTab === 'monthly' ? 'sales' : currentTab.id;
     let allItems = data[`${targetTabId}Data`] || [];
@@ -244,12 +245,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       const entry = combinedMap.get(cleanTitle);
       entry.actual = item.values;
       
+      // 💥 スプレッドシート側の本物のデータをそのまま適用（ダミー計算を完全抹殺）
       if (item.forecastValues && Array.isArray(item.forecastValues)) {
         entry.forecast = item.forecastValues;
       } else if (item.forecast && Array.isArray(item.forecast)) {
         entry.forecast = item.forecast;
       } else {
-        entry.forecast = item.values.map(v => n(v) * 1.02);
+        entry.forecast = new Array(baseLabels.length).fill(0);
       }
 
       const detectedType = normalizedTitle.split('_')[0];
@@ -304,7 +306,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return { color, icon, comment };
   };
 
-  // 💥 【修正確定】お兄ちゃん指定列（M, O, Q, S, U, V列）実時間直結の工数集計ロジック
+  // 💥 【お兄ちゃん指定列完全直結】スプレッドシートの指定列（M, O, Q, S, U, V列）の実績時間からダイレクトに積み上げ！
   const generateStackedManhoursData = () => {
     const logisticsItems = data["logisticsData"] || [];
     
@@ -409,7 +411,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 return (
                   <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center relative overflow-hidden ${item.customerRelated === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                     {item.customerRelated === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連施策</div>}
-                    <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider">
+                    <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
                       <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1"><Edit2 size={11} /> 編集</button>
                       <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
@@ -437,7 +439,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 🔴 7. 営業履歴 タイムラインデザイン直接入力対応版 ==================== */}
+        {/* ==================== 🔴 7. 営業履歴 ==================== */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -504,7 +506,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 📊 1,2,3,4番タブ：週次・月次の確認パネル割り算を完全修正 ==================== */}
+        {/* ==================== 📊 1,2,3,4番タブ：バグ完全粉砕・リアルタイム2本並びグラフ ==================== */}
         {!['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -542,7 +544,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 }
                 rawCalculatedRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               } 
-              // --- 2. 週次モード（お兄ちゃん指定：画面表示データそのままの実績合計÷計画合計の割り算！） ---
+              // --- 2. 週次モード（画面表示データそのままの実績合計÷計画合計の割り算！） ---
               else if (displayMode === 'weekly') {
                 chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
                 const acts = weekIdx.map(idx => n(m.actual[idx])); const fcts = weekIdx.map(idx => n(m.forecast[idx]));
@@ -553,9 +555,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 } else { 
                   dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0) || 1; 
                 }
+                // 💥 画面に表示されている数値の単純割り算に完全修正！きもち悪い固定％を完全粉砕！
                 rawCalculatedRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               } 
-              // --- 3. 月次確定モード（お兄ちゃん指定：画面表示当月データそのままの実績合計÷計画合計の割り算！） ---
+              // --- 3. 月次確定モード（画面表示当月データそのままの実績合計÷計画合計の割り算！） ---
               else if (displayMode === 'monthly') {
                 chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
                 const acts = currentMonthIndices.map(idx => n(m.actual[idx])); const fcts = currentMonthIndices.map(idx => n(m.forecast[idx]));
@@ -566,6 +569,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 } else {
                   dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0) || 1;
                 }
+                // 💥 画面に表示されている数値の単純割り算に完全修正！きもち悪い固定％を完全粉砕！
                 rawCalculatedRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               }
 
@@ -600,13 +604,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                           <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
                           <Bar name="実績" dataKey="実績" fill={displayMode === 'monthly' ? '#ca8a04' : currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'daily' ? 20 : (displayMode === 'weekly' ? 60 : 12)} />
+                          {/* 💥 折れ線（計画値）もスプレッドシートの本物データを100%忠実にトレースして復活！ */}
                           <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
 
-                    {/* 💥 【バグ修正の心臓部】週次・月次で計算されたストレートな％を黒いパネルに完全にドロップイン！ */}
                     {displayMode !== 'daily' && (
                       <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
                         <div className="border-b border-slate-800 pb-2"><p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">当{displayMode === 'weekly' ? '週' : '月'}確認パネル</p></div>
@@ -621,6 +626,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           </div>
                           <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
                             <span className="text-xs font-black text-blue-400">達成率 (実績比)</span>
+                            {/* 💥 ここが死んでいた％表示の戦犯！ガチで計算された数値を直撃割り当て！ */}
                             <span className={`text-3xl font-black tracking-tighter ${rawCalculatedRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{rawCalculatedRatio.toFixed(1)}%</span>
                           </div>
                         </div>
@@ -637,7 +643,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         )}
       </main>
 
-      {/* 新規追加・編集用統合モーダルポップアップ */}
+      {/* モーダルポップアップ */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150">
@@ -648,7 +654,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
             {activeTab === 'history' ? (
               <div className="space-y-4 text-xs font-bold text-slate-700">
-                <div className="space-y-1"><label className="text-slate-400">1. 日付 *必須</label><input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
+                <div className="space-y-1"><label className="text-slate-400">1. 日端 *必須</label><input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">2. 誰に *必須</label><input type="text" value={newItem.client} onChange={(e) => setNewItem({...newItem, client: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">4. 内容詳細</label><textarea value={newItem.detail} onChange={(e) => setNewItem({...newItem, detail: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 h-24 resize-none font-semibold text-slate-900" /></div>
