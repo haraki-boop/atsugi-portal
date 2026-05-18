@@ -163,7 +163,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     const ratio = currentRatio;
     
     let modeText = '直近';
-    if (mode === 'daily') modeText = '当月日次平均'; // 🌟 AIテキストの表現を日次平均に修正
+    if (mode === 'daily') modeText = '今日までの累計進捗'; // AIコメントの基準テキストを修正
     if (mode === 'weekly') modeText = `当週${isTotal ? '合計' : '平均'}`;
     if (mode === 'monthly') modeText = `当月${isTotal ? '合計' : '平均'}`;
 
@@ -274,14 +274,43 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             let dispAct = 0; let dispFct = 0;
 
             if (displayMode === 'daily') {
+              // グラフは選択された月のデータを全日分綺麗にレンダリング
               chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
               
-              // 💥 【お兄ちゃん指定：日次モード時の右上実績数値を最新1日から「当月内の日次アベレージ平均」に大改造！】
-              const dailyActs = currentMonthIndices.map(idx => n(m.actual[idx]));
-              const dailyFcts = currentMonthIndices.map(idx => n(m.forecast[idx]));
-              
-              dispAct = dailyActs.length ? dailyActs.reduce((a, b) => a + b, 0) / dailyActs.length : 0;
-              dispFct = dailyFcts.length ? dailyFcts.reduce((a, b) => a + b, 0) / dailyFcts.length : 1;
+              // 💥 【新設：今日までの予算合計・実績合計を串刺し集計するエンジン】
+              const today = new Date();
+              const todayMonth = today.getMonth() + 1;
+              const todayDate = today.getDate();
+
+              // 今日までの日付に該当するインデックスだけをフィルタリング
+              const upToTodayIndices = currentMonthIndices.filter(idx => {
+                const label = m.labels[idx];
+                if (typeof label === 'string' && label.includes('/')) {
+                  const p = label.split('/');
+                  const mNum = parseInt(p[0], 10);
+                  const dNum = parseInt(p[1], 10);
+                  // 選択中の月と同じ月で、かつ今日以前の日付、または過去の月ならすべて対象
+                  if (mNum < todayMonth) return true;
+                  if (mNum === todayMonth && dNum <= todayDate) return true;
+                }
+                return false;
+              });
+
+              // 万が一データが未来のものしかない場合の安全ガード（その場合は全データを使う）
+              const targetIndices = upToTodayIndices.length > 0 ? upToTodayIndices : currentMonthIndices;
+
+              const acts = targetIndices.map(idx => n(m.actual[idx]));
+              const fcts = targetIndices.map(idx => n(m.forecast[idx]));
+
+              if (isProductivityRatio) {
+                // 生産性などの効率指標は、今日までの日次アベレージ平均で割り返す
+                dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0;
+                dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 1;
+              } else {
+                // 売上やコストなどの金額系は、お兄ちゃんの指示通り【今日までの純粋な累計実績合計 ✕ 累計予算合計】！
+                dispAct = acts.reduce((a, b) => a + b, 0);
+                dispFct = fcts.reduce((a, b) => a + b, 0) || 1;
+              }
             } 
             else if (displayMode === 'weekly') {
               chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
@@ -314,6 +343,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               }
             }
 
+            // 💥 【実績合計 ÷ 予算合計 ＝ 進捗率】として完全に一本化連動！
             const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
             const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast, currentMonthIndices);
 
@@ -328,12 +358,15 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   {displayMode === 'daily' && (
                     <div className="flex gap-6 text-right items-center">
                       <div className="border-r pr-4 border-slate-100">
-                        {/* 💥 看板テキストも「日次平均」であることが伝わるようにブラッシュアップ */}
-                        <p className="text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月度 日次平均実績</p>
+                        {/* 💥 看板のテキストも「今日までの累計」が伝わるプロ仕様に調整 */}
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">
+                          {globalSelectedMonth}月 本日まで{isProductivityRatio ? 'の平均実績' : 'の累計実績'}
+                        </p>
                         <p className="text-xl font-black text-slate-800 tracking-tight">{Math.round(dispAct).toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase">{m.forecastType}比</p>
+                        {/* 💥 ここが「今日までの実績合計 ÷ 予算合計 ＝ 進捗」のリアルタイム割り返し％ */}
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">今日現在の進捗率</p>
                         <p className={`text-xl font-black ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</p>
                       </div>
                     </div>
