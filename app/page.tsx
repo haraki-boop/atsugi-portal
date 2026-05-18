@@ -30,7 +30,7 @@ export default function MapPortalPage() {
     },
     {
       id: 'craft-delica',
-      name: 'クラフトデリカ（イオンフードサプライ本社）',
+      name: 'クラフトデリカ',
       address: '千葉県船橋市高瀬町24-6',
       lat: 35.6715,
       lng: 139.9930,
