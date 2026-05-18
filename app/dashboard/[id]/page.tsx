@@ -12,7 +12,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
 
-  // 🚀 Supabase用ステート（ローカルストレージからクラウドへ移行）
+  // Supabase用ステート
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
@@ -36,9 +36,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
-  // 🚀 Supabaseへ直接リクエストを送る共通関数
+  // 🚀 【重要修正】新しいデータAPI（sb_publishable_...）の正規URL構造に完全適合化
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
+      // 新しいデータAPIでは /v1/ の後に直接テーブル名を指定します
       const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
       const headers: any = {
         'apikey': 'sb_publishable_tFUeDqwtyM924ZEgXI94OQ_8g9sAV2q',
@@ -49,15 +50,19 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
       if (method === 'GET') {
         const res = await fetch(`${url}?location_id=eq.${params.id}&order=id.asc`, { method: 'GET', headers });
+        if (!res.ok) throw new Error(`GET ${res.status}`);
         return await res.json();
       } else if (method === 'POST') {
         const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
         const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
       } else if (method === 'DELETE') {
-        await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
+        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
+        if (!res.ok) throw new Error(`DELETE ${res.status}`);
         return true;
       }
     } catch (e) {
@@ -66,7 +71,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return null;
   };
 
-  // 🚀 クラウドからリアルタイムデータを読み込み
   const fetchSupabaseData = async () => {
     const dxData = await supabaseRequest('dx_actions', 'GET');
     if (dxData) setDxItems(dxData);
@@ -94,7 +98,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return Array.from(monthsSet).sort((a, b) => n(a) - n(b));
   };
 
-  // 1️⃣ 起動時にデータ同期
   useEffect(() => {
     fetchSupabaseData();
 
@@ -153,7 +156,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     setIsModalOpen(true);
   };
 
-  // 🚀 Supabaseクラウドへのデータ保存・上書き処理
   const handleSaveItem = async () => {
     if (activeTab === 'history') {
       if (!newItem.client || !newItem.proposal) {
@@ -194,11 +196,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         await supabaseRequest(targetTable, 'POST', payload);
       }
     }
-    await fetchSupabaseData(); // リロードして全員の最新状態に完全同期
+    await fetchSupabaseData(); 
     setIsModalOpen(false);
   };
 
-  // 🚀 Supabaseクラウドからのデータ抹消処理
   const handleDeleteItem = async (indexToDelete: number) => {
     if (activeTab === 'history') {
       await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
@@ -207,7 +208,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     } else {
       await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
     }
-    await fetchSupabaseData(); // 最新状態に再同期
+    await fetchSupabaseData(); 
   };
 
   if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
@@ -290,7 +291,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。この推移を維持して着地できれば、当月末の総執行は予測枠より【${formatVal(deviationAmount)}】削減され、営業利益率の直接的な押し上げ要因となります。`;
       } else if (ratio > 103) {
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />;
-        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過 of 赤信号。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
+        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
       } else {
         comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるシミュレーション結果です。`;
       }
@@ -342,7 +343,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </p>
         </div>
         
-        {/* 💥 右上の月切り替えフィルター（プルダウン形式） */}
+        {/* 右上の月切り替えフィルター（プルダウン形式） */}
         <div className="flex gap-3 items-center">
           <div className="relative flex items-center group">
             <Calendar size={14} className="absolute left-3 text-slate-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
@@ -474,7 +475,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         {activeTab === 'manhours' && (
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><Clock className="text-slate-600" size={20} /> 現場別投下工数実績内訳スタック分析（指定列M, O, Q, S, U, V同期）</h2>
+              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><Clock className="text-slate-600" size={20} /> 現場別投下工数実績内訳スタック分析</h2>
             </div>
             <div className="h-[380px] bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
               <ResponsiveContainer width="100%" height="100%">
