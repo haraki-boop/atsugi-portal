@@ -38,7 +38,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return parseFloat(val.toString().replace(/[^0-9.-]/g, '')) || 0;
   };
 
-  // 💥 週のグルーピングロジック（日曜日切り替え）
   const getWeeklyGroups = (labels: string[]) => {
     const groups: { weekNum: number; label: string; indices: number[] }[] = [];
     if (!labels || labels.length === 0) return groups;
@@ -67,7 +66,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const baseLabels = data.labels || ["4/1", "4/2"];
   const weeklyGroups = getWeeklyGroups(baseLabels);
 
-  // 💥 データ結合ロジック
   const getCombinedMetrics = () => {
     let allItems = data[`${currentTab.id}Data`] || [];
     const combinedMap = new Map();
@@ -88,10 +86,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 経営エキスパートAI（数字・財務特化評価用）
   const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal, currentRatio) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
-    const ratio = currentRatio; // 割り返したガチの比率をそのまま評価に使う
+    const ratio = currentRatio;
     const modeText = mode === 'daily' ? '直近' : `当週${isTotal ? '合計' : '平均'}`;
 
     let status = 'STABLE';
@@ -174,7 +171,11 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
-              const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k));
+              
+              // 生産性指標かどうかの動的ジャッジ
+              const isProductivityRatio = m.title.includes("生産性") || currentTab.id === 'productivity';
+              
+              const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k)) && !isProductivityRatio;
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               
               let chartData = [];
@@ -187,7 +188,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               } else {
                 chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
                 const acts = weekIdx.map(idx => n(m.actual[idx])); const fcts = weekIdx.map(idx => n(m.forecast[idx]));
-                if (isTotalType) { 
+                
+                if (isProductivityRatio) {
+                  // 生産性指標の週次データは「平均（アベレージ）」を算出
+                  dispAct = acts.length ? acts.reduce((a, b) => a + b, 0) / acts.length : 0;
+                  dispFct = fcts.length ? fcts.reduce((a, b) => a + b, 0) / fcts.length : 0;
+                } else if (isTotalType) { 
                   dispAct = acts.reduce((a, b) => a + b, 0); 
                   dispFct = fcts.reduce((a, b) => a + b, 0); 
                 } else { 
@@ -196,8 +202,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 }
               }
 
-              // 💥 【お兄ちゃんの指示通りに完全一本化】
-              // 画面に表示するパネルの数字（dispAct, dispFct）をそのまま直接「割り算」して％を算出する仕組みに改造！
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio);
 
@@ -241,20 +245,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                     {displayMode === 'weekly' && (
                       <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
                         <div className="border-b border-slate-800 pb-2">
-                          <p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">当週{isTotalType ? '合計' : '平均'}確認パネル</p>
+                          <p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">当週{isProductivityRatio ? '平均' : (isTotalType ? '合計' : '平均')}確認パネル</p>
                         </div>
                         <div className="space-y-4 my-auto">
                           <div className="flex justify-between items-baseline">
-                            <span className="text-xs font-bold text-slate-400">{isTotalType ? '合計実績' : '平均実績'}</span>
+                            {/* 🌟 【解決】生産性関連の項目が選ばれた時は、テキストを自動で「平均実績」に固定スイッチ！ */}
+                            <span className="text-xs font-bold text-slate-400">{isProductivityRatio ? '平均実績' : (isTotalType ? '合計実績' : '平均実績')}</span>
                             <span className="text-2xl font-black tracking-tight text-white">{Math.round(dispAct).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between items-baseline">
-                            <span className="text-xs font-bold text-slate-400">{isTotalType ? `合計${m.forecastType}` : `平均${m.forecastType}`}</span>
+                            {/* 🌟 【解決】予測（予算）側も自動で「平均予測」に固定スイッチ！ */}
+                            <span className="text-xs font-bold text-slate-400">{isProductivityRatio ? `平均${m.forecastType}` : (isTotalType ? `合計${m.forecastType}` : `平均${m.forecastType}`)}</span>
                             <span className="text-xl font-bold tracking-tight text-slate-300">{Math.round(dispFct).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
                             <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span>
-                            {/* 💥 固定値バグ消滅！パネル内の表示用数値（dispAct と dispFct）から直接その場で算出したパーセンテージ */}
                             <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                           </div>
                         </div>
