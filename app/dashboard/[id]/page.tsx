@@ -117,33 +117,57 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     const combinedMap = new Map();
     allItems.forEach(item => {
       if (!item || !item.title || !item.values || !Array.isArray(item.values)) return;
+      
       const normalizedTitle = item.title.replace('＿', '_');
-      let rawTitle = normalizedTitle.replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '');
-      let cleanTitle = item.title.includes('社会保険') ? '社会保険' : rawTitle;
+      let cleanTitle = normalizedTitle
+        .replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '')
+        .replace('実績', '').replace('予測', '').replace('予算', '').replace('目標', '');
+      
+      if (item.title.includes('社会保険')) cleanTitle = '社会保険';
+
       if (!combinedMap.has(cleanTitle)) {
-        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: [], forecast: [], forecastType: '予測' });
+        combinedMap.set(cleanTitle, { 
+          title: cleanTitle, 
+          labels: item.labels || baseLabels, 
+          actual: new Array(baseLabels.length).fill(0), 
+          forecast: new Array(baseLabels.length).fill(0), 
+          forecastType: '予測' 
+        });
       }
+      
       const entry = combinedMap.get(cleanTitle);
-      if (item.title.startsWith('実績_') || item.title.startsWith('実績＿')) entry.actual = item.values;
-      else { entry.forecast = item.values; entry.forecastType = normalizedTitle.split('_')[0] || '予測'; }
+      
+      if (normalizedTitle.includes('実績')) {
+        entry.actual = item.values;
+      } else {
+        entry.forecast = item.values;
+        const detectedType = normalizedTitle.split('_')[0];
+        if (detectedType && detectedType !== normalizedTitle) {
+          entry.forecastType = detectedType;
+        } else if (normalizedTitle.includes('予算')) {
+          entry.forecastType = '予算';
+        } else if (normalizedTitle.includes('目標')) {
+          entry.forecastType = '目標';
+        } else {
+          entry.forecastType = '予測';
+        }
+      }
     });
     return Array.from(combinedMap.values());
   };
 
   const allMetrics = getCombinedMetrics();
 
-  // 💥 【超強化】経営エキスパートAI：未来着地シミュレーション＆経営命令生成エンジン
   const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal, currentRatio, rawForecastArray, currentIndices) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = currentRatio;
     
     let modeText = '直近';
+    if (mode === 'daily') modeText = '当月日次平均'; // 🌟 AIテキストの表現を日次平均に修正
     if (mode === 'weekly') modeText = `当週${isTotal ? '合計' : '平均'}`;
     if (mode === 'monthly') modeText = `当月${isTotal ? '合計' : '平均'}`;
 
-    // 🌟 月の総予算（予測データ）を算出
     const totalMonthForecast = currentIndices.reduce((sum, idx) => sum + n(rawForecastArray[idx]), 0);
-    // 🌟 このままのペースで着地した場合の月末想定数値（金額ベースか比率ベースか）
     const projectedEndResult = totalMonthForecast * (ratio / 100);
     const deviationAmount = Math.abs(projectedEndResult - totalMonthForecast);
 
@@ -251,8 +275,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
             if (displayMode === 'daily') {
               chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
-              dispAct = currentMonthIndices.length ? n(m.actual[currentMonthIndices[currentMonthIndices.length - 1]]) : 0;
-              dispFct = currentMonthIndices.length ? (n(m.forecast[currentMonthIndices[currentMonthIndices.length - 1]]) || 1) : 1;
+              
+              // 💥 【お兄ちゃん指定：日次モード時の右上実績数値を最新1日から「当月内の日次アベレージ平均」に大改造！】
+              const dailyActs = currentMonthIndices.map(idx => n(m.actual[idx]));
+              const dailyFcts = currentMonthIndices.map(idx => n(m.forecast[idx]));
+              
+              dispAct = dailyActs.length ? dailyActs.reduce((a, b) => a + b, 0) / dailyActs.length : 0;
+              dispFct = dailyFcts.length ? dailyFcts.reduce((a, b) => a + b, 0) / dailyFcts.length : 1;
             } 
             else if (displayMode === 'weekly') {
               chartData = weekIdx.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
@@ -286,8 +315,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             }
 
             const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
-            
-            // 🌟 月末の総予算を計算させるために「m.forecast（生配列）」と「currentMonthIndices（その月の位置）」を丸ごとAIにプレゼント
             const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast, currentMonthIndices);
 
             return (
@@ -301,7 +328,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   {displayMode === 'daily' && (
                     <div className="flex gap-6 text-right items-center">
                       <div className="border-r pr-4 border-slate-100">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月 直近の実績</p>
+                        {/* 💥 看板テキストも「日次平均」であることが伝わるようにブラッシュアップ */}
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月度 日次平均実績</p>
                         <p className="text-xl font-black text-slate-800 tracking-tight">{Math.round(dispAct).toLocaleString()}</p>
                       </div>
                       <div>
@@ -357,7 +385,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   )}
                 </div>
 
-                {/* 🌟 未来の着地予測数値をガチで喋りまくる大迫力のAIコメントボックス */}
                 <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
                   <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
                   <p>{evalData.comment}</p>
