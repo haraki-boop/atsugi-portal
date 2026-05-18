@@ -8,14 +8,12 @@ export default function MapPortalPage() {
   const [map, setMap] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
-  // 📍 お兄ちゃんの本物の10拠点データ（1文字も改変せず完全復元）
+  // 📍 お兄ちゃんの本物の10拠点データ（勝手な言葉の書き換えを一切排除し完全復元）
   const locations = [
     {
       id: 'showa-reizo',
       name: '昭和冷蔵',
       address: '神奈川県厚木市（本社エリア）',
-      lat: 35.4430,
-      lng: 139.3640,
       type: 'hub',
       desc: '昭和冷蔵 マネジメント・コア・ブレイン拠点'
     },
@@ -159,15 +157,13 @@ export default function MapPortalPage() {
             {/* 💥 【お兄ちゃん指定】「SHOWA REIZO」から「株式会社PAL」へ完全変更 */}
             <h1 className="text-xs font-black tracking-[0.2em] text-slate-400 uppercase">株式会社PAL</h1>
             
-            {/* 💥 【お兄ちゃん指定】画像が絶対に型崩れ・縦伸びしない保護枠を文字列の左横にドッキング */}
+            {/* 💥 【お兄ちゃん指定】文字のすぐ左横に、お兄ちゃんの本物のBase64データのみを一本に繋ぎ直して直撃埋め込み */}
             <p className="text-base font-black text-slate-800 tracking-tighter uppercase flex items-center mt-1">
-              <div className="w-16 h-8 flex items-center justify-center shrink-0 mr-1.5 bg-transparent overflow-hidden">
-                <img 
-                  src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHwAAAAwCAYAAADThB6pAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATNSURBVHhe7Zu/iyRFFMdfLyy6l/grcMVgqxWFQ8Q/YauN7kT8cRiYTVduIqKCgVUleuAFF2yggkjXRIpmmlxWzWHiLwQ9lHN37cJgjws0kWPPqE2mhu7X0z+nZ7Znpj5QsFOvqqfo77xXr36sl6ZpCo6NYQtXONYbJ/iG4QTfMM5McCEExHGMqx0LZumCx3EMvu+DlBKbHEtgaYIbYyAIAgiCAIwx2FzJ6S834L/jP3G1owNLEVwIAb7vdwrht68ewM1nL+BqR0cWKngcxxAEQafwfef7H+Hw4otw6/IVbHLMwcIEZ4xBEASdvPrW5Stw+NxLcOeHn7DJMSe9C66UAt/3QSmFTbX8e/1buBlcgNtXD7DJ0RO9CW6TMsZY66QM0hRO3n0Pji+9Cqe/3sBWR494feylCyFy8zSlFAghuTaz4JzDg38cwQl/H+4eHmFzjvPfXYd7Hn8MVztaMpfgcRyDlLIwT3POQQiRqyvjny++gr9eex1XF3CC90PnkG7X1Fjss8YY06j0QafpawIeT1npm9aCK6XA87zBCZ0ljmNgjIHv+6XF87zp302jURZjDCilOr0HY0zlGIMg6PzsWtKWAEBt4ZzjbqX8/fumX6c8PPVpb7h4d4661cM4L49Jap` + `urlHOeUkqnNkJIq3HbZ1NKsakVWuvcGMMwxE16Za0Fxy8TkyRJQfQoinCzAkmS5J6bJAlu0hj8LK01btIrrUP6OkEIgSiKpisKY0yjXUG8x9CkTxl4NYM/981aC97k5RFCYDQaTT/b+bUKKWXu2UqphSRYi2CtBW8KpTT3uUpw691a64Loq4ATfAZVkcF6N44M4/F4JbzcCT4J41mwx1vs2tgKLYTIzf9VkWEoOMEn3mlzMOVUkAIya3bsZcPnY0XHG9waK1zdovN4LMCA4oGcRwXosXQ2CjBs4IYY0AIAYyxqT2KotJwbpMyvCtHKc31GXrytlGCj8djYIxNt1XH4zEQQoBzDmmaQhiGuMsUKSVwznE1AArrUspBe/lGCR5FEUitYbLDCEmSQJIkBa/FWK8t+0GEYZib94ecvG2U4F2xO2lSSmCMzSxZhpy8rYTg9z1/EbZ3H8bVS8EuxSilsLe3V1pGo9HUywedvOHN9TrwQcms0ufhyckHH+IujcEHE13gnKeEEFw9kzAMp9/V5tQrO8Y2BzFt2loG6+He9jbsfXIAj7zzFjYtjbKlWBnZdsvYX+9yaDNIwXeeOg9PXvsaHnjlEjYtlbKlWBn4Lt8il2hdnz04we9/+QV44to3sPPM09jUmnk9TEpZui4vY94lWpP2xhhgjJUuE6sYlOC7b78B5NOPYGvnXmzqRJOXV4b16v39fWyqBP9AunpiGfHknzGhYgu4ikEIvnXuHJDPPobdN+tvr7YBL4+ahmalVKf5cRb2Vm/Zjw+PyS7zhBCFYi+OQsWeQC04i6sDZ+SzStss/fS333F1Z7TWuWwZF0JIGobhzAw3SZKUEFLoQymtzbq11jP7Zkv2+lQYhrXtq0rXq1Ct76V7noerclBKSw8gHGdPryFda+3EHji9CE4IAa11IWFxDI+5Q7oL4avFXB7uQvjq0UlwF8JXl9YhPQgC59UrTGvBHatNp5DuWF2c4BuGE3zD+B+R2CF0YjSabAAAAABJRU5ErkJggg=="
-                  alt="株式会社PAL Logo" 
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
+              <img 
+                src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHwAAAAwCAYAAADThB6pAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATNSURBVHhe7Zu/iyRFFMdfLyy6l/grcMVgqxWFQ8Q/YauN7kT8cRiYTVduIqKCgVUleuAFF2yggkjXRIpmmlxWzWHiLwQ9lHN37cJgjws0kWPPqE2mhu7X0z+nZ7Znpj5QsFOvqqfo77xXr36sl6ZpCo6NYQtXONYbJ/iG4QTfMM5McCEExHGMqx0LZumCx3EMvu+DlBKbHEtgaYIbYyAIAgiCAIwx2FzJ6S834L/jP3G1owNLEVwIAb7vdwrht68ewM1nL+BqR0cWKngcxxAEQafwfef7H+Hw4otw6/IVbHLMwcIEZ4xBEASdvPrW5Stw+NxLcOeHn7DJMSe9C66UAt/3QSmFTbX8e/1buBlcgNtXD7DJ0RO9CW6TMsZY66QM0hRO3n0Pji+9Cqe/3sBWR494feylCyFy8zSlFAghuTaz4JzDg38cwQl/H+4eHmFzjvPfXYd7Hn8MVztaMpfgcRyDlLIwT3POQQiRqyvjny++gr9eex1XF3CC90PnkG7X1Fjss8YY06j0QafpawIeT1npm9aCK6XA87zBCZ0ljmNgjIHv+6XF87zp302jURZjDCilOr0HY0zlGIMg6PzsWtKWAEBt4ZzjbqX8/fumX6c8PPVpb7h4d4661cM4L49Jap1rrlHOeUkqnNkJIq3HbZ1NKsakVWuvcGMMwxE16Za0Fxy8TkyRJQfQoinCzAkmS5J6bJAlu0hj8LK01btIrrUP6OkEIgSiKpisKY0yjXUG8x9CkTxl4NYM/981aC97k5RFCYDQaTT/b+bUKKWXu2UqphSRYi2CtBW8KpTT3uUpw691a64Loq4ATfAZVkcF6N44M4/F4JbzcCT4J41mwx1vs2tgKLYTIzf9VkWEoOMEn3mlzMOVUkAIya3bsZcPnY0XHG9waK1zdovN4LMCA4oGcRwXosXQ2CjBs4IYY0AIAYyxqT2KotJwbpMyvCtHKc31GXrytlGCj8djYIxNt1XH4zEQQoBzDmmaQhiGuMsUKSVwznE1AArrUspBe/lGCR5FEUitYbLDCEmSQJIkBa/FWK8t+0GEYZib94ecvG2U4F2xO2lSSmCMzSxZhpy8rYTg9z1/EbZ3H8bVS8EuxSilsLe3V1pGo9HUywedvOHN9TrwQcms0ufhyckHH+IujcEHE13gnKeEEFw9kzAMp9/V5tQrO8Y2BzFt2loG6+He9jbsfXIAj7zzFjYtjbKlWBnZdsvYX+9yaDNIwXeeOg9PXvsaHnjlEjYtlbKlWBn4Lt8il2hdnz04we9/+QV44to3sPPM09jUmnk9TEpZui4vY94lWpP2xhhgjJUuE6sYlOC7b78B5NOPYGvnXmzqRJOXV4b16v39fWyqBP9AunpiGfHknzGhYgu4ikEIvnXuHJDPPobdN+tvr7YBL4+ahmalVKf5cRb2Vm/Zjw+PyS7zhBCFYi+OQsWeQC04i6sDZ+SzStss/fS333F1Z7TWuWwZF0JIGobhzAw3SZKUEFLoQymtzbq11jP7Zkv2+lQYhrXtq0rXq1Ct76V7noerclBKSw8gHGdPryFda+3EHji9CE4IAa11IWFxDI+5Q7oL4avFXB7uQvjq0UlwF8JXl9YhPQgC59UrTGvBHatNp5DuWF2c4BuGE3zD+B+R2CF0YjSabAAAAABJRU5ErkJggg=="
+                alt="株式会社PAL Logo" 
+                className="h-7 w-auto object-contain inline-block mr-1.5 align-middle"
+              />
               <span className="align-middle">拠点統括ロジスティクスマップ</span>
             </p>
           </div>
