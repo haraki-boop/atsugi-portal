@@ -8,7 +8,7 @@ export default function MapPortalPage() {
   const [map, setMap] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
-  // 📍 お兄ちゃんの既存拠点 ＋ 新しい8拠点を完全にドッキングしたマスター配列
+  // 📍 既存拠点 ＋ 新しい8拠点を完全にドッキングしたマスター配列
   const locations = [
     {
       id: 'showa-reizo',
@@ -28,6 +28,7 @@ export default function MapPortalPage() {
       type: 'center',
       desc: '南関東エリア 基幹物流コントロールセンター'
     },
+    // 🌟 追加された新しい8拠点
     {
       id: 'craft-delica',
       name: 'クラフトデリカ（イオンフードサプライ本社）',
@@ -102,10 +103,11 @@ export default function MapPortalPage() {
     }
   ];
 
-  // 💥 お兄ちゃんのLeaflet地図スクリプトをNext.js側で安全に完全起動させるエフェクト
+  // 日本列島がきれいに収まる基準座標
+  const mapBounds = { minLat: 32.0, maxLat: 37.0, minLng: 130.0, maxLng: 141.5 };
+
   useEffect(() => {
     if (typeof window !== 'undefined' && !map) {
-      // LeafletのCSSとJSを動的にインポートして頭脳を直結
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -114,23 +116,21 @@ export default function MapPortalPage() {
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.onload = () => {
-        // 厚木・座間エリアを中心に初期化
         const L = window.L;
         const leafMap = L.map('leaflet-map-container', {
           zoomControl: true,
           attributionControl: true
-        }).setView([35.2, 137.5], 7); // 全国が見渡せる絶妙なズーム
+        }).setView([35.2, 137.5], 7);
 
-        // 🌟 お兄ちゃん指定のオープンストリートマップ標準タイルレイヤー
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+        // 💥 【お兄ちゃん指定】シンプルな白ベースのタイルレイヤーURLに完全修正！
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
         }).addTo(leafMap);
 
-        // 各拠点のピンを地図上に本物の座標で全自動プロット
+        // ピンの全自動プロット
         locations.forEach(loc => {
           const marker = L.marker([loc.lat, loc.lng]).addTo(leafMap);
           
-          // ピンをクリックした時に右下のカスタムポップアップが連動して開く仕組み
           marker.on('click', () => {
             setSelectedLocation(loc);
             leafMap.panTo([loc.lat, loc.lng]);
@@ -143,7 +143,6 @@ export default function MapPortalPage() {
     }
   }, [map]);
 
-  // サイドバーから拠点をクリックしたときに本物の地図をそこへスムーズに動かす
   const handleLocationClick = (loc: any) => {
     setSelectedLocation(loc);
     if (map && window.L) {
@@ -154,7 +153,7 @@ export default function MapPortalPage() {
   return (
     <div className="h-screen w-screen bg-slate-50 text-slate-900 flex overflow-hidden font-sans">
       
-      {/* 🗛 左側：デザイン完全固定サイドバー */}
+      {/* 左側サイドバー */}
       <div className="w-[400px] bg-white border-r border-slate-200 flex flex-col justify-between z-20 shadow-lg shrink-0">
         <div className="p-6 space-y-6 overflow-y-auto flex-1">
           <div className="border-b border-slate-100 pb-4">
@@ -176,7 +175,7 @@ export default function MapPortalPage() {
                   }`}
                 >
                   <div className="space-y-1 flex-1 pr-2">
-                    {/* 💥 【お兄ちゃん指定】各センターの名前を大きく（text-base）、極太（font-black）に強化！ */}
+                    {/* 各センターの名前を大きく（text-base）、極太（font-black）に強調 */}
                     <h3 className={`text-base font-black tracking-tighter leading-snug ${selectedLocation?.id === loc.id ? 'text-white' : 'text-slate-900'}`}>
                       {loc.name}
                     </h3>
@@ -195,18 +194,17 @@ export default function MapPortalPage() {
         </div>
       </div>
 
-      {/* 🗺️ 右側：Leaflet本物地図表示エリア */}
+      {/* 右側：Leaflet白ベース地図表示エリア */}
       <div className="flex-1 w-full h-full bg-slate-100 relative overflow-hidden">
         
-        {/* 💥 ここに本物のオープンストリートマップのリアルな世界が100%全画面で描写されます！ */}
+        {/* 地図コンテナ */}
         <div id="leaflet-map-container" className="w-full h-full z-10"></div>
 
-        {/* 🖥️ 拠点ポップアップ（クリーンな白デザインベースを完全固定） */}
+        {/* 拠点ポップアップ */}
         {selectedLocation && (
           <div className="absolute bottom-8 right-8 w-[360px] bg-white/95 border border-slate-200 p-5 rounded-[2rem] shadow-2xl animate-in slide-in-from-bottom-2 duration-150 z-30 space-y-4 backdrop-blur-md">
             <div className="flex justify-between items-start border-b border-slate-100 pb-2">
               <div className="space-y-0.5">
-                {/* 💥 【お兄ちゃん指定】ポップアップ内の名前も大きく・極太（text-lg font-black）に完全対応！ */}
                 <h2 className="text-lg font-black text-slate-900 tracking-tighter leading-tight">
                   {selectedLocation.name}
                 </h2>
@@ -226,12 +224,12 @@ export default function MapPortalPage() {
               </div>
             </div>
 
-            {/* 🚀 【お兄ちゃん指定】「青文字リンク」は跡形もなく完全消滅！エントリーボタン1本に美しく統合 */}
+            {/* 🚀 【お兄ちゃん指定】「ダッシュボードを開く」へテキストを完全修正！不要な青文字リンクは完全削除状態を維持 */}
             <Link
               href={`/dashboard/${selectedLocation.id}`}
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-widest text-center shadow-md transition-all flex items-center justify-center gap-1 uppercase no-underline border-t border-white/10"
             >
-              コックピットへエントリー <ChevronRight size={13} />
+              ダッシュボードを開く <ChevronRight size={13} />
             </Link>
           </div>
         )}
