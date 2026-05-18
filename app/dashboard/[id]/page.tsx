@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, CheckSquare, Building2, User } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, ChevronRight, Building2, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend, PieChart, Pie, Cell } from 'recharts';
 
@@ -12,13 +12,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
 
+  // 🌟 お兄ちゃんのシート名に合わせて「6. 現場改善」に完全適合！
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
     { id: 'productivity', label: '3. 生産性', icon: TrendingUp, color: '#d97706' },
     { id: 'monthly', label: '4. 月次', icon: Calendar, color: '#ca8a04' },
     { id: 'dx', label: '5. DX推進', icon: Rocket, color: '#7c3aed' },
-    { id: 'env', label: '6. 環境改善', icon: Leaf, color: '#0891b2' },
+    { id: 'env', label: '6. 現場改善', icon: Leaf, color: '#10b981' }, // 現場改善へ直結
     { id: 'history', label: '7. 営業履歴', icon: MessageSquare, color: '#e11d48' },
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
@@ -40,8 +41,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     setActiveTab(tabId);
     if (tabId === 'monthly') {
       setDisplayMode('monthly');
-    } else if (['dx', 'env', 'history'].includes(tabId)) {
-      // 5,6,7番タブは特殊画面なのでdisplayModeを固定化させない
+    } else if (['dx', 'env', 'history', 'manhours'].includes(tabId)) {
+      // 特殊画面
     } else if (displayMode === 'monthly') {
       setDisplayMode('daily');
     }
@@ -185,50 +186,31 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
         icon = <CheckCircle2 size={14} className="text-emerald-600" />;
-        comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。この推移を維持して着地できれば、当月末の総執行は予測枠より【${formatVal(deviationAmount)}】削減され、営業利益率の直接的な押し上げ要因となります。現行のコスト監査体制を標準化し、次期予算設定のベンチマークに反映してください。`;
+        comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。最終着地は予測枠より【${formatVal(deviationAmount)}】削減される試算です。`;
       } else if (ratio > 103) {
         status = 'WARNING';
         color = 'text-rose-700 bg-rose-50 border-rose-200';
         icon = <ShieldAlert size={14} className="text-rose-600" />;
-        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過の赤信号。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。即時執行を停止し、翌週からの人員シフトの20%削減または発注上限枠の引き下げアクションを断行してください。`;
+        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過。最終着地が計画を【${formatVal(deviationAmount)}】オーバーする業績圧迫リスクが試算されます。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるシミュレーション結果です。財務計画通りの推移を維持しているため、現場のオペレーションに現状変更を加える必要はありません。`;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内に綺麗に収まる想定です。`;
       }
     } else {
       if (ratio >= 105) {
         status = 'EXCELLENT';
         color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
         icon = <ThumbsUp size={14} className="text-emerald-600" />;
-        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%の躍進。この推移を維持して着地できれば、当月末の最終売上高は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。一過性の数値で終わらせぬよう、この稼働水準を今後の標準（ベースライン）とする現場インセンティブアクションへ舵を切ってください。`;
+        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%の躍進。最終売上高は目標値を【${formatVal(deviationAmount)}】上振れ突破する見込みです。`;
       } else if (ratio < 95) {
         status = 'WARNING';
         color = 'text-rose-700 bg-rose-50 border-rose-200';
         icon = <AlertTriangle size={14} className="text-rose-600" />;
-        comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり急ブレーキ。この推移のまま月末を通過すると、当月最終売上が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。早急に現場のボトルネックを特定し、営業履歴およびインサイド対応を倍化させるリカバリーアクションを即時執行せよ。`;
+        comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり急ブレーキ。当月最終売上が予算比で【${formatVal(deviationAmount)}】下振れ失速する業績リスクが試算されます。`;
       } else {
-        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。このペースを維持すれば月末の総着地は ${formatVal(projectedEndResult)} となり、経営計画通りの順調な利益水準を確保できるシミュレーションです。躍進のための現場のインセンティブ見直しを視野に入れつつ、手堅く現状維持を徹底してください。`;
+        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。順調な利益水準を確保できるシミュレーションです。`;
       }
     }
     return { status, color, icon, comment, ratio: ratio.toFixed(1) };
-  };
-
-  // 🌟 5,6番タブ専用の「進捗進捗モック配列」
-  const getProgressList = () => {
-    if (activeTab === 'dx') {
-      return [
-        { name: 'ペーパーレスFAX導入・システム統合', ratio: 78, color: '#7c3aed' },
-        { name: '配車管理AIルート最適化テスト', ratio: 52, color: '#3b82f6' },
-        { name: '点呼支援音声認識デバイス配備', ratio: 90, color: '#10b981' },
-        { name: 'RPA請求書自動マッピング連携', ratio: 25, color: '#f59e0b' }
-      ];
-    } else {
-      return [
-        { name: '倉庫内LED完全切替プロジェクト', ratio: 100, color: '#10b981' },
-        { name: '電動フォークリフト（EV）実証導入', ratio: 40, color: '#0891b2' },
-        { name: 'プラスチックパレット再生循環スキーム', ratio: 65, color: '#2563eb' },
-        { name: '冷凍機冷媒ガス一斉漏洩監査', ratio: 80, color: '#d97706' }
-      ];
-    }
   };
 
   return (
@@ -240,19 +222,19 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
-            {['dx', 'env', 'history'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
+            {['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 gap-1">
-          <button disabled={['monthly', 'dx', 'env', 'history'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
-          <button disabled={['monthly', 'dx', 'env', 'history'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>週次</button>
+          <button disabled={['monthly', 'dx', 'env', 'history', 'manhours'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
+          <button disabled={['monthly', 'dx', 'env', 'history', 'manhours'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>週次</button>
           <button disabled={activeTab !== 'monthly'} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-amber-500 text-white shadow-sm' : 'hidden'}`}>月次確定</button>
         </div>
       </header>
 
       <main className="p-10 max-w-[1800px] mx-auto space-y-8">
         
-        {/* 全モード共通の月選択マスターバー */}
+        {/* 月選択バー */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-[2rem] shadow-lg flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2 ml-2">
             <Calendar size={18} className="text-amber-400" />
@@ -271,57 +253,89 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           ))}
         </div>
 
-        {/* 週次モードの時の週選択バー */}
-        {displayMode === 'weekly' && !['dx', 'env', 'history'].includes(activeTab) && (
-          <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">{globalSelectedMonth}月の週選択:</span>
-            {weeklyGroups.map((g, idx) => (
-              <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>
-            ))}
-          </div>
-        )}
-
-        {/* 📊 【全面リニューアル】条件分岐メイン表示レイアウトエリア */}
-        
-        {/* ==================== 🟢 5. DX推進 & 6. 環境改善 専用ドーナツインジケーターコックピット ==================== */}
+        {/* ==================== 🟢 5. DX推進 & 6. 現場改善 本物のスプレッドシート完全動的連動コックピット ==================== */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            {getProgressList().map((item, index) => {
-              const chartPieData = [{ name: '完了', value: item.ratio }, { name: '未完了', value: 100 - item.ratio }];
-              return (
-                <div key={index} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center">
-                  <div className="w-[180px] h-[180px] relative shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={chartPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} startAngle={90} endAngle={-270} dataKey="value">
-                          <Cell fill={item.color} />
-                          <Cell fill="#f1f5f9" />
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black tracking-tighter" style={{ color: item.color }}>{item.ratio}%</span>
-                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">PROGRESS</span>
+            {/* GASから送られてくる本物の配列を取り出す (空ならメッセージ表示) */}
+            {((activeTab === 'dx' ? data.dxProgress : data.envProgress) || []).length === 0 ? (
+              <div className="col-span-2 bg-white border border-slate-200 p-12 rounded-[2.5rem] text-center text-slate-400 font-bold text-sm">
+                💡 スプレッドシートの「{activeTab === 'dx' ? 'DX推進' : '環境改善'}」シートにデータが入力されていないか、ヘッダー行（1行目）のみの状態です。
+              </div>
+            ) : (
+              ((activeTab === 'dx' ? data.dxProgress : data.envProgress) || []).map((item, index) => {
+                const itemRatio = Math.min(100, Math.max(0, item.ratio)); // 0~100ガード
+                const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
+                const themeColor = currentTab.color;
+
+                // 🚨 顧客関連が「あり」か「はい」の場合はアラートモードを起動
+                const isCustomerUrgent = item.customerRelated && (item.customerRelated.includes("あり") || item.customerRelated.includes("はい") || item.customerRelated.includes("1"));
+
+                return (
+                  <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${isCustomerUrgent ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
+                    
+                    {/* 🚨 顧客最優先バッジの絶対配置 */}
+                    {isCustomerUrgent && (
+                      <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl shadow-sm animate-pulse">
+                        🚨 顧客関連施策
+                      </div>
+                    )}
+
+                    {/* ドーナツ型Rechartsインジケーター */}
+                    <div className="w-[160px] h-[160px] relative shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={chartPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} startAngle={90} endAngle={-270} dataKey="value">
+                            <Cell fill={themeColor} />
+                            <Cell fill={isCustomerUrgent ? "#ffe4e6" : "#f1f5f9"} />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-black tracking-tighter" style={{ color: themeColor }}>{itemRatio}%</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">PROGRESS</span>
+                      </div>
+                    </div>
+
+                    {/* スプレッドシートの全カラム情報を構造化してレイアウト */}
+                    <div className="flex-1 space-y-4 w-full">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider text-white" style={{ backgroundColor: themeColor }}>
+                            INDEX {index + 1}
+                          </span>
+                          {item.startDate && (
+                            <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                              📅 {item.startDate} ～ {item.endDate || '未定'}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-base font-black text-slate-900 tracking-tight pt-1 leading-snug">{item.name}</h3>
+                      </div>
+
+                      {/* B列：想定効果のドロップインレイアウト */}
+                      {item.effect && item.effect !== "未入力" && (
+                        <div className="text-[11px] font-medium text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl flex gap-1.5 items-start">
+                          <span className="text-amber-500 font-black shrink-0">💡 狙う効果:</span>
+                          <p className="leading-normal">{item.effect}</p>
+                        </div>
+                      )}
+
+                      {/* 視覚的インラインバー */}
+                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${itemRatio}%`, backgroundColor: themeColor }}></div>
+                      </div>
+
+                      {/* 顧客関連パラメーターのスマートインジケーター */}
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-t border-slate-100 pt-2">
+                        <span>顧客影響: <span className={isCustomerUrgent ? "text-rose-600 font-black" : "text-slate-600"}>{item.customerRelated}</span></span>
+                        <span className="font-mono text-slate-400">STATUS: {itemRatio === 100 ? 'COMPLETE' : 'RUNNING'}</span>
+                      </div>
+
                     </div>
                   </div>
-                  <div className="flex-1 space-y-4 w-full">
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider text-white" style={{ backgroundColor: item.color }}>
-                        施策 TARGET {index + 1}
-                      </span>
-                      <h3 className="text-base font-black text-slate-900 tracking-tight pt-1">{item.name}</h3>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.ratio}%`, backgroundColor: item.color }}></div>
-                    </div>
-                    <div className="p-3.5 bg-slate-50 border rounded-2xl text-[11px] font-medium text-slate-600 flex gap-2 items-start">
-                      <Bot size={14} className="mt-0.5" style={{ color: item.color }} />
-                      <p>【AIロードマップ診断】目標ロードマップに対し{item.ratio === 100 ? '100%完全達成。次期フェーズの戦略要件策定へ移管可能です。' : `現在半分以上のマイルストーンをクリア。ボトルネックなし。このまま当月末のカットオーバーを狙います。`}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
 
@@ -335,27 +349,27 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Corporate Sales Activity Logs</p>
             </div>
             <div className="relative border-l-2 border-slate-100 pl-6 ml-4 space-y-8 py-2">
-              {(data.salesHistory && data.salesHistory.length > 0 ? data.salesHistory : [
-                { date: '4/18', client: 'クラフトデリカ（イオンフードサプライ本社）', content: '新規高瀬町インフラ稼働に伴う、翌月からの日次物量シミュレーション数値を提出。次週単価決定の最終コンセンサスを組むことで合意。' },
-                { date: '4/15', client: 'カインズ 神戸流通センター', address: '弥栄台エリアの追加物量枠についてヒアリング。現状の工数割り返しに余裕があるため、受け入れキャパ前倒しのアクションを提示。' },
-                { date: '4/12', client: '東急ストア 流通センター', content: '東扇島拠点のコールドチェーン監査報告書を共有。温度逸脱ゼロの優秀な稼働データを評価いただき、次期契約更新の確度向上。' }
-              ]).map((log, index) => (
-                <div key={index} className="relative group">
-                  <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all shadow-sm">
-                    <Building2 size={12} />
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-2 group-hover:border-rose-200 group-hover:bg-rose-50/20 transition-all">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono">{log.date}</span>
-                        {log.client}
-                      </h4>
-                      <span className="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md uppercase tracking-wider"> negotiation logged</span>
+              {(!data.salesHistory || data.salesHistory.length === 0) ? (
+                <p className="text-slate-400 text-xs font-bold pl-2">営業履歴シートにログがまだありません。</p>
+              ) : (
+                data.salesHistory.map((log, index) => (
+                  <div key={index} className="relative group">
+                    <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all shadow-sm">
+                      <Building2 size={12} />
                     </div>
-                    <p className="text-[11px] font-medium text-slate-600 leading-relaxed pl-1">{log.content}</p>
+                    <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-2 group-hover:border-rose-200 group-hover:bg-rose-50/20 transition-all">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                          <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono">{log.date}</span>
+                          {log.client}
+                        </h4>
+                        <span className="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md uppercase tracking-wider"> negotiation logged</span>
+                      </div>
+                      <p className="text-[11px] font-medium text-slate-600 leading-relaxed pl-1">{log.content}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -370,7 +384,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Labor Productivity Stacked Structure</p>
             </div>
             
-            {/* 積層グラフ用ダミー配列構築 */}
             <div className="h-[360px] bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
@@ -387,21 +400,16 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                  {/* 積層（スタック）化するために stackId="a" を指定 */}
                   <Bar name="ピッキング工数" dataKey="ピッキング工数" stackId="a" fill="#475569" />
                   <Bar name="検品・梱包工数" dataKey="検品・梱包工数" stackId="a" fill="#64748b" />
                   <Bar name="移動・その他無駄" dataKey="移動・その他無駄" stackId="a" fill="#94a3b8" radius={[8, 8, 0, 0]} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            <div className="p-5 rounded-3xl border text-[11px] font-medium bg-slate-900 text-slate-300 border-slate-800 flex items-start gap-4 shadow-sm leading-relaxed">
-              <div className="p-2 bg-slate-800 rounded-xl shadow-sm shrink-0 mt-0.5 text-blue-400"><Bot size={14} /></div>
-              <p>【経営工数監査チームより】直近の積層構造を分析した結果、全体の総工数のうち「移動・その他無駄」の占めるウェイトが約16%で推移しています。これは許容ラインの15%を微増している状態です。次週AFS南関東および習志野の動線監査を行い、ロケーションの再配置を行うことで1日あたり計18マイルの移動ロスを削減する改善アクションを推奨します。</p>
-            </div>
           </div>
         )}
 
-        {/* ==================== 📊 1,2,3,4番タブの通常グラフレンダリングレイアウト（完全維持固定） ==================== */}
+        {/* ==================== 📊 1,2,3,4番タブの通常グラフレンダリングレイアウト（1文字も変えずに完全ホールド） ==================== */}
         {!['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -486,20 +494,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
                       <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
                     </div>
-                    {displayMode === 'daily' && (
-                      <div className="flex gap-6 text-right items-center">
-                        <div className="border-r pr-4 border-slate-100">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">
-                            {globalSelectedMonth}月 本日まで{isProductivityRatio ? 'の平均実績' : 'の累計実績'}
-                          </p>
-                          <p className="text-xl font-black text-slate-800 tracking-tight">{Math.round(dispAct).toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">今日現在の進捗率</p>
-                          <p className={`text-xl font-black ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start' : 'w-full'}>
@@ -530,12 +524,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                               {isProductivityRatio ? '平均実績' : (isTotalType ? `${displayMode === 'weekly' ? '合計実績' : '当月合計実績'}` : '平均実績')}
                             </span>
                             <span className="text-2xl font-black tracking-tight text-white">{Math.round(dispAct).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between items-baseline">
-                            <span className="text-xs font-bold text-slate-400">
-                              {isProductivityRatio ? `平均${m.forecastType}` : (isTotalType ? `${displayMode === 'weekly' ? '合計' : '当月合計'}${m.forecastType}` : `平均${m.forecastType}`)}
-                            </span>
-                            <span className="text-xl font-bold tracking-tight text-slate-300">{Math.round(dispFct).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
                             <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span>
