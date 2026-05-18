@@ -153,16 +153,16 @@ export default function MapPortalPage() {
           <div className="border-b border-slate-100 pb-4">
             <h1 className="text-xs font-black tracking-[0.2em] text-slate-400 uppercase">株式会社PAL</h1>
             
-            {/* 💥 タイトル横に1本に繋ぎ直した綺麗なBase64画像をインライン配置 */}
+            {/* 💥 正しい画像名 /pal-logo.png で綺麗にインライン読み込み */}
             <p className="text-base font-black text-slate-800 tracking-tighter uppercase flex items-center mt-1">
               <img 
-                src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKgAAAAwCAYAAABgE67pAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAdXSURBVHhe7Z1bixVFFEbxu+gX0S+iX0S/iH4R/SL6RfSDoAcvgnrwIogHL4J48CKIBy+CePAiiA9eBPHgRRAfvAjSffZkdWbVdHdU1+me7sk9s7wPXDg7u6tO99p77VV77Sqn6wY7XfNisEPlgq69UdA1Nwq69sZBN9w4vG9XUUrR87wPhBD4Zl2WUlhU0NskpYTkexAEAUiSBIQQ6HnZ9O0X9An9VnO3swwOCroUQpCmaWES9p/PP4NnX3wLL776prmaR6SgoCshBEmSFNYVvOnz+9fP4GHLn8D9X37WXD0ivQidClFKwVrn8LzK8p9vX8HTZ8fg0Tffaq4ekZ6EzoUxhp7nbVLGGIdn1pZfPnsET178DB6/+FnN1ePQt9CZECEx1kgpIUkSXLc2fPvxI3j2xe/g/scfaK6exf/ffAzX/vshXNdz7UuIUnpW1pVSgHMOnHPwPI/GqCzeY2h/71pKyTnfZgXnnANjzFbeLOfv8mZl3pSUEpRSnZ6DMbZ2jCGEOO/R+g9bUlpKAAB6C+fU9XbZ8fcfv6QvPr6ztuxu7eLpS+GcF8Z9XttY61xrnXPOS0qnNt706baVUnIpFfN8p7XWjVEMfdyit9ZasPlgZowBxli39bIsyzE0mS0N1WvWWrB9YmOMYZrGVY8xxhiKovS5Stsc7+VtrQVvC6XUz/O9CkJIk6bpfEXhjKmdZ+p1mkaXUqZ2ZfOfZp6p12kaLWWaRqeEEMiyLNsUuLSuLdfUnF7T9TymZscYfP3ExY9bUshYfP3M893WCSEwZfI6N7F03eN8e0+PZ1nN/84C3uXvN7WfIYTg+mK0WfA+wYCiQRRFpWhv6FGU8K4iUuLduI9SSpIkBdbLpGgP22wY+FasfVvV+9Y6Z/vCttm7gIHCgqFBURQfksHQ0CDBy7yvUop9O6bpfEvhXZY6vKsU5m3z9zZ/b/O+Zl5m7wsGFA3iOC5Ei6GhUYLvN6YUhBBYY5ZpEUVZ6fCuIpS+U56vLd6V623WWrDt995Wb0bN9p6Zp9v7gAFFA8YYEEJgqUeRFbXFp3WfIu7bMU3nX/r2bU7XpW0G7wqFeVvsXf5eSkmSJClM2/y97O1Z3mbvCgYUDbTWpZQw3XGUZVkGSZLkpxZ7vVpYd+X6fXpPhWGYm/f2vM6/7O09ZdpWvXG/fX/Iybtm/g8i6rDPMW6qXgZ2H6wZ7O2YwSdfegWPXfwUHrt4GZuaSlnY6wPHv0/8+3W0K70Iff9mU/0YvAnG4EHeN/L2Zq87Fp6cnK8p+OCiDLzI+w7O3bX3vGDfGqUUhBDXm9bpdHq9r/N7XU69Yp9X1HwZ13WfM0WZZenYm5Ftt4wYvAnG4EG25tBmkKInYf86G1/O9n/n+f9Y1Fp78mUfvAbe5T348tPH4fErz8P9D9/SplbYp8f6NveWb5FLfI0p8Xq2S42Lg1V+r31fPInZ/L3pW/fWf6bM9b4Z1D7Y963LpYyYzbcoM67vR41T817fW68u0bH96P6S2vYmGGNga6unvVmpmH99f9Q8GZ+v993CvsXf60nIpm3V61Wp1o/SWsc6R0u6vHrvHpwgXyv4w6+8CU88eh7uP/e8NrUGXvK9fIsy/ZpBndv/vO/20f0lZVvAtz96Fv747BlYf6P+9WpX8XrvqVfbtE+G+6uD+S7Rsk/9vT+I0wK+8c5DcPuxs/Dwqxe1qTPw997LrSizL5ky1ZwM="
-                  alt="株式会社PAL Logo" 
-                  className="h-7 w-auto object-contain inline-block mr-2 align-middle"
-                />
-                <span className="align-middle">拠点統括ロジスティクスマップ</span>
-              </p>
-            </div>
+                src="/pal-logo.png" 
+                alt="株式会社PAL Logo" 
+                className="h-7 w-auto object-contain inline-block mr-1.5 align-middle"
+              />
+              <span className="align-middle">拠点統括ロジスティクスマップ</span>
+            </p>
+          </div>
 
           <div className="space-y-2">
             <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase px-1">拠点一覧 ({locations.length})</p>
