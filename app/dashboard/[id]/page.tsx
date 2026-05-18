@@ -53,7 +53,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費"];
 
-  // 💥 安全に数値をパースする防壁ロジック
   const n = (val: any) => {
     if (val === undefined || val === null || val === "") return 0;
     const clean = val.toString().replace(/[^0-9.-]/g, '');
@@ -236,7 +235,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
       <main className="p-10 max-w-[1800px] mx-auto space-y-8">
         
-        {/* 月選択バー */}
+        {/* 月選択マスターバー */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-[2rem] shadow-lg flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2 ml-2">
             <Calendar size={18} className="text-amber-400" />
@@ -265,19 +264,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 🟢 5. DX推進 ＆ 6. 現地での改善 完全にシート同期した描写エンジン ==================== */}
+        {/* ==================== 🟢 5. DX推進 ＆ 6. 現場改善 完全にシート同期した描写エンジン ==================== */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
-              // 💥 【シート名迷子を一発撃破！】GAS側からくる `dxProgress` と `envProgress` もしくは生シート名配列を完全フォールバック
-              const rawList = activeTab === 'dx' 
-                ? (data.dxProgress || data["DX推進"] || []) 
-                : (data.envProgress || data["現場改善"] || data["現地での改善"] || []);
-              
-              // 💥 ヘッダー行「項目」「効果」の文字が入っている行を絶対に排除する鉄壁フィルター
-              const cleanList = Array.isArray(rawList) 
-                ? rawList.filter(item => item && item.name !== "項目" && item.name !== "項目名" && item.name !== "施策名") 
-                : [];
+              // 💥 お兄ちゃんの最新GAS（マスター版）から返ってくる正確なキー配列を取り出し
+              const rawList = activeTab === 'dx' ? data.dxProgress : data.envProgress;
+              const cleanList = Array.isArray(rawList) ? rawList : [];
 
               if (cleanList.length === 0) {
                 return (
@@ -288,8 +281,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               }
 
               return cleanList.map((item, index) => {
-                // 進捗率を安全に0〜100%の数値へ変換
-                const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio || item.progress))));
+                // 進捗数値を100%安全にパース
+                const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio))));
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
 
@@ -327,9 +320,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider text-white" style={{ backgroundColor: themeColor }}>
                             施策 {index + 1}
                           </span>
-                          {(item.startDate || item.date || item.dueDate) && (
+                          {(item.startDate) && (
                             <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                              📅 {item.startDate || item.date} ～ {item.endDate || item.dueDate || '未定'}
+                              📅 {item.startDate} ～ {item.endDate || '未定'}
                             </span>
                           )}
                         </div>
@@ -338,7 +331,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </div>
 
                       {/* B列：想定効果 */}
-                      {item.effect && item.effect !== "未入力" && item.effect !== "効果" && (
+                      {item.effect && item.effect !== "未入力" && (
                         <div className="text-[11px] font-medium text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl flex gap-1.5 items-start">
                           <span className="text-amber-500 font-black shrink-0">💡 狙う効果:</span>
                           <p className="leading-normal">{item.effect}</p>
