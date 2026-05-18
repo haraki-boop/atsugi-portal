@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, ChevronRight, Building2, Plus, X } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, ChevronRight, Building2, Plus, X, Edit2 } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend, PieChart, Pie, Cell } from 'recharts';
 
@@ -12,12 +12,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
 
-  // 💥 画面入力用のローカルステート
+  // 画面入力・編集用のローカルステート
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null); // 💥 編集中のインデックス管理
 
-  // 新規入力用の一時ステート
+  // 入力フォーム用の一時ステート
   const [newItem, setNewItem] = useState({
     name: '',
     effect: '',
@@ -68,7 +69,31 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // 💥 新規アイテム保存処理
+  // 💥 新規追加モーダルを開く
+  const handleOpenAddModal = () => {
+    setEditingIndex(null);
+    setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0 });
+    setIsModalOpen(true);
+  };
+
+  // 💥 編集モーダルを開く（既存データをフォームに完全注入！）
+  const handleOpenEditModal = (index: number) => {
+    setEditingIndex(index);
+    const targetList = activeTab === 'dx' ? dxItems : envItems;
+    const item = targetList[index];
+    
+    setNewItem({
+      name: item.name || '',
+      effect: item.effect === '未入力' ? '' : (item.effect || ''),
+      startDate: item.startDate ? item.startDate.replace(/\//g, '-') : '',
+      endDate: item.endDate ? item.endDate.replace(/\//g, '-') : '',
+      customerRelated: item.customerRelated === 'あり',
+      ratio: item.ratio || 0
+    });
+    setIsModalOpen(true);
+  };
+
+  // 💥 保存・上書き処理の一本化
   const handleSaveItem = () => {
     if (!newItem.name) {
       alert("項目名（内容）を入力してください！");
@@ -84,22 +109,34 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
       ratio: Number(newItem.ratio)
     };
 
+    let updatedList = [];
     if (activeTab === 'dx') {
-      const updated = [...dxItems, formattedItem];
-      setDxItems(updated);
-      localStorage.setItem(`dx_${params.id}`, JSON.stringify(updated));
+      if (editingIndex !== null) {
+        // 上書き編集
+        updatedList = [...dxItems];
+        updatedList[editingIndex] = formattedItem;
+      } else {
+        // 新規追加
+        updatedList = [...dxItems, formattedItem];
+      }
+      setDxItems(updatedList);
+      localStorage.setItem(`dx_${params.id}`, JSON.stringify(updatedList));
     } else {
-      const updated = [...envItems, formattedItem];
-      setEnvItems(updated);
-      localStorage.setItem(`env_${params.id}`, JSON.stringify(updated));
+      if (editingIndex !== null) {
+        // 上書き編集
+        updatedList = [...envItems];
+        updatedList[editingIndex] = formattedItem;
+      } else {
+        // 新規追加
+        updatedList = [...envItems, formattedItem];
+      }
+      setEnvItems(updatedList);
+      localStorage.setItem(`env_${params.id}`, JSON.stringify(updatedList));
     }
 
-    // 入力リセット＆モーダル閉じる
-    setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0 });
     setIsModalOpen(false);
   };
 
-  // アイテム削除機能（お兄ちゃんが間違えて追加したとき用）
   const handleDeleteItem = (indexToDelete: number) => {
     if (activeTab === 'dx') {
       const updated = dxItems.filter((_, idx) => idx !== indexToDelete);
@@ -294,11 +331,10 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </p>
         </div>
         
-        {/* 右上の新規追加ボタン（5・6番タブの時だけ綺麗に出現） */}
         <div className="flex gap-3 items-center">
           {['dx', 'env'].includes(activeTab) && (
             <button 
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"
             >
               <Plus size={14} /> 新規追加
@@ -314,7 +350,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
       <main className="p-10 max-w-[1800px] mx-auto space-y-8">
         
-        {/* 月選択マスターバー */}
+        {/* 月選択バー */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-[2rem] shadow-lg flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2 ml-2">
             <Calendar size={18} className="text-amber-400" />
@@ -343,7 +379,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 🟢 5. DX推進 ＆ 6. 現場改善 画面直接入力連動コックピット ==================== */}
+        {/* ==================== 🟢 5. DX推進 ＆ 6. 現場改善 画面直接入力・編集コックピット ==================== */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
@@ -372,13 +408,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </div>
                     )}
 
-                    {/* ゴミ箱代わりの簡易削除ボタン（右上に配置） */}
-                    <button 
-                      onClick={() => { if(confirm("この項目を削除しますか？")) handleDeleteItem(index); }}
-                      className="absolute bottom-4 right-4 text-[10px] font-bold text-slate-300 hover:text-rose-500 transition-all"
-                    >
-                      削除
-                    </button>
+                    {/* 💥 アクションボタン群（編集＆削除） */}
+                    <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
+                      <button 
+                        onClick={() => handleOpenEditModal(index)}
+                        className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"
+                      >
+                        <Edit2 size={11} /> 編集
+                      </button>
+                      <button 
+                        onClick={() => { if(confirm("この項目を削除しますか？")) handleDeleteItem(index); }}
+                        className="text-slate-300 hover:text-rose-500 transition-all"
+                      >
+                        削除
+                      </button>
+                    </div>
 
                     {/* 円グラフメーター */}
                     <div className="w-[160px] h-[160px] relative shrink-0">
@@ -392,7 +436,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <span className="text-2xl font-black tracking-tighter" style={{ color: themeColor }}>{itemRatio}%</span>
-                        {/* 💥 【お兄ちゃん指定】100%の場合は「完了」、それ以外は「進捗率」へ文字を完全仕分け */}
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
                           {itemRatio === 100 ? '完了' : '進捗率'}
                         </span>
@@ -400,7 +443,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                     </div>
 
                     {/* カラムインフォ */}
-                    <div className="flex-1 space-y-4 w-full">
+                    <div className="flex-1 space-y-4 w-full pb-3 md:pb-0">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider text-white" style={{ backgroundColor: themeColor }}>
@@ -430,7 +473,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-t border-slate-100 pt-2">
                         <span>顧客影響: <span className={isCustomerUrgent ? "text-rose-600 font-black" : "text-slate-600"}>{item.customerRelated}</span></span>
-                        {/* 💥 【お兄ちゃん指定】ここも文字を100%連動対応 */}
                         <span className="font-mono text-slate-400">ステータス: {itemRatio === 100 ? '100%完了' : '実行中'}</span>
                       </div>
                     </div>
@@ -506,7 +548,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ==================== 📊 1,2,3,4番タブの通常2本並びグラフ（200%大復活ホールド） ==================== */}
+        {/* ==================== 📊 【大復活】1,2,3,4番タブの通常グラフ ＆ 黒い数値評価パネル完全合体 ==================== */}
         {!['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -585,6 +627,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
               return (
                 <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
+                  
                   <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                       <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
@@ -606,8 +649,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                     )}
                   </div>
 
-                  <div className="w-full">
-                    <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
+                  {/* 💥 【完全復活】週次・月次の時だけ横に出現する、お兄ちゃんお気に入りの黒い集計ボードのレイアウト枠 */}
+                  <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start' : 'w-full'}>
+                    <div className={displayMode !== 'daily' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100'}>
                       <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -620,6 +664,36 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
+
+                    {/* 💥 黒い数値集計評価ボード (Executive Management DB) */}
+                    {displayMode !== 'daily' && (
+                      <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
+                        <div className="border-b border-slate-800 pb-2">
+                          <p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">
+                            当{displayMode === 'weekly' ? '週' : '月'}{isProductivityRatio ? '平均' : (isTotalType ? '合計' : '平均')}確認パネル
+                          </p>
+                        </div>
+                        <div className="space-y-4 my-auto">
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs font-bold text-slate-400">
+                              {isProductivityRatio ? '平均実績' : (isTotalType ? `${displayMode === 'weekly' ? '合計実績' : '当月合計実績'}` : '平均実績')}
+                            </span>
+                            <span className="text-2xl font-black tracking-tight text-white">{Math.round(dispAct).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs font-bold text-slate-400">
+                              {isProductivityRatio ? `平均${m.forecastType}` : (isTotalType ? `${displayMode === 'weekly' ? '合計' : '当月合計'}${m.forecastType}` : `平均${m.forecastType}`)}
+                            </span>
+                            <span className="text-xl font-bold tracking-tight text-slate-300">{Math.round(dispFct).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
+                            <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span>
+                            <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="text-[9px] text-slate-500 font-bold text-center uppercase tracking-wider">Executive Management DB</div>
+                      </div>
+                    )}
                   </div>
 
                   <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
@@ -633,14 +707,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         )}
       </main>
 
-      {/* 🖥️ 新規追加用：超高級近未来ポップアップモーダル画面 */}
+      {/* 🖥️ 新規追加 ＆ 編集兼用の超高級ポップアップモーダル画面 */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] border border-slate-200 p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900 tracking-tight">
-                  【{activeTab === 'dx' ? '5. DX推進' : '6. 現場改善'}】新規マネジメント項目の追加
+                  【{activeTab === 'dx' ? '5. DX推進' : '6. 現場改善'}】マニュアル管理データ{editingIndex !== null ? 'の編集上書き' : 'の新規追加'}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Direct Database Injection Mode</p>
               </div>
@@ -648,7 +722,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             </div>
 
             <div className="space-y-4 text-xs font-bold text-slate-700">
-              {/* A列：名前 */}
               <div className="space-y-1">
                 <label className="text-[11px] tracking-wider text-slate-400 uppercase">項目名（改善内容） <span className="text-rose-500">*必須</span></label>
                 <input 
@@ -660,7 +733,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 />
               </div>
 
-              {/* B列：想定効果 */}
               <div className="space-y-1">
                 <label className="text-[11px] tracking-wider text-slate-400 uppercase">想定効果・目的</label>
                 <textarea 
@@ -671,7 +743,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 />
               </div>
 
-              {/* C・D列：期日日付 */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[11px] tracking-wider text-slate-400 uppercase">{activeTab === 'dx' ? '開始期日' : '記入日'}</label>
@@ -693,21 +764,19 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
 
-              {/* E列：顧客関連フラグ */}
               <div className="flex items-center gap-2.5 bg-slate-50 p-4 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
                 <input 
                   type="checkbox" 
                   checked={newItem.customerRelated}
-                  onChange={() => {}} // 親divのonClickで制御
+                  onChange={() => {}} 
                   className="w-4 h-4 accent-slate-900 cursor-pointer"
                 />
                 <div className="text-left">
                   <p className="text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</p>
-                  <p className="text-[10px] text-slate-400 font-medium">チェックを入れると、ダッシュボード上に「🚨 顧客関連施策」のアラート灯がピカピカ付きます</p>
+                  <p className="text-[10px] text-slate-400 font-medium">チェックを入れると、カード上に「🚨 顧客関連施策」のアラート灯がつきます</p>
                 </div>
               </div>
 
-              {/* F列：進捗率（スライダー仕様） */}
               <div className="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div className="flex justify-between items-center">
                   <label className="text-[11px] tracking-wider text-slate-400 uppercase">現在の進捗ステータス</label>
