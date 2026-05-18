@@ -8,16 +8,16 @@ export default function MapPortalPage() {
   const [map, setMap] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
-  // 📍 既存拠点 ＋ 新しい8拠点を完全にドッキングしたマスター配列
+  // 📍 謎の説明文を全削除 ＆ 昭和冷蔵の住所から「（本社）」を削除した綺麗なデータ配列
   const locations = [
     {
       id: 'showa-reizo',
       name: '昭和冷蔵',
-      address: '神奈川県厚木市（本社エリア）',
+      address: '神奈川県厚木市',
       lat: 35.4430,
       lng: 139.3640,
       type: 'hub',
-      desc: '昭和冷蔵 マネジメント・コア・ブレイン拠点'
+      desc: ''
     },
     {
       id: 'afs-minamikanto',
@@ -26,9 +26,8 @@ export default function MapPortalPage() {
       lat: 35.4740,
       lng: 139.4230,
       type: 'center',
-      desc: '南関東エリア 基幹物流コントロールセンター'
+      desc: ''
     },
-    // 🌟 追加された新しい8拠点
     {
       id: 'craft-delica',
       name: 'クラフトデリカ（イオンフードサプライ本社）',
@@ -36,7 +35,7 @@ export default function MapPortalPage() {
       lat: 35.6715,
       lng: 139.9930,
       type: 'center',
-      desc: 'イオンフードサプライ本社インフラ連携'
+      desc: ''
     },
     {
       id: 'landport-narashino',
@@ -45,7 +44,7 @@ export default function MapPortalPage() {
       lat: 35.6586,
       lng: 139.9920,
       type: 'center',
-      desc: '習志野エリア 高機能型最先端物流デポ'
+      desc: ''
     },
     {
       id: 'tokyu-store',
@@ -54,7 +53,7 @@ export default function MapPortalPage() {
       lat: 35.4998,
       lng: 139.7702,
       type: 'center',
-      desc: '東扇島臨海エリア コールドチェーン流通センター'
+      desc: ''
     },
     {
       id: 'afs-bisai',
@@ -63,7 +62,7 @@ export default function MapPortalPage() {
       lat: 35.2869,
       lng: 136.7391,
       type: 'center',
-      desc: '中部エリア 尾西広域マザー流通センター'
+      desc: ''
     },
     {
       id: 'yamanaka-shionagi',
@@ -72,7 +71,7 @@ export default function MapPortalPage() {
       lat: 35.0797,
       lng: 136.8618,
       type: 'center',
-      desc: '名古屋港湾エリア 生鮮サプライコールドデポ'
+      desc: ''
     },
     {
       id: 'mitsui-chubu',
@@ -81,7 +80,7 @@ export default function MapPortalPage() {
       lat: 35.0461,
       lng: 136.9485,
       type: 'center',
-      desc: '緑区高根山 中部広域サプライチェーンコア'
+      desc: ''
     },
     {
       id: 'cainz-kobe',
@@ -90,7 +89,7 @@ export default function MapPortalPage() {
       lat: 34.6860,
       lng: 135.0750,
       type: 'center',
-      desc: 'カインズ 神戸流通ネットワークデポ'
+      desc: ''
     },
     {
       id: 'cainz-fukuoka',
@@ -99,12 +98,9 @@ export default function MapPortalPage() {
       lat: 33.6420,
       lng: 130.5050,
       type: 'center',
-      desc: 'カインズ 福岡流通ネットワークデポ'
+      desc: ''
     }
   ];
-
-  // 日本列島がきれいに収まる基準座標
-  const mapBounds = { minLat: 32.0, maxLat: 37.0, minLng: 130.0, maxLng: 141.5 };
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !map) {
@@ -122,12 +118,12 @@ export default function MapPortalPage() {
           attributionControl: true
         }).setView([35.2, 137.5], 7);
 
-        // 💥 【お兄ちゃん指定】シンプルな白ベースのタイルレイヤーURLに完全修正！
+        // シンプルな白ベースのタイルレイヤー
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
           attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
         }).addTo(leafMap);
 
-        // ピンの全自動プロット
+        // ピンをプロット
         locations.forEach(loc => {
           const marker = L.marker([loc.lat, loc.lng]).addTo(leafMap);
           
@@ -175,7 +171,6 @@ export default function MapPortalPage() {
                   }`}
                 >
                   <div className="space-y-1 flex-1 pr-2">
-                    {/* 各センターの名前を大きく（text-base）、極太（font-black）に強調 */}
                     <h3 className={`text-base font-black tracking-tighter leading-snug ${selectedLocation?.id === loc.id ? 'text-white' : 'text-slate-900'}`}>
                       {loc.name}
                     </h3>
@@ -194,7 +189,7 @@ export default function MapPortalPage() {
         </div>
       </div>
 
-      {/* 右側：Leaflet白ベース地図表示エリア */}
+      {/* 右側：地図表示エリア */}
       <div className="flex-1 w-full h-full bg-slate-100 relative overflow-hidden">
         
         {/* 地図コンテナ */}
@@ -216,15 +211,18 @@ export default function MapPortalPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="bg-slate-50 p-3 rounded-xl text-[11px] text-slate-600 font-medium">
-                {selectedLocation.desc}
-              </div>
+              {/* 🚀 説明文（desc）が空の場合はこの枠を表示しないスマートガード */}
+              {selectedLocation.desc && (
+                <div className="bg-slate-50 p-3 rounded-xl text-[11px] text-slate-600 font-medium">
+                  {selectedLocation.desc}
+                </div>
+              )}
               <div className="text-[11px] text-slate-500 font-medium">
                 <span className="text-slate-400 font-bold">住所:</span> {selectedLocation.address}
               </div>
             </div>
 
-            {/* 🚀 【お兄ちゃん指定】「ダッシュボードを開く」へテキストを完全修正！不要な青文字リンクは完全削除状態を維持 */}
+            {/* ボタン：「ダッシュボードを開く」 */}
             <Link
               href={`/dashboard/${selectedLocation.id}`}
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-widest text-center shadow-md transition-all flex items-center justify-center gap-1 uppercase no-underline border-t border-white/10"
