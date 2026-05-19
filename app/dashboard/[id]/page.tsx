@@ -22,7 +22,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null); // 🚀 整数ではなく、Supabaseの本物のUUID文字列を保持する形に変更
 
   const [newItem, setNewItem] = useState({
     name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0,
@@ -40,7 +40,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
-  // 🚀 【完全決着】あなたの作った完璧な英語カラム構造と100%直通で通信するロジック
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
       const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
@@ -54,7 +53,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       };
 
       if (method === 'GET') {
-        const res = await fetch(`${url}?location_id=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
+        const res = await fetch(`${url}?location_id=eq.${locationId}&order=created_at.asc`, { method: 'GET', headers, cache: 'no-store' });
         if (!res.ok) throw new Error(`GET ${res.status}`);
         return await res.json();
       } else if (method === 'POST') {
@@ -62,6 +61,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
+        // 🚀 URLに渡すIDを、本物のUUID文字列形式（body.id）で正しく引き渡すように修正
         const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
         if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
@@ -134,15 +134,15 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   };
 
   const handleOpenAddModal = () => {
-    setEditingIndex(null);
+    setEditingId(null); // 🚀 新規追加時はIDなし
     setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●' });
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (index: number) => {
-    setEditingIndex(index);
     if (activeTab === 'history') {
       const item = historyItems[index];
+      setEditingId(item.id); // 🚀 Supabaseから降ってきた本物のID文字列をキャッチ
       setNewItem({
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
         client: item.name || '', proposal: item.effect || '', detail: item.end_date || '', result: item.customer_related || '●'
@@ -150,6 +150,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     } else {
       const targetList = activeTab === 'dx' ? dxItems : envItems;
       const item = targetList[index];
+      setEditingId(item.id); // 🚀 Supabaseから降ってきた本物のID文字列をキャッチ
       setNewItem({
         name: item.name || '', 
         effect: item.effect === '未入力' ? '' : (item.effect || ''),
@@ -170,8 +171,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         name: newItem.client, effect: newItem.proposal, end_date: newItem.detail || '', customer_related: newItem.result
       };
-      if (editingIndex !== null) {
-        payload.id = historyItems[editingIndex].id;
+      if (editingId !== null) {
+        payload.id = editingId; // 🚀 本物のUUIDをそのまま乗せて上書きへ
         await supabaseRequest('sales_history', 'PATCH', payload);
       } else {
         await supabaseRequest('sales_history', 'POST', payload);
@@ -188,9 +189,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         ratio: Number(newItem.ratio)
       };
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
-      if (editingIndex !== null) {
-        const targetList = activeTab === 'dx' ? dxItems : envItems;
-        payload.id = targetList[editingIndex].id;
+      if (editingId !== null) {
+        payload.id = editingId; // 🚀 本物のUUIDをそのまま乗せて上書きへ
         await supabaseRequest(targetTable, 'PATCH', payload);
       } else {
         await supabaseRequest(targetTable, 'POST', payload);
@@ -599,7 +599,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingIndex !== null ? '編集上書き' : '新規追加'}</h3>
+              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingId !== null ? '編集上書き' : '新規追加'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={18} /></button>
             </div>
             {activeTab === 'history' ? (
