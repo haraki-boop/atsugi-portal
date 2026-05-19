@@ -147,7 +147,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     setEditingItem(item); 
 
     if (isHistory) {
-      // 🚀 営業履歴専用の正しいカラム名に完全適合
       setNewItem({
         startDate: item.date ? item.date.replace(/\//g, '-') : '',
         client: item.client || '', 
@@ -171,7 +170,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const handleSaveItem = async () => {
     if (activeTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
-      // 🚀 営業履歴専用の正しいカラム名（date, client, proposal, detail, result）で送信
       const payload = {
         location_id: locationId,
         date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
@@ -195,7 +193,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
         customer_related: newItem.customerRelated ? 'あり' : 'なし', 
-        ratio: n(newItem.ratio)
+        ratio: Number(newItem.ratio)
       };
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingItem) {
@@ -282,6 +280,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
   const allMetrics = getCombinedMetrics();
 
+  // 🚀 【①AI総評の文字数大拡張】プロフェッショナルな経営コンサルティング品質の250文字テキストへ完全復活！
   const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal, currentRatio, rawForecastArray) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = currentRatio;
@@ -290,29 +289,25 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     const projectedEndResult = totalMonthForecast * (ratio / 100);
     const deviationAmount = Math.abs(projectedEndResult - totalMonthForecast);
     const formatVal = (val) => title.includes("%") || title.includes("率") ? `${val.toFixed(1)}%` : `¥${Math.round(val).toLocaleString()}`;
-    let status = 'STABLE', color = 'text-slate-700 bg-slate-50 border-slate-200', icon = <Bot size={14} className="text-slate-600" />, comment = "";
+    let comment = "";
     if (isLowBetter) {
       if (ratio <= 92) {
-        status = 'EXCELLENT'; color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; icon = <CheckCircle2 size={14} className="text-emerald-600" />;
-        comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功。この推移を維持して着地できれば、当月末の総執行は予測枠より【${formatVal(deviationAmount)}】削減され、営業利益率の直接的な押し上げ要因となります。`;
+        comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功しています。この驚異的な推移を維持して着地できれば、当月末の総執行額は予測枠よりも【${formatVal(deviationAmount)}】削減され、営業利益率を直接的に押し上げる強力な要因となります。現場の徹底したリソース管理とオペレーションの効率化が数値として結実しており、限界利益の最大化に向けて非常に理想的な巡航速度を保っています。この調子で固定費・変動費の最適化を継続してください。`;
       } else if (ratio > 103) {
-        status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />;
-        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
+        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過という危険水域に突入しています。この過剰な執行推移のまま月末を迎えた場合、最終着地が当初計画を【${formatVal(deviationAmount)}】もオーバーしてしまい、今期の限界利益を著しく圧迫する致命的なシミュレーション結果となっています。直ちに原因（タイミーの過剰投入、シフト管理の不備、突発的な非効率の発生など）を特定し、緊急のシフト調整や稼働適正化対策を講じる必要があります。早期の軌道修正を強く推奨します。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に収まるシミュレーション結果です。`;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と、極めて適正かつ計画に沿ったコントロールが維持されています。現在の安定したペースを維持することができれば、月末の総執行額も当初の経営計画枠内（着地想定: ${formatVal(projectedEndResult)}）に確実に収まる試算結果です。過不足のないリソース配分が行われており、現場のオペレーション品質とコストバランスが高度に両立している証左です。引き続き急激な物量変動に伴うコスト変動に注視しつつ、安定推移を維持してください。`;
       }
     } else {
       if (ratio >= 105) {
-        status = 'EXCELLENT'; color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; icon = <ThumbsUp size={14} className="text-emerald-600" />;
-        comment = `【経営予測：収益ポテンシャル拡大】『${title}高』は${modeText}目標比${ratio.toFixed(1)}%の躍近。この推移を維持して着地できれば、当月末の最終売上高は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。`;
+        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%という素晴らしい躍進を遂げています。この極めて力強い営業・生産推移を維持して着地できれば、当月末の最終売上高および指標は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。新規案件の獲得や現場の処理能力向上がダイレクトにプラス影響を与えており、経営基盤のさらなる強化に直結します。高稼働に伴う現場の疲弊や安全面の管理に万全を期しつつ、この拡大トレンドを最大化させましょう。`;
       } else if (ratio < 95) {
-        status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <AlertTriangle size={14} className="text-rose-600" />;
-        comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり急ブレーキ。この推移のまま月末を通過すると、当月最終売上が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。`;
+        comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり、看過できない急ブレーキがかかっています。この深刻な推移のまま月末を通過してしまうと、当月最終売上および主要指標が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。進捗遅延や受注減の真因を即座に洗い出し、営業アプローチの再強化や人員の再配置など、リカバリーのための即効性のある施策を即刻打つ必要があります。このまま放置すると、黒字化目標に黄色信号が灯ります。`;
       } else {
-        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移. このペースを維持すれば月末の総着地は ${formatVal(projectedEndResult)} となり、経営計画通りの順調な利益水準を確保できるシミュレーションです。`;
+        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と、経営計画通りの手堅く堅実な推移を見せています。このペースを確実に維持できれば、月末の総着地は ${formatVal(projectedEndResult)} 前後となり、当初の見込み通りの順調な利益水準を確保できるシミュレーション結果です。大きなブレもなく市場変動を吸収できている状態であり、現在の管理体制および現場オペレーションをそのまま継続・発展させていくことで、今期のマイルストーンを安定して突破可能です。`;
       }
     }
-    return { status, color, icon, comment, ratio: ratio.toFixed(1) };
+    return { comment, ratio: ratio.toFixed(1) };
   };
 
   const generateStackedManhoursData = () => {
@@ -339,9 +334,16 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
-        <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600">
-          <ArrowLeft size={16} /> <span className="text-xs">ポータルへ戻る</span>
-         </Link>
+        
+        {/* 🚀 【②・③ロゴと文言修正】かぶらないように flex レイアウトを組み、区切り線を追加して、拠点MAPに戻るに修正 */}
+        <div className="flex items-center gap-4">
+          <img src="/pal-logo.png" alt="PAL Logo" className="h-7 w-auto object-contain shrink-0" />
+          <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
+          <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600 transition-colors">
+            <ArrowLeft size={15} /> <span className="text-xs tracking-tight">拠点MAPに戻る</span>
+          </Link>
+        </div>
+
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
@@ -453,7 +455,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                         <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(log.id); }} className="text-slate-300 hover:text-rose-500">削除</button>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
-                        {/* 🚀 営業履歴専用の正しいプロパティを画面に表示 */}
                         <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
                         <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
                         <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
@@ -590,8 +591,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                       </div>
                     )}
                   </div>
-                  <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
-                    <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5">{evalData.icon}</div>
+                  <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed text-slate-700 bg-slate-50 border-slate-200`}>
+                    <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5"><Bot size={14} className="text-slate-600" /></div>
                     <p>{evalData.comment}</p>
                   </div>
                 </div>
