@@ -512,7 +512,7 @@ export default function AfsMinamikantoDashboardPage() {
         {activeTab === 'accidents' && (
           <div className="space-y-8">
             <div className="border-b border-slate-200 pb-4">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3"><AccidentIcon className="text-amber-500" size={28} /> カテゴリ別 安全管理ステータス ({globalSelectedMonth}月度)</h2>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3"><AccidentIcon className="text-amber-500" size={28} /> カテゴリ別 事故件数 ({globalSelectedMonth}月度)</h2>
               <p className="text-slate-400 text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
             </div>
             
