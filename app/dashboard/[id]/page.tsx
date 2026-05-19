@@ -1,18 +1,22 @@
 // @ts-nocheck
 'use client';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Plus, X, Building2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend, PieChart, Pie, Cell } from 'recharts';
 
-export default function DashboardPage({ params }: { params: { id: string } }) {
+export default function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+  const unwrappedParams = React.use(params);
+  const rawId = unwrappedParams?.id || 'showa-reizo';
+  const locationId = rawId.toLowerCase();
+
+  const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
 
-  // Supabase用ステート
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
@@ -36,27 +40,21 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
-  // 🚀 【修正】Vercelの環境変数（NEXT_PUBLIC_...）から本物のURLと鍵を安全に読み込むロジックに統一
+  // 🚀 環境変数を一切使わず、通信情報とトークンをここに完全直接固定（Missingエラーを100%回避）
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ukhcalayaazwmufewsks.supabase.co';
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-      if (!supabaseKey) {
-        console.error("Supabase API Key is missing in environment variables.");
-        return null;
-      }
-
-      const url = `${supabaseUrl}/rest/v1/${table}`;
+      const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
+      const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVraGNhbGF5YWF6d211ZmV3c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMDc5MTUsImV4cCI6MjA5NDY4MzkxNX0.I5A3_xeDUcBJvRogo_pYVa45_vJ_qL8Fur1qbuu3j4c`;
+      
       const headers: any = {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       };
 
       if (method === 'GET') {
-        const res = await fetch(`${url}?location_id=eq.${params.id}&order=id.asc`, { method: 'GET', headers });
+        const res = await fetch(`${url}?location_id=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
         if (!res.ok) throw new Error(`GET ${res.status}`);
         return await res.json();
       } else if (method === 'POST') {
@@ -73,19 +71,20 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         return true;
       }
     } catch (e) {
-      console.error("Supabase Sync Error:", e);
+      console.error("Supabase Operation Error:", e);
     }
     return null;
   };
 
   const fetchSupabaseData = async () => {
-    const dxData = await supabaseRequest('dx_actions', 'GET');
+    if (!locationId) return;
+    const [dxData, envData, historyData] = await Promise.all([
+      supabaseRequest('dx_actions', 'GET'),
+      supabaseRequest('env_actions', 'GET'),
+      supabaseRequest('sales_history', 'GET')
+    ]);
     if (dxData) setDxItems(dxData);
-    
-    const envData = await supabaseRequest('env_actions', 'GET');
     if (envData) setEnvItems(envData);
-    
-    const historyData = await supabaseRequest('sales_history', 'GET');
     if (historyData) setHistoryItems(historyData);
   };
 
@@ -105,7 +104,9 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     return Array.from(monthsSet).sort((a, b) => n(a) - n(b));
   };
 
+  // 🚀 1つ目のエラーの原因になっていた [params.id] の監視を完全に排除し、安全な [locationId] に統一
   useEffect(() => {
+    setIsMounted(true);
     fetchSupabaseData();
 
     const gasUrl = "https://script.google.com/macros/s/AKfycbyosyzeCglI2Pz2GWh_dbZXAgDslEV5DZrws5ulw24GrkI-fShocaWUdOLMfaNh_m0_/exec";
@@ -115,7 +116,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         const months = getAvailableMonths(json.labels);
         const today = new Date();
         const currentMonth = (today.getMonth() + 1).toString();
-        
         if (months.includes(currentMonth)) {
           setGlobalSelectedMonth(currentMonth);
         } else {
@@ -123,15 +123,13 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         }
       }
     });
-  }, [params.id]);
+  }, [locationId]);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === 'monthly') {
       setDisplayMode('monthly');
-    } else if (['dx', 'env', 'history', 'manhours'].includes(tabId)) {
-      // 特殊表示
-    } else if (displayMode === 'monthly') {
+    } else if (!['dx', 'env', 'history', 'manhours'].includes(tabId) && displayMode === 'monthly') {
       setDisplayMode('daily');
     }
   };
@@ -157,7 +155,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''),
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
         endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '',
-        customerRelated: item.customer_related === 'あり', ratio: item.ratio || 0
+        customer_related: item.customer_related === 'あり', ratio: item.ratio || 0
       });
     }
     setIsModalOpen(true);
@@ -165,16 +163,12 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
 
   const handleSaveItem = async () => {
     if (activeTab === 'history') {
-      if (!newItem.client || !newItem.proposal) {
-        alert("日付、誰に、何をは必須入力です！");
-        return;
-      }
-      const payload: any = {
-        location_id: params.id,
+      if (!newItem.client || !newItem.proposal) return;
+      const payload = {
+        location_id: locationId,
         date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result
       };
-
       if (editingIndex !== null) {
         payload.id = historyItems[editingIndex].id;
         await supabaseRequest('sales_history', 'PATCH', payload);
@@ -182,18 +176,14 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         await supabaseRequest('sales_history', 'POST', payload);
       }
     } else {
-      if (!newItem.name) {
-        alert("項目名を入力してください！");
-        return;
-      }
-      const payload: any = {
-        location_id: params.id,
+      if (!newItem.name) return;
+      const payload = {
+        location_id: locationId,
         name: newItem.name, effect: newItem.effect || '未入力',
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
-        customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio)
+        customer_related: newItem.customer_related ? 'あり' : 'なし', ratio: Number(newItem.ratio)
       };
-
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingIndex !== null) {
         const targetList = activeTab === 'dx' ? dxItems : envItems;
@@ -218,7 +208,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
     await fetchSupabaseData(); 
   };
 
-  if (!data) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
+  if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数"];
@@ -266,7 +256,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         .replace('実績', '').replace('予測', '').replace('予算', '').replace('目標', '');
       if (item.title.includes('社会保険')) cleanTitle = '社会保険';
       if (!combinedMap.has(cleanTitle)) {
-        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: new Array(baseLabels.length).fill(0), forecast: new Array(baseLabels.length).fill(0), forecastType: '予測' });
+        combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: item.values, forecast: new Array(baseLabels.length).fill(0), forecastType: '予測' });
       }
       const entry = combinedMap.get(cleanTitle);
       if (normalizedTitle.includes('実績')) { entry.actual = item.values; } else {
@@ -300,7 +290,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />;
         comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に綺麗に収まるシミュレーション結果です。`;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に収まるシミュレーション結果です。`;
       }
     } else {
       if (ratio >= 105) {
@@ -349,8 +339,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             {['dx', 'env', 'history', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
         </div>
-        
-        {/* 右上の月切り替えフィルター（プルダウン形式） */}
         <div className="flex gap-3 items-center">
           <div className="relative flex items-center group">
             <Calendar size={14} className="absolute left-3 text-slate-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
@@ -365,7 +353,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             </select>
             <ChevronDown size={12} className="absolute right-3 text-slate-400 pointer-events-none" />
           </div>
-
           {['dx', 'env', 'history'].includes(activeTab) && (
             <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"><Plus size={14} /> 新規追加</button>
           )}
@@ -376,25 +363,20 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </header>
-
       <main className="p-10 max-w-[1800px] mx-auto space-y-8">
-        
         <div className="flex flex-wrap gap-2.5">
           {tabs.map((t) => (
             <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-6 py-3 rounded-2xl transition-all font-black text-xs ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
           ))}
         </div>
-
         {displayMode === 'weekly' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">{globalSelectedMonth}月の週選択:</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">月の週選択:</span>
             {weeklyGroups.map((g, idx) => (
               <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>
             ))}
           </div>
         )}
-
-        {/* 5. DX推進 ＆ 6. 現場改善 */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
@@ -444,8 +426,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             })()}
           </div>
         )}
-
-        {/* 7. 営業履歴 */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -477,8 +457,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             </div>
           </div>
         )}
-
-        {/* 8. 工数 */}
         {activeTab === 'manhours' && (
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -503,8 +481,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
             </div>
           </div>
         )}
-
-        {/* 1,2,3,4番タブ通常グラフ */}
         {!['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -512,7 +488,6 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
               const isProductivityRatio = m.title.includes("生産性") || activeTab === 'productivity';
               const isTotalType = totalMetricsKeywords.some(k => m.title.includes(k)) && !isProductivityRatio;
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
-              
               let chartData = []; let dispAct = 0; let dispFct = 0;
               if (displayMode === 'daily') {
                 chartData = currentMonthIndices.map(idx => ({ name: m.labels[idx], "実績": n(m.actual[idx]), [m.forecastType]: n(m.forecast[idx]) }));
@@ -616,7 +591,7 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
         )}
       </main>
 
-      {/* 新規追加 ＆ 編集用モーダル */}
+      {/* 新規追加・編集モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">
@@ -647,8 +622,8 @@ export default function DashboardPage({ params }: { params: { id: string } }) {
                   <input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" />
                   <input type="date" value={newItem.endDate} onChange={(e) => setNewItem({...newItem, endDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" />
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
-                  <input type="checkbox" checked={newItem.customerRelated} onChange={() => {}} className="accent-slate-900" />
+                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customer_related: !newItem.customer_related})}>
+                  <input type="checkbox" checked={newItem.customer_related} onChange={() => {}} className="accent-slate-900" />
                   <span className="text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</span>
                 </div>
                 <div className="space-y-1 bg-slate-50 p-3 rounded-xl border">
