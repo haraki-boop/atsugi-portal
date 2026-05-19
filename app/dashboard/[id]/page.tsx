@@ -40,7 +40,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
-  // 🚀 環境変数を一切使わず、通信情報とトークンをここに完全直接固定（Missingエラーを100%回避）
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
       const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
@@ -104,7 +103,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     return Array.from(monthsSet).sort((a, b) => n(a) - n(b));
   };
 
-  // 🚀 1つ目のエラーの原因になっていた [params.id] の監視を完全に排除し、安全な [locationId] に統一
   useEffect(() => {
     setIsMounted(true);
     fetchSupabaseData();
@@ -152,15 +150,18 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       const targetList = activeTab === 'dx' ? dxItems : envItems;
       const item = targetList[index];
       setNewItem({
-        name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''),
+        name: item.name || '', 
+        effect: item.effect === '未入力' ? '' : (item.effect || ''),
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
         endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '',
-        customer_related: item.customer_related === 'あり', ratio: item.ratio || 0
+        customerRelated: item.customer_related === 'あり', 
+        ratio: item.ratio || 0
       });
     }
     setIsModalOpen(true);
   };
 
+  // 🚀 【最重要修正】編集上書き（PATCH）のときも、列名がズレないよう「customer_related」の形式を統一
   const handleSaveItem = async () => {
     if (activeTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
@@ -179,10 +180,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       if (!newItem.name) return;
       const payload = {
         location_id: locationId,
-        name: newItem.name, effect: newItem.effect || '未入力',
+        name: newItem.name, 
+        effect: newItem.effect || '未入力',
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
-        customer_related: newItem.customer_related ? 'あり' : 'なし', ratio: Number(newItem.ratio)
+        customer_related: newItem.customerRelated ? 'あり' : 'なし', 
+        ratio: Number(newItem.ratio)
       };
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingIndex !== null) {
@@ -622,8 +625,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   <input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" />
                   <input type="date" value={newItem.endDate} onChange={(e) => setNewItem({...newItem, endDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" />
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customer_related: !newItem.customer_related})}>
-                  <input type="checkbox" checked={newItem.customer_related} onChange={() => {}} className="accent-slate-900" />
+                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
+                  <input type="checkbox" checked={newItem.customerRelated} onChange={() => {}} className="accent-slate-900" />
                   <span className="text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</span>
                 </div>
                 <div className="space-y-1 bg-slate-50 p-3 rounded-xl border">
