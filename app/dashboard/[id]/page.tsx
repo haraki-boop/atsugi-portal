@@ -48,6 +48,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // 🚀 あなたが大切に組んでくれたインデックス番号による管理ロジック
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const [newItem, setNewItem] = useState({
@@ -55,7 +57,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     client: '', proposal: '', detail: '', result: '●'
   });
 
-  // タブ構成（8: 事故, 9: 工数分析）
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
@@ -89,7 +90,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
-        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
+        // 🛠️ 【PATCH 400エラー大手術】ボディから id を確実に切り離すクレンジング処理を完全復活！
+        const targetId = String(body.id);
+        const { id, ...cleanBody } = body; 
+        const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'PATCH', headers, body: JSON.stringify(cleanBody) });
         if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
       } else if (method === 'DELETE') {
@@ -288,7 +292,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       if (!combinedMap.has(cleanTitle)) {
         combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: item.values, forecast: new Array(baseLabels.length).fill(0), forecastType: '予測' });
       }
-      const entry = combinedMap.get(combinedMap.get(cleanTitle) ? cleanTitle : cleanTitle);
       if (normalizedTitle.includes('実績')) { combinedMap.get(cleanTitle).actual = item.values; } else {
         combinedMap.get(cleanTitle).forecast = item.values;
         const detectedType = normalizedTitle.split('_')[0];
@@ -446,7 +449,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
         
-        {/* 🚀 【ロゴと導線文言修正】 */}
+        {/* 🚀 【ロゴ＆MAP導線修正】 */}
         <div className="flex items-center gap-4">
           <img src="/pal-logo.png" alt="PAL Logo" className="h-7 w-auto object-contain shrink-0" />
           <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
@@ -578,8 +581,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><Clock className="text-slate-600" size={20} /> 現場別投下工数実績内訳スタック analysis</h2>
             </div>
-            <div className="h-[450px] bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[450px] bg-slate-50/50 p-6 rounded-3xl border border-slate-100 min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <ComposedChart data={generateStackedManhoursData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
@@ -598,7 +601,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 🚀 グラフ表示タブ */}
+        {/* 主要数値グラフ表示（売上、物量・工数、生産性、月次） */}
         {!['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -643,13 +646,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast);
               
-              // 🚀 工数棒グラフのピンク化
               const isKousu = m.title.includes('工数');
               const barColor = isKousu ? '#f472b6' : (displayMode === 'monthly' ? '#ca8a04' : currentTab.color);
               const lineColor = "#7c3aed"; 
               
               return (
-                <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6">
+                <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6 min-w-0">
                   <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                       <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
@@ -669,10 +671,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                     )}
                   </div>
                   
-                  {/* 🛠️ 【確認パネルの表示ロジック大復活構造】 */}
-                  <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start' : 'w-full'}>
-                    <div className={displayMode !== 'daily' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100'}>
-                      <ResponsiveContainer width="100%" height="100%">
+                  {/* 🛠️ 【確認パネル】大復活ブロック */}
+                  <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start min-w-0' : 'w-full min-w-0'}>
+                    <div className={displayMode !== 'daily' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100 min-w-0' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100 min-w-0'}>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
@@ -685,7 +687,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                       </ResponsiveContainer>
                     </div>
                     
-                    {/* 🚀 週次・月次の時だけ出現する美麗な黒い確認パネルをここに完全結合 */}
                     {displayMode !== 'daily' && (
                       <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
                         <div className="border-b border-slate-800 pb-2">
@@ -722,7 +723,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 🚀 DX推進・現場改善タブ */}
+        {/* DX推進・現場改善タブ */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
@@ -739,10 +740,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                       <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
                       <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
-                    <div className="w-[160px] h-[160px] relative shrink-0">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="w-[160px] h-[160px] relative shrink-0 min-w-0">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
-                          {/* 🛠️ 【円グラフ復活！】data={chartPieData} に100%修正完了！ */}
+                          {/* 🛠️ 【円グラフイラスト復活】 */}
                           <Pie data={chartPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} startAngle={90} endAngle={-270} dataKey="value">
                             <Cell fill={themeColor} />
                             <Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
@@ -774,7 +775,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 🚀 7. 営業履歴タブ */}
+        {/* 🚀 7. 営業履歴タブ（あなたのベースロジック100%ホールド版） */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
