@@ -22,12 +22,13 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
 
-  const [newItem, setNewItem] = useState({
+  const newItemData = {
     name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0,
     client: '', proposal: '', detail: '', result: '●'
-  });
+  };
+  const [newItem, setNewItem] = useState(newItemData);
 
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
@@ -61,11 +62,15 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
-        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
+        // 🚀 【超完全クレンジング】idを完全に除外し、URLへ渡すIDをString型に明示変換して型の不整合を完全に根絶！
+        const targetId = String(body.id);
+        const { id, ...cleanBody } = body;
+        const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'PATCH', headers, body: JSON.stringify(cleanBody) });
         if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
       } else if (method === 'DELETE') {
-        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
+        const targetId = String(body.id);
+        const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'DELETE', headers });
         if (!res.ok) throw new Error(`DELETE ${res.status}`);
         return true;
       }
@@ -133,24 +138,24 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   };
 
   const handleOpenAddModal = () => {
-    setEditingId(null);
+    setEditingItem(null);
     setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●' });
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (index: number) => {
-    if (activeTab === 'history') {
-      const item = historyItems[index];
-      setEditingId(item.id);
+  const handleOpenEditModal = (item: any, isHistory = false) => {
+    if (!item || !item.id) return;
+    setEditingItem(item); 
+
+    if (isHistory) {
       setNewItem({
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
-        client: item.name || '', proposal: item.effect || '', detail: item.end_date || '', result: item.customer_related || '●'
+        client: item.name || '', 
+        proposal: item.effect || '', 
+        detail: item.end_date || '', 
+        result: item.customer_related || '●'
       });
     } else {
-      const targetList = activeTab === 'dx' ? dxItems : envItems;
-      const item = targetList[index];
-      setEditingId(item.id);
-      // 🚀 【最重要修正】item.ratio などの英語のキーから寸分違わずデータをモーダルに引き込む
       setNewItem({
         name: item.name || '', 
         effect: item.effect === '未入力' ? '' : (item.effect || ''),
@@ -171,8 +176,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         name: newItem.client, effect: newItem.proposal, end_date: newItem.detail || '', customer_related: newItem.result
       };
-      if (editingId !== null) {
-        payload.id = editingId;
+      if (editingItem) {
+        payload.id = editingItem.id;
         await supabaseRequest('sales_history', 'PATCH', payload);
       } else {
         await supabaseRequest('sales_history', 'POST', payload);
@@ -186,11 +191,11 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
         customer_related: newItem.customerRelated ? 'あり' : 'なし', 
-        ratio: Number(newItem.ratio)
+        ratio: n(newItem.ratio)
       };
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
-      if (editingId !== null) {
-        payload.id = editingId;
+      if (editingItem) {
+        payload.id = editingItem.id;
         await supabaseRequest(targetTable, 'PATCH', payload);
       } else {
         await supabaseRequest(targetTable, 'POST', payload);
@@ -200,15 +205,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     setIsModalOpen(false);
   };
 
-  const handleDeleteItem = async (indexToDelete: number) => {
-    if (activeTab === 'history') {
-      await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
-    } else if (activeTab === 'dx') {
-      await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
-    } else {
-      await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
-    }
-    await fetchSupabaseData(); 
+  const handleDeleteItem = (idToDelete: string) => {
+    if (!idToDelete) return;
+    const targetTable = activeTab === 'history' ? 'sales_history' : (activeTab === 'dx' ? 'dx_actions' : 'env_actions');
+    supabaseRequest(targetTable, 'DELETE', { id: idToDelete }).then(() => {
+      fetchSupabaseData();
+    });
   };
 
   if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
@@ -303,7 +305,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <AlertTriangle size={14} className="text-rose-600" />;
         comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり急ブレーキ。この推移のまま月末を通過すると、当月最終売上が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。`;
       } else {
-        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移。このペースを維持すれば月末の総着地は ${formatVal(projectedEndResult)} となり、経営計画通りの順調な利益水準を確保できるシミュレーションです。`;
+        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と手堅く推移. このペースを維持すれば月末の総着地は ${formatVal(projectedEndResult)} となり、経営計画通りの順調な利益水準を確保できるシミュレーションです。`;
       }
     }
     return { status, color, icon, comment, ratio: ratio.toFixed(1) };
@@ -331,11 +333,11 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
         <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600">
           <ArrowLeft size={16} /> <span className="text-xs">ポータルへ戻る</span>
-        </Link>
+         </Link>
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
@@ -390,11 +392,11 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
                 return (
-                  <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
+                  <div key={item.id || index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                     {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
                     <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                      <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
+                      <button onClick={() => handleOpenEditModal(item, false)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
+                      <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(item.id); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
                     <div className="w-[160px] h-[160px] relative shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
@@ -439,20 +441,20 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 <div className="text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
               ) : (
                 historyItems.map((log, index) => (
-                  <div key={index} className="relative group">
+                  <div key={log.id || index} className="relative group">
                     <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500"><Building2 size={12} /></div>
                     <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative">
                       <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                        <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                        <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
+                        <button onClick={() => handleOpenEditModal(log, true)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
+                        <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(log.id); }} className="text-slate-300 hover:text-rose-500">削除</button>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
-                        <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
-                        <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
+                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.start_date || '日付未設定'}</span>
+                        <h4 className="text-base font-black text-slate-900 tracking-tight">{log.name}</h4>
+                        <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.customer_related === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.customer_related}</span>
                       </div>
-                      {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
-                      {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
+                      {log.effect && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.effect}</div>}
+                      {log.end_date && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.end_date}</p>}
                     </div>
                   </div>
                 ))
@@ -463,7 +465,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         {activeTab === 'manhours' && (
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><Clock className="text-slate-600" size={20} /> 現場別投下工数実績内訳スタック分析</h2>
+              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><Clock className="text-slate-600" size={20} /> 現場別投下工数実績内訳スタック analysis</h2>
             </div>
             <div className="h-[380px] bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
               <ResponsiveContainer width="100%" height="100%">
@@ -472,7 +474,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingBottom: '15px' }} />
                   <Bar name="リコス" dataKey="リコス" stackId="reizoManpower" fill="#3b82f6" />
                   <Bar name="リコスアイス" dataKey="リコスアイス" stackId="reizoManpower" fill="#06b6d4" />
                   <Bar name="ブロンコビリー" dataKey="ブロンコビリー" stackId="reizoManpower" fill="#2563eb" />
@@ -599,7 +601,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingId !== null ? '編集上書き' : '新規追加'}</h3>
+              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingItem !== null ? '編集上書き' : '新規追加'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={18} /></button>
             </div>
             {activeTab === 'history' ? (
