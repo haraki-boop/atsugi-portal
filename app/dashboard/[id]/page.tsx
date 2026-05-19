@@ -40,32 +40,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     { id: 'manhours', label: '8. 工数', icon: Clock, color: '#475569' },
   ];
 
-  // 🚀 【安全対策】英語のデータをSupabaseの日本語カラムに自動翻訳する最強の変換器
-  const convertToSupabasePayload = (rawBody: any, isHistory = false) => {
-    if (!rawBody) return null;
-    if (isHistory) {
-      return {
-        id: rawBody.id,
-        'ロケーションID': locationId,
-        '開始日': rawBody.date || '',
-        '名前': rawBody.client || '',
-        '効果': rawBody.proposal || '',
-        '終了日': rawBody.detail || '',
-        '顧客関連': rawBody.result || '●'
-      };
-    }
-    return {
-      id: rawBody.id,
-      'ロケーションID': locationId,
-      '名前': rawBody.name || '',
-      '効果': rawBody.effect || '未入力',
-      '開始日': rawBody.start_date || '',
-      '終了日': rawBody.end_date || '',
-      '顧客関連': rawBody.customer_related || 'なし',
-      '比率': Number(rawBody.ratio || 0)
-    };
-  };
-
+  // 🚀 【完全決着】あなたの作った完璧な英語カラム構造と100%直通で通信するロジック
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
       const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
@@ -78,45 +53,16 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         'Prefer': 'return=representation'
       };
 
-      // URLエンコードされた「%E3%83%AD%E3%82%B1%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3ID」は「ロケーションID」のことです
       if (method === 'GET') {
-        const res = await fetch(`${url}?%E3%83%AD%E3%82%B1%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3ID=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
+        const res = await fetch(`${url}?location_id=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
         if (!res.ok) throw new Error(`GET ${res.status}`);
-        const json = await res.json();
-        
-        // 🚀 【大復活】読み込んだ日本語データを、プログラムが認識できるクリーンな英語データに逆翻訳してあげる
-        return json.map((item: any) => {
-          if (table === 'sales_history') {
-            return {
-              id: item.id,
-              date: item['開始日'] || item.date || '',
-              client: item['名前'] || item.client || '',
-              proposal: item['効果'] || item.proposal || '',
-              detail: item['終了日'] || item.detail || '',
-              result: item['顧客関連'] || item.result || '●'
-            };
-          }
-          return {
-            id: item.id,
-            name: item['名前'] || item.name || '',
-            effect: item['効果'] || item.effect || '未入力',
-            start_date: item['開始日'] || item.start_date || '',
-            end_date: item['終了日'] || item.end_date || '',
-            customer_related: item['顧客関連'] || item.customer_related || 'なし',
-            ratio: item['比率'] !== undefined ? n(item['比率']) : n(item.ratio)
-          };
-        });
-      }
-
-      // 送信（POST / PATCH / DELETE）の処理
-      const translatedBody = method !== 'DELETE' ? convertToSupabasePayload(body, table === 'sales_history') : body;
-      
-      if (method === 'POST') {
-        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(translatedBody) });
+        return await res.json();
+      } else if (method === 'POST') {
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
-        const res = await fetch(`${url}?id=eq.${translatedBody.id}`, { method: 'PATCH', headers, body: JSON.stringify(translatedBody) });
+        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
         if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
       } else if (method === 'DELETE') {
@@ -198,8 +144,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     if (activeTab === 'history') {
       const item = historyItems[index];
       setNewItem({
-        startDate: item.date ? item.date.replace(/\//g, '-') : '',
-        client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●'
+        startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
+        client: item.name || '', proposal: item.effect || '', detail: item.end_date || '', result: item.customer_related || '●'
       });
     } else {
       const targetList = activeTab === 'dx' ? dxItems : envItems;
@@ -220,8 +166,9 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     if (activeTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
       const payload = {
-        date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
-        client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result
+        location_id: locationId,
+        start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
+        name: newItem.client, effect: newItem.proposal, end_date: newItem.detail || '', customer_related: newItem.result
       };
       if (editingIndex !== null) {
         payload.id = historyItems[editingIndex].id;
@@ -232,6 +179,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     } else {
       if (!newItem.name) return;
       const payload = {
+        location_id: locationId,
         name: newItem.name, 
         effect: newItem.effect || '未入力',
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
@@ -445,7 +393,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                     {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
                     <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                      {/* 🚀 【大復活】綺麗になった編集ボタン */}
                       <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
                       <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
