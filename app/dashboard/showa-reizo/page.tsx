@@ -236,6 +236,44 @@ export default function ShowaReizoDashboardPage() {
     await fetchSupabaseData();
   };
 
+  if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
+
+  // 🚀 【完全大復活】ここで現在のタブの色情報を定義！
+  const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
+
+  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故"];
+  const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
+
+  const baseLabels = data.labels || ["4/1", "4/2"];
+  const availableMonths = getAvailableMonths(baseLabels);
+  const currentMonthIndices = baseLabels.map((l, idx) => (typeof l === 'string' && l.split('/')[0] === globalSelectedMonth) ? idx : -1).filter(idx => idx !== -1);
+
+  const weeklyGroups = (() => {
+    const groups: { weekNum: number; label: string; indices: number[] }[] = [];
+    if (!currentMonthIndices || currentMonthIndices.length === 0) return groups;
+    let currentWeekIndices: number[] = [];
+    let weekCount = 1;
+    let startLabel = baseLabels[currentMonthIndices[0]];
+
+    currentMonthIndices.forEach((idx) => {
+      const label = baseLabels[idx];
+      if (!label || typeof label !== 'string' || !label.includes('/')) {
+        currentWeekIndices.push(idx); return;
+      }
+      const parts = label.split('/');
+      const date = new Date(2026, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+      if (date.getDay() === 0 && currentWeekIndices.length > 0) {
+        groups.push({ weekNum: weekCount, label: `${globalSelectedMonth}月度 ${weekCount}週目 (${startLabel} ～ ${baseLabels[idx - 1]})`, indices: currentWeekIndices });
+        weekCount++; startLabel = label; currentWeekIndices = [];
+      }
+      currentWeekIndices.push(idx);
+    });
+    if (currentWeekIndices.length > 0) {
+      groups.push({ weekNum: weekCount, label: `${weekCount}週目 (${startLabel} ～ ${baseLabels[currentMonthIndices[currentMonthIndices.length - 1]]})`, indices: currentWeekIndices });
+    }
+    return groups;
+  })();
+
   const getCombinedMetrics = () => {
     const targetTabId = activeTab === 'monthly' ? 'sales' : (activeTab === 'accidents' ? 'logistics' : currentTab.id);
     let allItems = data[`${targetTabId}Data`] || [];
@@ -346,7 +384,7 @@ export default function ShowaReizoDashboardPage() {
     rawCategories.forEach(row => {
       const name = row.name;
       if (row.lastDate && row.lastDate !== "未取得") {
-        if (!absoluteLastDateMap[name] || new Date(row.lastDate) > new Date(absoluteLastMap[name])) {
+        if (!absoluteLastDateMap[name] || new Date(row.lastDate) > new Date(absoluteLastDateMap[name])) {
           absoluteLastDateMap[name] = row.lastDate;
         }
       }
