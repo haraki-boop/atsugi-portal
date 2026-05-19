@@ -32,7 +32,6 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 export default function ShowaReizoDashboardPage() {
-  // 🚀 【昭和冷蔵専用に完全固定】URL引数エラーのリスクを根絶
   const locationId = 'showa-reizo';
 
   const [isMounted, setIsMounted] = useState(false);
@@ -134,7 +133,6 @@ export default function ShowaReizoDashboardPage() {
     setIsMounted(true);
     fetchSupabaseData();
     
-    // 🚀 昭和冷蔵専用のGASへ直結
     const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
@@ -348,7 +346,7 @@ export default function ShowaReizoDashboardPage() {
     rawCategories.forEach(row => {
       const name = row.name;
       if (row.lastDate && row.lastDate !== "未取得") {
-        if (!absoluteLastDateMap[name] || new Date(row.lastDate) > new Date(absoluteLastDateMap[name])) {
+        if (!absoluteLastDateMap[name] || new Date(row.lastDate) > new Date(absoluteLastMap[name])) {
           absoluteLastDateMap[name] = row.lastDate;
         }
       }
@@ -575,7 +573,6 @@ export default function ShowaReizoDashboardPage() {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
               const isProductivityRatio = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || activeTab === 'productivity';
               
-              // 🚀 【合計化のインテリジェント強化】率や％以外のすべての物量データ・ケース数を確実に合計（SUM）で捉える防御キーワード
               const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
               const isTotalType = (totalMetricsKeywords.some(k => m.title.includes(k)) || activeTab === 'logistics' || activeTab === 'sales' || activeTab === 'monthly') && !isProductivityRatio;
               
@@ -617,6 +614,7 @@ export default function ShowaReizoDashboardPage() {
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast);
               
+              const isKousu = m.title.includes('工数');
               const barColor = isKousu ? '#f472b6' : (displayMode === 'monthly' ? '#ca8a04' : currentTab.color);
               const lineColor = "#7c3aed"; 
               
