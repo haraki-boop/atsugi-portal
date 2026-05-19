@@ -62,7 +62,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
-        // 🚀 【超完全クレンジング】idを完全に除外し、URLへ渡すIDをString型に明示変換して型の不整合を完全に根絶！
         const targetId = String(body.id);
         const { id, ...cleanBody } = body;
         const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'PATCH', headers, body: JSON.stringify(cleanBody) });
@@ -148,12 +147,13 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     setEditingItem(item); 
 
     if (isHistory) {
+      // 🚀 営業履歴専用の正しいカラム名に完全適合
       setNewItem({
-        startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
-        client: item.name || '', 
-        proposal: item.effect || '', 
-        detail: item.end_date || '', 
-        result: item.customer_related || '●'
+        startDate: item.date ? item.date.replace(/\//g, '-') : '',
+        client: item.client || '', 
+        proposal: item.proposal || '', 
+        detail: item.detail || '', 
+        result: item.result || '●'
       });
     } else {
       setNewItem({
@@ -171,10 +171,14 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const handleSaveItem = async () => {
     if (activeTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
+      // 🚀 営業履歴専用の正しいカラム名（date, client, proposal, detail, result）で送信
       const payload = {
         location_id: locationId,
-        start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
-        name: newItem.client, effect: newItem.proposal, end_date: newItem.detail || '', customer_related: newItem.result
+        date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
+        client: newItem.client, 
+        proposal: newItem.proposal, 
+        detail: newItem.detail || '', 
+        result: newItem.result
       };
       if (editingItem) {
         payload.id = editingItem.id;
@@ -449,12 +453,13 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                         <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(log.id); }} className="text-slate-300 hover:text-rose-500">削除</button>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.start_date || '日付未設定'}</span>
-                        <h4 className="text-base font-black text-slate-900 tracking-tight">{log.name}</h4>
-                        <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.customer_related === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.customer_related}</span>
+                        {/* 🚀 営業履歴専用の正しいプロパティを画面に表示 */}
+                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
+                        <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
+                        <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
                       </div>
-                      {log.effect && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.effect}</div>}
-                      {log.end_date && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.end_date}</p>}
+                      {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
+                      {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
                     </div>
                   </div>
                 ))
