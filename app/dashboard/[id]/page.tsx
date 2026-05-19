@@ -257,7 +257,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         .replace('実績_', '').replace('予測_', '').replace('予算_', '').replace('目標_', '')
         .replace('実績', '').replace('予測', '').replace('予算', '').replace('目標', '');
       if (item.title.includes('社会保険')) cleanTitle = '社会保険';
-      if (!combinedMap.has(combinedMap.has(cleanTitle))) {
+      if (!combinedMap.has(cleanTitle)) {
         combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: item.values, forecast: new Array(baseLabels.length).fill(0), forecastType: '予測' });
       }
       const entry = combinedMap.get(cleanTitle);
@@ -292,12 +292,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <ShieldAlert size={14} className="text-rose-600" />;
         comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過。この推移のまま月末を迎えると、最終着地が計画を【${formatVal(deviationAmount)}】オーバーし、今期の限界利益を著しく圧迫する試算となります。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に収まるシミュレーション結果です。`;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と適正。このままのペースであれば月末の総執行も計画枠内（着地想定: ${formatVal(projectedEndResult)}）に収まるシミュレーション結果です。`;
       }
     } else {
       if (ratio >= 105) {
         status = 'EXCELLENT'; color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; icon = <ThumbsUp size={14} className="text-emerald-600" />;
-        comment = `【経営予測：収益ポテンシャル拡大】『${title}高』は${modeText}目標比${ratio.toFixed(1)}%の躍近。この推移を維持して着地できれば、当月末の最終売上高は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。`;
+        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%の躍近。この推移を維持して着地できれば、当月末の最終売上高は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。`;
       } else if (ratio < 95) {
         status = 'WARNING'; color = 'text-rose-700 bg-rose-50 border-rose-200'; icon = <AlertTriangle size={14} className="text-rose-600" />;
         comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり急ブレーキ。この推移のまま月末を通過すると、当月最終売上が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。`;
@@ -392,7 +392,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                     {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
                     <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
                       <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
                     <div className="w-[160px] h-[160px] relative shrink-0">
@@ -442,7 +441,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                     <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500"><Building2 size={12} /></div>
                     <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative">
                       <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                        <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
                         <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
@@ -593,12 +591,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         )}
       </main>
 
-      {/* 新規追加・編集モーダル */}
+      {/* 新規追加モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingIndex !== null ? '編集上書き' : '新規追加'}</h3>
+              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの新規追加</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={18} /></button>
             </div>
             {activeTab === 'history' ? (
