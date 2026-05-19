@@ -48,15 +48,14 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const newItemData = {
+  const [newItem, setNewItem] = useState({
     name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0,
     client: '', proposal: '', detail: '', result: '●'
-  };
-  const [newItem, setNewItem] = useState(newItemData);
+  });
 
-  // タブ構成変更（8: 事故, 9: 工数分析）
+  // タブ構成（8: 事故, 9: 工数分析）
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
@@ -82,7 +81,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       };
 
       if (method === 'GET') {
-        const res = await fetch(`${url}?location_id=eq.${locationId}&order=created_at.asc`, { method: 'GET', headers, cache: 'no-store' });
+        const res = await fetch(`${url}?location_id=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
         if (!res.ok) throw new Error(`GET ${res.status}`);
         return await res.json();
       } else if (method === 'POST') {
@@ -90,14 +89,11 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
-        const targetId = String(body.id);
-        const { id, ...cleanBody } = body;
-        const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'PATCH', headers, body: JSON.stringify(cleanBody) });
+        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
         if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
       } else if (method === 'DELETE') {
-        const targetId = String(body.id);
-        const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'DELETE', headers });
+        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
         if (!res.ok) throw new Error(`DELETE ${res.status}`);
         return true;
       }
@@ -138,8 +134,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     setIsMounted(true);
     fetchSupabaseData();
-
-    // 🚀 【最新のGASのURLへ直結完了】
+    
     const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
@@ -166,30 +161,29 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   };
 
   const handleOpenAddModal = () => {
-    setEditingItem(null);
-    setNewItem({ ...newItemData });
+    setEditingIndex(null);
+    setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●' });
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (item: any, isHistory = false) => {
-    if (!item || !item.id) return;
-    setEditingItem(item); 
-    if (isHistory) {
+  const handleOpenEditModal = (index: number) => {
+    setEditingIndex(index);
+    if (activeTab === 'history') {
+      const item = historyItems[index];
       setNewItem({
         startDate: item.date ? item.date.replace(/\//g, '-') : '',
-        client: item.client || '', 
-        proposal: item.proposal || '', 
-        detail: item.detail || '', 
-        result: item.result || '●'
+        client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●'
       });
     } else {
+      const targetList = activeTab === 'dx' ? dxItems : envItems;
+      const item = targetList[index];
       setNewItem({
-        name: item.name || '', 
+        name: item.name || '',
         effect: item.effect === '未入力' ? '' : (item.effect || ''),
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
         endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '',
-        customerRelated: item.customer_related === 'あり', 
-        ratio: n(item.ratio)
+        customerRelated: item.customer_related === 'あり',
+        ratio: item.ratio || 0
       });
     }
     setIsModalOpen(true);
@@ -201,13 +195,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       const payload = {
         location_id: locationId,
         date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
-        client: newItem.client, 
-        proposal: newItem.proposal, 
-        detail: newItem.detail || '', 
-        result: newItem.result
+        client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result
       };
-      if (editingItem) {
-        payload.id = editingItem.id;
+      if (editingIndex !== null) {
+        payload.id = historyItems[editingIndex].id;
         await supabaseRequest('sales_history', 'PATCH', payload);
       } else {
         await supabaseRequest('sales_history', 'POST', payload);
@@ -216,31 +207,35 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       if (!newItem.name) return;
       const payload = {
         location_id: locationId,
-        name: newItem.name, 
+        name: newItem.name,
         effect: newItem.effect || '未入力',
         start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '',
         end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '',
-        customer_related: newItem.customerRelated ? 'あり' : 'なし', 
+        customer_related: newItem.customerRelated ? 'あり' : 'なし',
         ratio: Number(newItem.ratio)
       };
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
-      if (editingItem) {
-        payload.id = editingItem.id;
+      if (editingIndex !== null) {
+        const targetList = activeTab === 'dx' ? dxItems : envItems;
+        payload.id = targetList[editingIndex].id;
         await supabaseRequest(targetTable, 'PATCH', payload);
       } else {
         await supabaseRequest(targetTable, 'POST', payload);
       }
     }
-    await fetchSupabaseData(); 
+    await fetchSupabaseData();
     setIsModalOpen(false);
   };
 
-  const handleDeleteItem = (idToDelete: string) => {
-    if (!idToDelete) return;
-    const targetTable = activeTab === 'history' ? 'sales_history' : (activeTab === 'dx' ? 'dx_actions' : 'env_actions');
-    supabaseRequest(targetTable, 'DELETE', { id: idToDelete }).then(() => {
-      fetchSupabaseData();
-    });
+  const handleDeleteItem = async (indexToDelete: number) => {
+    if (activeTab === 'history') {
+      await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
+    } else if (activeTab === 'dx') {
+      await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
+    } else {
+      await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
+    }
+    await fetchSupabaseData();
   };
 
   if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
@@ -293,14 +288,14 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       if (!combinedMap.has(cleanTitle)) {
         combinedMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || baseLabels, actual: item.values, forecast: new Array(baseLabels.length).fill(0), forecastType: '予測' });
       }
-      const entry = combinedMap.get(cleanTitle);
-      if (normalizedTitle.includes('実績')) { entry.actual = item.values; } else {
-        entry.forecast = item.values;
+      const entry = combinedMap.get(combinedMap.get(cleanTitle) ? cleanTitle : cleanTitle);
+      if (normalizedTitle.includes('実績')) { combinedMap.get(cleanTitle).actual = item.values; } else {
+        combinedMap.get(cleanTitle).forecast = item.values;
         const detectedType = normalizedTitle.split('_')[0];
-        if (detectedType && detectedType !== normalizedTitle) { entry.forecastType = detectedType; } 
-        else if (normalizedTitle.includes('予算')) { entry.forecastType = '予算'; } 
-        else if (normalizedTitle.includes('目標')) { entry.forecastType = '目標'; } 
-        else { entry.forecastType = '予測'; }
+        if (detectedType && detectedType !== normalizedTitle) { combinedMap.get(cleanTitle).forecastType = detectedType; } 
+        else if (normalizedTitle.includes('予算')) { combinedMap.get(cleanTitle).forecastType = '予算'; } 
+        else if (normalizedTitle.includes('目標')) { combinedMap.get(cleanTitle).forecastType = '目標'; } 
+        else { combinedMap.get(cleanTitle).forecastType = '予測'; }
       }
     });
     return Array.from(combinedMap.values());
@@ -374,11 +369,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     });
   };
 
-  // 🚀 【月別自動合体エンジン】
   const accidentCategories = (() => {
     const rawCategories = data?.accidentStats?.categories || [];
-    
-    // ① 全期間を通じた各カテゴリの最新の事故発生日（無事故DAYS用）
     const absoluteLastDateMap = {};
     rawCategories.forEach(row => {
       const name = row.name;
@@ -389,7 +381,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       }
     });
 
-    // ② 選択された月（globalSelectedMonth）のデータにフィルター
     const currentMonthRows = rawCategories.filter(cat => {
       if (!cat.lastDate || cat.lastDate === "未取得") return false;
       const parts = cat.lastDate.split('/');
@@ -400,7 +391,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       return false;
     });
 
-    // ③ カテゴリごとに数値を合算
     const catMap = {};
     currentMonthRows.forEach(row => {
       const name = row.name;
@@ -418,7 +408,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       }
     });
 
-    // ④ ユニークなカテゴリ一覧をマッピング
     const allCategoryNames = Array.from(new Set(rawCategories.map(r => r.name))).filter(Boolean);
     const result = allCategoryNames.map(name => {
       return {
@@ -456,6 +445,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
+        
+        {/* 🚀 【ロゴと導線文言修正】 */}
         <div className="flex items-center gap-4">
           <img src="/pal-logo.png" alt="PAL Logo" className="h-7 w-auto object-contain shrink-0" />
           <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
@@ -463,6 +454,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             <ArrowLeft size={15} /> <span className="text-xs tracking-tight">拠点MAPに戻る</span>
           </Link>
         </div>
+
         <div className="text-center">
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
@@ -508,11 +500,11 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 🚀 8. 事故管理タブ（月連動 ＆ 自動合体） */}
+        {/* 🚀 8. 事故管理タブ */}
         {activeTab === 'accidents' && (
           <div className="space-y-8">
             <div className="border-b border-slate-200 pb-4">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3"><AccidentIcon className="text-amber-500" size={28} /> カテゴリ別 事故件数 ({globalSelectedMonth}月度)</h2>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3"><AccidentIcon className="text-amber-500" size={28} /> カテゴリ別 安全管理ステータス ({globalSelectedMonth}月度)</h2>
               <p className="text-slate-400 text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
             </div>
             
@@ -580,7 +572,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 🚀 9. 工数分析タブ（スタックグラフ移動） */}
+        {/* 🚀 9. 工数分析タブ */}
         {activeTab === 'manhours' && (
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -593,7 +585,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingBottom: '15px' }} />
+                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
                   <Bar name="リコス" dataKey="リコス" stackId="reizoManpower" fill="#3b82f6" />
                   <Bar name="リコスアイス" dataKey="リコスアイス" stackId="reizoManpower" fill="#06b6d4" />
                   <Bar name="ブロンコビリー" dataKey="ブロンコビリー" stackId="reizoManpower" fill="#2563eb" />
@@ -606,7 +598,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 主要グラフ表示タブ */}
+        {/* 🚀 グラフ表示タブ */}
         {!['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2' : ''} gap-8`}>
             {allMetrics.map((m, i) => {
@@ -651,7 +643,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
               const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
               const evalData = getAiCorporateEvaluation(m.title, dispAct, dispFct, displayMode, isTotalType, currentRatio, m.forecast);
               
-              // 🚀 【工数の実績棒グラフだけピンポイントピンク化】
+              // 🚀 工数棒グラフのピンク化
               const isKousu = m.title.includes('工数');
               const barColor = isKousu ? '#f472b6' : (displayMode === 'monthly' ? '#ca8a04' : currentTab.color);
               const lineColor = "#7c3aed"; 
@@ -666,29 +658,58 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                     {displayMode === 'daily' && (
                       <div className="flex gap-6 text-right items-center">
                         <div className="border-r pr-4 border-slate-100">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月 累計実績</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月 本日まで{isProductivityRatio ? 'の平均' : 'の累計'}</p>
                           <p className="text-xl font-black text-slate-800 tracking-tight">{Math.round(dispAct).toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">進捗率</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">今日現在の進捗率</p>
                           <p className={`text-xl font-black ${currentRatio >= 101 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (currentRatio < 99 ? (isCost ? 'text-emerald-600' : 'text-rose-600') : 'text-slate-600')}`}>{currentRatio.toFixed(1)}%</p>
                         </div>
                       </div>
                     )}
                   </div>
-                  <div className="h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                        <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingBottom: '15px' }} />
-                        <Bar name="実績" dataKey="実績" fill={barColor} radius={[10, 10, 0, 0]} barSize={displayMode === 'daily' ? 20 : (displayMode === 'weekly' ? 60 : 12)} />
-                        <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke={lineColor} strokeWidth={3} dot={false} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
+                  
+                  {/* 🛠️ 【確認パネルの表示ロジック大復活構造】 */}
+                  <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start' : 'w-full'}>
+                    <div className={displayMode !== 'daily' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100'}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                          <Bar name="実績" dataKey="実績" fill={barColor} radius={[10, 10, 0, 0]} barSize={displayMode === 'daily' ? 20 : (displayMode === 'weekly' ? 60 : 12)} />
+                          <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke={lineColor} strokeWidth={3} dot={false} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    {/* 🚀 週次・月次の時だけ出現する美麗な黒い確認パネルをここに完全結合 */}
+                    {displayMode !== 'daily' && (
+                      <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
+                        <div className="border-b border-slate-800 pb-2">
+                          <p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">当{displayMode === 'weekly' ? '週' : '月'}{isProductivityRatio ? '平均' : (isTotalType ? '合計' : '平均')}確認パネル</p>
+                        </div>
+                        <div className="space-y-4 my-auto">
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs font-bold text-slate-400">{isProductivityRatio ? '平均実績' : (isTotalType ? `${displayMode === 'weekly' ? '合計実績' : '当月合計実績'}` : '平均実績')}</span>
+                            <span className="text-2xl font-black tracking-tight text-white">{Math.round(dispAct).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs font-bold text-slate-400">{isProductivityRatio ? `平均${m.forecastType}` : (isTotalType ? `${displayMode === 'weekly' ? '合計' : '当月合計'}${m.forecastType}` : `平均${m.forecastType}`)}</span>
+                            <span className="text-xl font-bold tracking-tight text-slate-300">{Math.round(dispFct).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
+                            <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span>
+                            <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 101 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (currentRatio < 99 ? (isCost ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-300')}`}>{currentRatio.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="text-[9px] text-slate-500 font-bold text-center uppercase tracking-wider">Executive Management DB</div>
+                      </div>
+                    )}
                   </div>
+                  
                   <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
                     <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5 flex items-center justify-center">
                       {evalData.icon}
@@ -701,7 +722,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* DX・現場改善タブ */}
+        {/* 🚀 DX推進・現場改善タブ */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
@@ -712,16 +733,17 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
                 return (
-                  <div key={item.id || index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
+                  <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                     {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
                     <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                      <button onClick={() => handleOpenEditModal(item, false)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                      <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(item.id); }} className="text-slate-300 hover:text-rose-500">削除</button>
+                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
+                      <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
                     <div className="w-[160px] h-[160px] relative shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie chartPieData={chartPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} startAngle={90} endAngle={-270} dataKey="value">
+                          {/* 🛠️ 【円グラフ復活！】data={chartPieData} に100%修正完了！ */}
+                          <Pie data={chartPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} startAngle={90} endAngle={-270} dataKey="value">
                             <Cell fill={themeColor} />
                             <Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
                           </Pie>
@@ -752,7 +774,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* 🚀 7. 営業履歴タブ（100%完全格納版） */}
+        {/* 🚀 7. 営業履歴タブ */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -763,12 +785,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 <div className="text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
               ) : (
                 historyItems.map((log, index) => (
-                  <div key={log.id || index} className="relative group">
+                  <div key={index} className="relative group">
                     <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500"><Building2 size={12} /></div>
                     <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative">
                       <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                        <button onClick={() => handleOpenEditModal(log, true)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                        <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(log.id); }} className="text-slate-300 hover:text-rose-500">削除</button>
+                        <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
+                        <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
@@ -791,7 +813,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingItem !== null ? '編集上書き' : '新規追加'}</h3>
+              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingIndex !== null ? '編集上書き' : '新規追加'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={18} /></button>
             </div>
             {activeTab === 'history' ? (
