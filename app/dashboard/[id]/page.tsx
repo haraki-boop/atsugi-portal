@@ -22,7 +22,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [historyItems, setHistoryItems] = useState<any[]>([]); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null); // 🚀 整数ではなく、Supabaseの本物のUUID文字列を保持する形に変更
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [newItem, setNewItem] = useState({
     name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0,
@@ -61,7 +61,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         if (!res.ok) throw new Error(`POST ${res.status}`);
         return await res.json();
       } else if (method === 'PATCH') {
-        // 🚀 URLに渡すIDを、本物のUUID文字列形式（body.id）で正しく引き渡すように修正
         const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'PATCH', headers, body: JSON.stringify(body) });
         if (!res.ok) throw new Error(`PATCH ${res.status}`);
         return await res.json();
@@ -134,7 +133,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   };
 
   const handleOpenAddModal = () => {
-    setEditingId(null); // 🚀 新規追加時はIDなし
+    setEditingId(null);
     setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●' });
     setIsModalOpen(true);
   };
@@ -142,7 +141,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const handleOpenEditModal = (index: number) => {
     if (activeTab === 'history') {
       const item = historyItems[index];
-      setEditingId(item.id); // 🚀 Supabaseから降ってきた本物のID文字列をキャッチ
+      setEditingId(item.id);
       setNewItem({
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
         client: item.name || '', proposal: item.effect || '', detail: item.end_date || '', result: item.customer_related || '●'
@@ -150,14 +149,15 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     } else {
       const targetList = activeTab === 'dx' ? dxItems : envItems;
       const item = targetList[index];
-      setEditingId(item.id); // 🚀 Supabaseから降ってきた本物のID文字列をキャッチ
+      setEditingId(item.id);
+      // 🚀 【最重要修正】item.ratio などの英語のキーから寸分違わずデータをモーダルに引き込む
       setNewItem({
         name: item.name || '', 
         effect: item.effect === '未入力' ? '' : (item.effect || ''),
         startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '',
         endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '',
         customerRelated: item.customer_related === 'あり', 
-        ratio: item.ratio || 0
+        ratio: n(item.ratio)
       });
     }
     setIsModalOpen(true);
@@ -172,7 +172,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         name: newItem.client, effect: newItem.proposal, end_date: newItem.detail || '', customer_related: newItem.result
       };
       if (editingId !== null) {
-        payload.id = editingId; // 🚀 本物のUUIDをそのまま乗せて上書きへ
+        payload.id = editingId;
         await supabaseRequest('sales_history', 'PATCH', payload);
       } else {
         await supabaseRequest('sales_history', 'POST', payload);
@@ -190,7 +190,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       };
       const targetTable = activeTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingId !== null) {
-        payload.id = editingId; // 🚀 本物のUUIDをそのまま乗せて上書きへ
+        payload.id = editingId;
         await supabaseRequest(targetTable, 'PATCH', payload);
       } else {
         await supabaseRequest(targetTable, 'POST', payload);
@@ -554,7 +554,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                           <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingBottom: '15px' }} />
                           <Bar name="実績" dataKey="実績" fill={displayMode === 'monthly' ? '#ca8a04' : currentTab.color} radius={[10, 10, 0, 0]} barSize={displayMode === 'daily' ? 20 : (displayMode === 'weekly' ? 60 : 12)} />
                           <Line name={m.forecastType} type="monotone" dataKey={m.forecastType} stroke="#7c3aed" strokeWidth={3} dot={false} />
                         </ComposedChart>
