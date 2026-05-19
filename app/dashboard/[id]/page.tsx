@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Plus, X, Building2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Plus, X, Building2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Line, ComposedChart, Legend, PieChart, Pie, Cell } from 'recharts';
 
@@ -280,7 +280,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
   const allMetrics = getCombinedMetrics();
 
-  // 🚀 【①AI総評の文字数大拡張】プロフェッショナルな経営コンサルティング品質の250文字テキストへ完全復活！
+  // 🚀 【ロボ君復活】±1%未満の時は冷静なBotアイコンを表示！
   const getAiCorporateEvaluation = (title, actual, forecast, mode, isTotal, currentRatio, rawForecastArray) => {
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword));
     const ratio = currentRatio;
@@ -289,25 +289,41 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     const projectedEndResult = totalMonthForecast * (ratio / 100);
     const deviationAmount = Math.abs(projectedEndResult - totalMonthForecast);
     const formatVal = (val) => title.includes("%") || title.includes("率") ? `${val.toFixed(1)}%` : `¥${Math.round(val).toLocaleString()}`;
+    
+    let color = 'text-slate-700 bg-slate-50 border-slate-200';
+    let icon = <Bot size={18} className="text-slate-500" />;
     let comment = "";
+
     if (isLowBetter) {
-      if (ratio <= 92) {
-        comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予算比${ratio.toFixed(1)}%と大幅なコスト抑制に成功しています。この驚異的な推移を維持して着地できれば、当月末の総執行額は予測枠よりも【${formatVal(deviationAmount)}】削減され、営業利益率を直接的に押し上げる強力な要因となります。現場の徹底したリソース管理とオペレーションの効率化が数値として結実しており、限界利益の最大化に向けて非常に理想的な巡航速度を保っています。この調子で固定費・変動費の最適化を継続してください。`;
-      } else if (ratio > 103) {
-        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${(ratio - 100).toFixed(1)}%超過という危険水域に突入しています。この過剰な執行推移のまま月末を迎えた場合、最終着地が当初計画を【${formatVal(deviationAmount)}】もオーバーしてしまい、今期の限界利益を著しく圧迫する致命的なシミュレーション結果となっています。直ちに原因（タイミーの過剰投入、シフト管理の不備、突発的な非効率の発生など）を特定し、緊急のシフト調整や稼働適正化対策を講じる必要があります。早期の軌道修正を強く推奨します。`;
+      if (ratio < 99) {
+        color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; 
+        icon = <ThumbsUp size={18} className="text-emerald-600" />;
+        comment = `【経営予測：利益上振れ】『${title}』は${modeText}で予測比${ratio.toFixed(1)}%と、見事なコスト抑制に成功しています。この驚異的な推移を維持して着地できれば、当月末の総執行額は予測枠よりも【${formatVal(deviationAmount)}】削減され、営業利益率を直接的に押し上げる強力な要因となります。現場の徹底したリソース管理とオペレーションの効率化が数値として結実しており、限界利益の最大化に向けて非常に理想的な巡航速度を保っています。この調子で固定費・変動費の最適化を継続してください。`;
+      } else if (ratio > 101) {
+        color = 'text-rose-700 bg-rose-50 border-rose-200'; 
+        icon = <ThumbsDown size={18} className="text-rose-600" />;
+        comment = `【経営予測：緊急コスト警告】『${title}』が計画比${ratio.toFixed(1)}%となり、許容誤差を越える超過推移に突入しています。この過剰な執行推移のまま月末を迎えた場合、最終着地が当初計画を【${formatVal(deviationAmount)}】もオーバーしてしまい、今期の限界利益を著しく圧迫する致命的なシミュレーション結果となっています。直ちに原因（タイミーの過剰投入、シフト管理の不備、突発的な非効率など）を特定し、緊急のシフト調整や稼働適正化対策を講じる必要があります。早期の軌道修正を強く推奨します。`;
       } else {
-        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%と、極めて適正かつ計画に沿ったコントロールが維持されています。現在の安定したペースを維持することができれば、月末の総執行額も当初の経営計画枠内（着地想定: ${formatVal(projectedEndResult)}）に確実に収まる試算結果です。過不足のないリソース配分が行われており、現場のオペレーション品質とコストバランスが高度に両立している証左です。引き続き急激な物量変動に伴うコスト変動に注視しつつ、安定推移を維持してください。`;
+        color = 'text-slate-700 bg-slate-50 border-slate-200'; 
+        icon = <Bot size={18} className="text-slate-500" />;
+        comment = `【経営予測：予算内着地想定】『${title}』は${modeText}執行率${ratio.toFixed(1)}%（誤差±1%未満）と、極めて適正かつ計画通りのコントロールが維持されています。現在の安定したペースを維持することができれば、月末の総執行額も当初の経営計画枠内（着地想定: ${formatVal(projectedEndResult)}）に確実に収まる試算結果です。過不足のないリソース配分が行われており、現場のオペレーション品質とコストバランスが高度に両立している証左です。引き続き安定推移を維持してください。`;
       }
     } else {
-      if (ratio >= 105) {
-        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%という素晴らしい躍進を遂げています。この極めて力強い営業・生産推移を維持して着地できれば、当月末の最終売上高および指標は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。新規案件の獲得や現場の処理能力向上がダイレクトにプラス影響を与えており、経営基盤のさらなる強化に直結します。高稼働に伴う現場の疲弊や安全面の管理に万全を期しつつ、この拡大トレンドを最大化させましょう。`;
-      } else if (ratio < 95) {
-        comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり、看過できない急ブレーキがかかっています。この深刻な推移のまま月末を通過してしまうと、当月最終売上および主要指標が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。進捗遅延や受注減の真因を即座に洗い出し、営業アプローチの再強化や人員の再配置など、リカバリーのための即効性のある施策を即刻打つ必要があります。このまま放置すると、黒字化目標に黄色信号が灯ります。`;
+      if (ratio > 101) {
+        color = 'text-emerald-700 bg-emerald-50 border-emerald-200'; 
+        icon = <ThumbsUp size={18} className="text-emerald-600" />;
+        comment = `【経営予測：収益ポテンシャル拡大】『${title}』は${modeText}目標比${ratio.toFixed(1)}%という素晴らしい躍進を遂げています。この極めて力強い営業・生産推移を維持して着地できれば、当月末の最終実績は目標値を【${formatVal(deviationAmount)}】上振れ突破し、過去最高の限界利益を叩き出す見込みです。現場の処理能力向上や確実な案件獲得がダイレクトにプラス影響を与えており、経営基盤のさらなる強化に直結します。高稼働に伴う品質低下や安全面に万全を期しつつ、この拡大トレンドを最大化させましょう。`;
+      } else if (ratio < 99) {
+        color = 'text-rose-700 bg-rose-50 border-rose-200'; 
+        icon = <ThumbsDown size={18} className="text-rose-600" />;
+        comment = `【経営予測：致命的失速アラート】『${title}』が計画の${ratio.toFixed(1)}%に留まり、看過できない急ブレーキがかかっています。この深刻な推移のまま月末を通過してしまうと、当月最終実績が予算比で【${formatVal(deviationAmount)}】も致命的に下振れ失速する業績リスクが試算されます。進捗遅延や物量減の真因を即座に洗い出し、リカバリーのための即効性のあるオペレーション改善や人員の再配置などを即刻打つ必要があります。このまま放置すると、全体の利益目標に黄色信号が灯ります。`;
       } else {
-        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%と、経営計画通りの手堅く堅実な推移を見せています。このペースを確実に維持できれば、月末の総着地は ${formatVal(projectedEndResult)} 前後となり、当初の見込み通りの順調な利益水準を確保できるシミュレーション結果です。大きなブレもなく市場変動を吸収できている状態であり、現在の管理体制および現場オペレーションをそのまま継続・発展させていくことで、今期のマイルストーンを安定して突破可能です。`;
+        color = 'text-slate-700 bg-slate-50 border-slate-200'; 
+        icon = <Bot size={18} className="text-slate-500" />;
+        comment = `【経営予測：計画達成維持】『${title}』は${modeText}達成率${ratio.toFixed(1)}%（誤差±1%未満）と、経営計画通りの手堅く堅実な推移を見せています。このペースを確実に維持できれば、月末の総着地は ${formatVal(projectedEndResult)} 前後となり、当初の見込み通りの順調な利益水準を確保できるシミュレーション結果です。大きなブレもなく市場や物量の変動を吸収できている状態であり、現在の管理体制および現場オペレーションをそのまま継続・発展させていくことで、今期のマイルストーンを安定して突破可能です。`;
       }
     }
-    return { comment, ratio: ratio.toFixed(1) };
+    return { color, icon, comment, ratio: ratio.toFixed(1) };
   };
 
   const generateStackedManhoursData = () => {
@@ -334,8 +350,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
-        
-        {/* 🚀 【②・③ロゴと文言修正】かぶらないように flex レイアウトを組み、区切り線を追加して、拠点MAPに戻るに修正 */}
         <div className="flex items-center gap-4">
           <img src="/pal-logo.png" alt="PAL Logo" className="h-7 w-auto object-contain shrink-0" />
           <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
@@ -549,7 +563,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                         </div>
                         <div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase">今日現在の進捗率</p>
-                          <p className={`text-xl font-black ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</p>
+                          <p className={`text-xl font-black ${currentRatio >= 101 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (currentRatio < 99 ? (isCost ? 'text-emerald-600' : 'text-rose-600') : 'text-slate-600')}`}>{currentRatio.toFixed(1)}%</p>
                         </div>
                       </div>
                     )}
@@ -584,15 +598,18 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                           </div>
                           <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
                             <span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span>
-                            <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
+                            <span className={`text-3xl font-black tracking-tighter ${currentRatio >= 101 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (currentRatio < 99 ? (isCost ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-300')}`}>{currentRatio.toFixed(1)}%</span>
                           </div>
                         </div>
                         <div className="text-[9px] text-slate-500 font-bold text-center uppercase tracking-wider">Executive Management DB</div>
                       </div>
                     )}
                   </div>
-                  <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed text-slate-700 bg-slate-50 border-slate-200`}>
-                    <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5"><Bot size={14} className="text-slate-600" /></div>
+                  {/* 🚀 AIの評価アイコン（Lucide）とコメント */}
+                  <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}>
+                    <div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5 flex items-center justify-center">
+                      {evalData.icon}
+                    </div>
                     <p>{evalData.comment}</p>
                   </div>
                 </div>
