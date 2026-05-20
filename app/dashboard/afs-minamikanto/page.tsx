@@ -22,9 +22,7 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 export default function AfsMinamikantoDashboardPage() {
-  // 🚀 IDをAFS南関東に変更
   const locationId = 'afs-minamikanto';
-  
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -102,10 +100,7 @@ export default function AfsMinamikantoDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
-    
-    // 🚀 AFS南関東のGASのURLに差し替え
     const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
-    
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
       if (json && json.labels && json.labels.length > 0) {
@@ -330,7 +325,6 @@ export default function AfsMinamikantoDashboardPage() {
     const logisticsItems = data["logisticsData"] || [];
     const colV_Total = logisticsItems.find(item => item && item.title && (item.title === "総工数" || item.title === "実績_総工数"));
     
-    // 🚀 AFS南関東向け：畜産と水産を抽出
     const colChikusan = logisticsItems.find(item => item && item.title && (item.title === "畜産工数" || item.title === "実績_畜産工数"));
     const colSuisan = logisticsItems.find(item => item && item.title && (item.title === "水産工数" || item.title === "実績_水産工数"));
     
@@ -369,7 +363,6 @@ export default function AfsMinamikantoDashboardPage() {
           </Link>
         </div>
         <div className="text-center">
-          {/* 🚀 タイトルを AFS南関東 に変更 */}
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
             {['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
@@ -475,7 +468,6 @@ export default function AfsMinamikantoDashboardPage() {
                   <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                  {/* 🚀 AFS南関東向けに「畜産」「水産」に変更 */}
                   <Bar name="畜産" dataKey="畜産" stackId="afsManpower" fill="#3b82f6" />
                   <Bar name="水産" dataKey="水産" stackId="afsManpower" fill="#06b6d4" />
                   <Bar name="間接工数" dataKey="間接工数" stackId="afsManpower" fill="#94a3b8" radius={[8, 8, 0, 0]} />
@@ -603,6 +595,9 @@ export default function AfsMinamikantoDashboardPage() {
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
                     const isMonthlyFixed = m.labels && m.labels.length > 0 && !m.labels[0].toString().includes('/');
                     
+                    // 🚀 ここでちゃんと isCost を定義！
+                    const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || monthlyLowerIsBetter.some(k => m.title.includes(k));
+
                     let dispAct = 0; let prevVal = 0; let dispFct = 0;
 
                     if (isMonthlyFixed) {
@@ -623,12 +618,39 @@ export default function AfsMinamikantoDashboardPage() {
                     
                     const formatVal = (val, title) => {
                       if (title.includes("%") || title.includes("率")) return `${val.toFixed(1)}%`;
-                      if (/売上|原価|費|利益|金額|時給|賃金/.test(title)) return `¥${Math.round(val).toLocaleString()}`;
-                      return Number(val.toFixed(1)).toLocaleString();
+                      if (title.includes("生産性") || /時給|最低賃金|人数|在籍者|違反者/.test(title)) return Number(val.toFixed(1)).toLocaleString();
+                      if (/売上|原価|費|利益|金額/.test(title)) return `¥${Math.round(val).toLocaleString()}`;
+                      return Math.round(val).toLocaleString();
                     };
 
+                    const evalData = (() => {
+                      let shortComment = "";
+                      if (isMonthlyFixed) {
+                        if (monthlyDisplayOnly.some(k => m.title.includes(k))) shortComment = "月次モニタリング指標として記録されています。";
+                        else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
+                            if (prevVal > 0 && dispAct < prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から減少し、改善傾向にあります。`;
+                            else if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。注意が必要です。`;
+                            else shortComment = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
+                        } else {
+                            if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・良化しています。`;
+                            else if (prevVal > 0 && dispAct < prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から減少・悪化しています。`;
+                            else shortComment = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
+                        }
+                      } else {
+                        if (isCost) {
+                          if (currentRatio < 99) shortComment = "コスト管理は想定以上に良好です。現体制の効率化維持を推奨します。";
+                          else if (currentRatio > 101) shortComment = "警告：予算超過ペース。直ちにしきい値の見直しと人員配置の適正化が必要です。";
+                          else shortComment = "計画通り順調な推移です。現状のオペレーションを維持してください。";
+                        } else {
+                          if (currentRatio > 101) shortComment = "業績好調。数値が目標を突破し、限界利益の押し上げに貢献しています。";
+                          else if (currentRatio < 99) shortComment = "失速アラート。目標値に対し下振れ傾向。早急な原因分析を求む。";
+                          else shortComment = "手堅い計画達成ペース。着実なオペレーション管理が行われています。";
+                        }
+                      }
+                      return { shortComment };
+                    })();
+
                     let evalColor = 'bg-slate-50 border-slate-100 text-slate-500'; let evalIcon = <Bot size={14} className="text-blue-500 shrink-0" />;
-                    let evalText = "当月固定運営指標としてマッピングされています。";
                     let badgeColor = 'bg-slate-50 text-slate-500'; let badgeText = prevVal > 0 ? `${((dispAct / prevVal) * 100).toFixed(1)}%` : "前月比 --%";
 
                     if (isMonthlyFixed) {
@@ -636,19 +658,19 @@ export default function AfsMinamikantoDashboardPage() {
                         badgeText = prevVal > 0 ? `${ratio.toFixed(1)}%` : "前月データなし";
 
                         if (monthlyDisplayOnly.some(k => m.title.includes(k))) {
-                            evalText = "月次モニタリング指標として記録されています。"; badgeColor = 'bg-slate-100 text-slate-500';
+                            badgeColor = 'bg-slate-100 text-slate-500';
                         } else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
-                            if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; evalText = `前月（${formatVal(prevVal, m.title)}）から減少し、改善傾向にあります。`; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
-                            else if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; evalText = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。注意が必要です。`; badgeColor = 'bg-rose-50 text-rose-600'; } 
-                            else { evalText = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。"; badgeColor = 'bg-slate-100 text-slate-500'; }
+                            if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
+                            else if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; badgeColor = 'bg-rose-50 text-rose-600'; } 
+                            else { badgeColor = 'bg-slate-100 text-slate-500'; }
                         } else {
-                            if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; evalText = `前月（${formatVal(prevVal, m.title)}）から増加・良化しています。`; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
-                            else if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; evalText = `前月（${formatVal(prevVal, m.title)}）から減少・悪化しています。`; badgeColor = 'bg-rose-50 text-rose-600'; } 
-                            else { evalText = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。"; badgeColor = 'bg-slate-100 text-slate-500'; }
+                            if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
+                            else if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; badgeColor = 'bg-rose-50 text-rose-600'; } 
+                            else { badgeColor = 'bg-slate-100 text-slate-500'; }
                         }
                     } else {
                        const ratio = dispFct > 0 ? (dispAct/dispFct)*100 : 0;
-                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; badgeColor = 'bg-slate-100 text-slate-500'; evalText = "日次データの月次集計値です。";
+                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; badgeColor = 'bg-slate-100 text-slate-500';
                     }
 
                     return (
@@ -671,7 +693,7 @@ export default function AfsMinamikantoDashboardPage() {
                         </div>
                         <div className={`rounded-xl p-3 text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
                           {evalIcon}
-                          <p className="line-clamp-2 leading-relaxed">{evalText}</p>
+                          <p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
                         </div>
                       </div>
                     );
@@ -732,32 +754,30 @@ export default function AfsMinamikantoDashboardPage() {
           </div>
         )}
 
-        {/* 7. 営業履歴タブ */}
+        {/* 🚀 7. 営業履歴タブ（2列グリッド） */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={20} /> 営業アプローチタイムライン</h2>
+              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={20} /> 営業アプローチ履歴</h2>
             </div>
-            <div className="relative border-l-2 border-slate-100 pl-6 ml-4 space-y-8 py-2">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 py-2">
               {historyItems.length === 0 ? (
-                <div className="text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
+                <div className="col-span-1 xl:col-span-2 text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
               ) : (
                 historyItems.map((log, index) => (
-                  <div key={index} className="relative group">
-                    <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500"><Building2 size={12} /></div>
-                    <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative">
-                      <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                        <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                        <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
-                        <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
-                        <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
-                      </div>
-                      {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
-                      {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
+                  <div key={index} className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative group hover:shadow-md transition-all">
+                    <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
+                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
+                      <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500 shrink-0"><Building2 size={12} /></div>
+                      <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
+                      <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
+                      <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
+                    </div>
+                    {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
+                    {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
                   </div>
                 ))
               )}
