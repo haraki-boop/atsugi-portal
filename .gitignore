@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# お試し用フォルダをGitの送信対象から外す
+/app/sandbox

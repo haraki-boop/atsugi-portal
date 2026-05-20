@@ -241,7 +241,7 @@ export default function AfsMinamikantoDashboardPage() {
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
 
-  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故"];
+  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故","償却"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
 
   const baseLabels = data.labels || ["4/1", "4/2"];
