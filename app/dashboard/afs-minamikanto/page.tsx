@@ -22,7 +22,7 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 export default function AfsMinamikantoDashboardPage() {
-  // 🚀 IDをAFS南関東用に変更
+  // 🚀 IDをAFS南関東に変更
   const locationId = 'afs-minamikanto';
   
   const [isMounted, setIsMounted] = useState(false);
@@ -103,8 +103,8 @@ export default function AfsMinamikantoDashboardPage() {
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
     
-    // ⚠️ AFS南関東のスプレッドシートで発行した新しいGASのURLに差し替えてください！
-    const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
+    // 🚀 AFS南関東のGASのURLに差し替え
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
@@ -327,20 +327,27 @@ export default function AfsMinamikantoDashboardPage() {
   };
 
   const generateStackedManhoursData = () => {
-    // ⚠️ AFS南関東固有の現場（部門）がある場合は、適宜ここを書き換えてください。
     const logisticsItems = data["logisticsData"] || [];
     const colV_Total = logisticsItems.find(item => item && item.title && (item.title === "総工数" || item.title === "実績_総工数"));
-    const colM_Lycos = logisticsItems.find(item => item && item.title && (item.title === "リコス工数" || item.title === "実績_リコス工数"));
-    const colO_Ice = logisticsItems.find(item => item && item.title && (item.title === "リコスアイス工数" || item.title === "実績_リコスアイス工数"));
-    const colQ_Bronco = logisticsItems.find(item => item && item.title && (item.title === "ブロンコビリー工数" || item.title === "実績_ブロンコビリー工数"));
-    const colS_Genuse = logisticsItems.find(item => item && item.title && (item.title === "汎用工数" || item.title === "実績_汎用工数"));
-    const colU_Ikkatsu = logisticsItems.find(item => item && item.title && (item.title === "一括工数" || item.title === "実績_一括工数"));
+    
+    // 🚀 AFS南関東向け：畜産と水産を抽出
+    const colChikusan = logisticsItems.find(item => item && item.title && (item.title === "畜産工数" || item.title === "実績_畜産工数"));
+    const colSuisan = logisticsItems.find(item => item && item.title && (item.title === "水産工数" || item.title === "実績_水産工数"));
+    
     return currentMonthIndices.map(idx => {
-      const label = baseLabels[idx]; const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
-      const lycosH = colM_Lycos && colM_Lycos.values ? n(colM_Lycos.values[idx]) : 0; const iceH = colO_Ice && colO_Ice.values ? n(colO_Ice.values[idx]) : 0;
-      const broncoH = colQ_Bronco && colQ_Bronco.values ? n(colQ_Bronco.values[idx]) : 0; const genuseH = colS_Genuse && colS_Genuse.values ? n(colS_Genuse.values[idx]) : 0;
-      const ikkatsuH = colU_Ikkatsu && colU_Ikkatsu.values ? n(colU_Ikkatsu.values[idx]) : 0; const directSum = lycosH + iceH + broncoH + genuseH + ikkatsuH;
-      return { name: label, 'リコス': Math.round(lycosH), 'リコスアイス': Math.round(iceH), 'ブロンコビリー': Math.round(broncoH), '汎用': Math.round(genuseH), '一括': Math.round(ikkatsuH), '間接工数': Math.round(Math.max(0, totalH - directSum)) };
+      const label = baseLabels[idx]; 
+      const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
+      
+      const chikusanH = colChikusan && colChikusan.values ? n(colChikusan.values[idx]) : 0; 
+      const suisanH = colSuisan && colSuisan.values ? n(colSuisan.values[idx]) : 0; 
+      
+      const directSum = chikusanH + suisanH;
+      return { 
+        name: label, 
+        '畜産': Math.round(chikusanH), 
+        '水産': Math.round(suisanH), 
+        '間接工数': Math.round(Math.max(0, totalH - directSum)) 
+      };
     });
   };
 
@@ -468,12 +475,10 @@ export default function AfsMinamikantoDashboardPage() {
                   <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                  <Bar name="リコス" dataKey="リコス" stackId="reizoManpower" fill="#3b82f6" />
-                  <Bar name="リコスアイス" dataKey="リコスアイス" stackId="reizoManpower" fill="#06b6d4" />
-                  <Bar name="ブロンコビリー" dataKey="ブロンコビリー" stackId="reizoManpower" fill="#2563eb" />
-                  <Bar name="汎用" dataKey="汎用" stackId="reizoManpower" fill="#1d4ed8" />
-                  <Bar name="一括" dataKey="一括" stackId="reizoManpower" fill="#1e3a8a" />
-                  <Bar name="間接工数" dataKey="間接工数" stackId="reizoManpower" fill="#94a3b8" radius={[8, 8, 0, 0]} />
+                  {/* 🚀 AFS南関東向けに「畜産」「水産」に変更 */}
+                  <Bar name="畜産" dataKey="畜産" stackId="afsManpower" fill="#3b82f6" />
+                  <Bar name="水産" dataKey="水産" stackId="afsManpower" fill="#06b6d4" />
+                  <Bar name="間接工数" dataKey="間接工数" stackId="afsManpower" fill="#94a3b8" radius={[8, 8, 0, 0]} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -486,7 +491,6 @@ export default function AfsMinamikantoDashboardPage() {
             {sortedMetrics.top.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
               const isAvgMetric = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || activeTab === 'productivity';
-              
               const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
               const isTotalType = (totalMetricsKeywords.some(k => m.title.includes(k)) || activeTab === 'logistics' || activeTab === 'sales' || activeTab === 'monthly') && !isAvgMetric;
               
@@ -614,6 +618,8 @@ export default function AfsMinamikantoDashboardPage() {
                       if (m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率")) { dispAct = calcAvg(acts); dispFct = calcAvg(fcts); } 
                       else { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
                     }
+                    
+                    const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : (dispAct === 0 ? 100 : 0);
                     
                     const formatVal = (val, title) => {
                       if (title.includes("%") || title.includes("率")) return `${val.toFixed(1)}%`;
