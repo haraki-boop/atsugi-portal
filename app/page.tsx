@@ -22,9 +22,9 @@ export default function MapPortalPage() {
     {
       id: 'afs-minamikanto',
       name: 'AFS南関東センター',
-      address: '神奈川県座間市ひばりが丘',
-      lat: 35.4740,
-      lng: 139.4230,
+      address: '〒千葉県船橋市高瀬町24番12号',
+      lat: 35.6717,
+      lng: 139.9924,
       type: 'center',
       desc: ''
     },
