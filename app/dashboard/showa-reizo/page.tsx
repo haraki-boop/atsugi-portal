@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2 } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Bar } from 'recharts';
 
@@ -160,7 +160,32 @@ export default function ShowaReizoDashboardPage() {
     await fetchSupabaseData();
   };
 
-  if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
+  // 🚀 リッチなローディング画面（ロゴ白背景対応）
+  if (!data || !isMounted) {
+    return (
+      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400">
+            PAL Productivity Dashboard
+          </h1>
+          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
+          </div>
+          <div className="flex items-center gap-3 text-slate-400">
+            <Loader2 className="animate-spin text-blue-500" size={18} />
+            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
+        `}} />
+      </div>
+    );
+  }
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却"];
@@ -581,7 +606,7 @@ export default function ShowaReizoDashboardPage() {
               );
             })}
             
-            {/* 月次タブのその他項目（Tier2 コンパクト表示） */}
+            {/* 🚀 月次タブのその他項目（修正完了版） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="lg:col-span-2 space-y-6 pt-8 border-t-2 border-dashed border-slate-200">
                 <h3 className="text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
@@ -591,6 +616,8 @@ export default function ShowaReizoDashboardPage() {
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
                     const isMonthlyFixed = m.labels && m.labels.length > 0 && !m.labels[0].toString().includes('/');
                     
+                    const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || monthlyLowerIsBetter.some(k => m.title.includes(k));
+
                     let dispAct = 0; let prevVal = 0; let dispFct = 0;
 
                     if (isMonthlyFixed) {
@@ -607,24 +634,26 @@ export default function ShowaReizoDashboardPage() {
                       else { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
                     }
                     
-                    const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : (dispAct === 0 ? 100 : 0);
-                    
                     const formatVal = (val, title) => {
                       if (title.includes("%") || title.includes("率")) return `${val.toFixed(1)}%`;
-                      if (/売上|原価|費|利益|金額|時給|賃金/.test(title)) return `¥${Math.round(val).toLocaleString()}`;
-                      return Number(val.toFixed(1)).toLocaleString();
+                      if (title.includes("生産性") || /時給|最低賃金|人数|在籍者|違反者/.test(title)) return Number(val.toFixed(1)).toLocaleString();
+                      if (/売上|原価|費|利益|金額/.test(title)) return `¥${Math.round(val).toLocaleString()}`;
+                      return Math.round(val).toLocaleString();
                     };
 
-                    let evalColor = 'bg-slate-50 border-slate-100 text-slate-500'; let evalIcon = <Bot size={14} className="text-blue-500 shrink-0" />;
+                    let evalColor = 'bg-slate-50 border-slate-100 text-slate-500'; 
+                    let evalIcon = <Bot size={14} className="text-blue-500 shrink-0" />;
                     let evalText = "当月固定運営指標としてマッピングされています。";
-                    let badgeColor = 'bg-slate-50 text-slate-500'; let badgeText = prevVal > 0 ? `${((dispAct / prevVal) * 100).toFixed(1)}%` : "前月比 --%";
+                    let badgeColor = 'bg-slate-50 text-slate-500'; 
+                    let badgeText = prevVal > 0 ? `${((dispAct / prevVal) * 100).toFixed(1)}%` : "前月比 --%";
 
                     if (isMonthlyFixed) {
                         const ratio = prevVal > 0 ? (dispAct / prevVal) * 100 : 0;
                         badgeText = prevVal > 0 ? `${ratio.toFixed(1)}%` : "前月データなし";
 
                         if (monthlyDisplayOnly.some(k => m.title.includes(k))) {
-                            evalText = "月次モニタリング指標として記録されています。"; badgeColor = 'bg-slate-100 text-slate-500';
+                            evalText = "月次モニタリング指標として記録されています。"; 
+                            badgeColor = 'bg-slate-100 text-slate-500';
                         } else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
                             if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; evalText = `前月（${formatVal(prevVal, m.title)}）から減少し、改善傾向にあります。`; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
                             else if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; evalText = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。注意が必要です。`; badgeColor = 'bg-rose-50 text-rose-600'; } 
@@ -636,7 +665,17 @@ export default function ShowaReizoDashboardPage() {
                         }
                     } else {
                        const ratio = dispFct > 0 ? (dispAct/dispFct)*100 : 0;
-                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; badgeColor = 'bg-slate-100 text-slate-500'; evalText = "日次データの月次集計値です。";
+                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; 
+                       badgeColor = 'bg-slate-100 text-slate-500'; 
+                       if (isCost) {
+                          if (ratio < 99) evalText = "コスト管理は想定以上に良好です。現体制の効率化維持を推奨します。";
+                          else if (ratio > 101) evalText = "警告：予算超過ペース。直ちにしきい値の見直しと人員配置の適正化が必要です。";
+                          else evalText = "計画通り順調な推移です。現状のオペレーションを維持してください。";
+                       } else {
+                          if (ratio > 101) evalText = "業績好調。数値が目標を突破し、限界利益の押し上げに貢献しています。";
+                          else if (ratio < 99) evalText = "失速アラート。目標値に対し下振れ傾向。早急な原因分析を求む。";
+                          else evalText = "手堅い計画達成ペース。着実なオペレーション管理が行われています。";
+                       }
                     }
 
                     return (
@@ -647,7 +686,11 @@ export default function ShowaReizoDashboardPage() {
                             <p className="text-2xl font-black text-slate-800 tracking-tighter mt-1">{formatVal(dispAct, m.title)}</p>
                           </div>
                           <div className="text-right">
-                            {dispFct > 0 && <p className="text-[10px] font-bold text-slate-400">{m.forecastType}: {formatVal(dispFct, m.title)}</p>}
+                            {isMonthlyFixed ? (
+                                <p className="text-[10px] font-bold text-slate-400">前月比</p>
+                            ) : (
+                                dispFct > 0 && <p className="text-[10px] font-bold text-slate-400">{m.forecastType}: {formatVal(dispFct, m.title)}</p>
+                            )}
                             <div className={`mt-1.5 px-3 py-1 rounded-xl text-[11px] font-black inline-block ${badgeColor}`}>
                               {badgeText}
                             </div>
@@ -716,7 +759,7 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 7. 営業履歴タブ（2列グリッド版へ変更） */}
+        {/* 7. 営業履歴タブ（2列グリッド化） */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">

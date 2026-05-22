@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2 } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Bar } from 'recharts';
 
@@ -21,8 +21,10 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function ShowaReizoDashboardPage() {
-  const locationId = 'showa-reizo';
+export default function AfsMinamikantoDashboardPage() {
+  // 🚀 IDをAFS南関東に変更
+  const locationId = 'afs-minamikanto';
+  
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -100,7 +102,8 @@ export default function ShowaReizoDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
-    const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
+    // 🚀 AFS南関東のGAS URL
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
       if (json && json.labels && json.labels.length > 0) {
@@ -160,7 +163,32 @@ export default function ShowaReizoDashboardPage() {
     await fetchSupabaseData();
   };
 
-  if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
+  // 🚀 リッチなローディング画面（ロゴ白背景対応）
+  if (!data || !isMounted) {
+    return (
+      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400">
+            PAL Productivity Dashboard
+          </h1>
+          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
+          </div>
+          <div className="flex items-center gap-3 text-slate-400">
+            <Loader2 className="animate-spin text-blue-500" size={18} />
+            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
+        `}} />
+      </div>
+    );
+  }
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却"];
@@ -324,17 +352,25 @@ export default function ShowaReizoDashboardPage() {
   const generateStackedManhoursData = () => {
     const logisticsItems = data["logisticsData"] || [];
     const colV_Total = logisticsItems.find(item => item && item.title && (item.title === "総工数" || item.title === "実績_総工数"));
-    const colM_Lycos = logisticsItems.find(item => item && item.title && (item.title === "リコス工数" || item.title === "実績_リコス工数"));
-    const colO_Ice = logisticsItems.find(item => item && item.title && (item.title === "リコスアイス工数" || item.title === "実績_リコスアイス工数"));
-    const colQ_Bronco = logisticsItems.find(item => item && item.title && (item.title === "ブロンコビリー工数" || item.title === "実績_ブロンコビリー工数"));
-    const colS_Genuse = logisticsItems.find(item => item && item.title && (item.title === "汎用工数" || item.title === "実績_汎用工数"));
-    const colU_Ikkatsu = logisticsItems.find(item => item && item.title && (item.title === "一括工数" || item.title === "実績_一括工数"));
+    
+    // 🚀 AFS南関東向け：畜産と水産を抽出
+    const colChikusan = logisticsItems.find(item => item && item.title && (item.title === "畜産工数" || item.title === "実績_畜産工数"));
+    const colSuisan = logisticsItems.find(item => item && item.title && (item.title === "水産工数" || item.title === "実績_水産工数"));
+    
     return currentMonthIndices.map(idx => {
-      const label = baseLabels[idx]; const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
-      const lycosH = colM_Lycos && colM_Lycos.values ? n(colM_Lycos.values[idx]) : 0; const iceH = colO_Ice && colO_Ice.values ? n(colO_Ice.values[idx]) : 0;
-      const broncoH = colQ_Bronco && colQ_Bronco.values ? n(colQ_Bronco.values[idx]) : 0; const genuseH = colS_Genuse && colS_Genuse.values ? n(colS_Genuse.values[idx]) : 0;
-      const ikkatsuH = colU_Ikkatsu && colU_Ikkatsu.values ? n(colU_Ikkatsu.values[idx]) : 0; const directSum = lycosH + iceH + broncoH + genuseH + ikkatsuH;
-      return { name: label, 'リコス': Math.round(lycosH), 'リコスアイス': Math.round(iceH), 'ブロンコビリー': Math.round(broncoH), '汎用': Math.round(genuseH), '一括': Math.round(ikkatsuH), '間接工数': Math.round(Math.max(0, totalH - directSum)) };
+      const label = baseLabels[idx]; 
+      const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
+      
+      const chikusanH = colChikusan && colChikusan.values ? n(colChikusan.values[idx]) : 0; 
+      const suisanH = colSuisan && colSuisan.values ? n(colSuisan.values[idx]) : 0; 
+      
+      const directSum = chikusanH + suisanH;
+      return { 
+        name: label, 
+        '畜産': Math.round(chikusanH), 
+        '水産': Math.round(suisanH), 
+        '間接工数': Math.round(Math.max(0, totalH - directSum)) 
+      };
     });
   };
 
@@ -356,7 +392,8 @@ export default function ShowaReizoDashboardPage() {
           </Link>
         </div>
         <div className="text-center">
-          <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
+          {/* 🚀 タイトルを AFS南関東 に変更 */}
+          <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
             {['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
@@ -461,12 +498,9 @@ export default function ShowaReizoDashboardPage() {
                   <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                  <Bar name="リコス" dataKey="リコス" stackId="reizoManpower" fill="#3b82f6" />
-                  <Bar name="リコスアイス" dataKey="リコスアイス" stackId="reizoManpower" fill="#06b6d4" />
-                  <Bar name="ブロンコビリー" dataKey="ブロンコビリー" stackId="reizoManpower" fill="#2563eb" />
-                  <Bar name="汎用" dataKey="汎用" stackId="reizoManpower" fill="#1d4ed8" />
-                  <Bar name="一括" dataKey="一括" stackId="reizoManpower" fill="#1e3a8a" />
-                  <Bar name="間接工数" dataKey="間接工数" stackId="reizoManpower" fill="#94a3b8" radius={[8, 8, 0, 0]} />
+                  <Bar name="畜産" dataKey="畜産" stackId="afsManpower" fill="#3b82f6" />
+                  <Bar name="水産" dataKey="水産" stackId="afsManpower" fill="#06b6d4" />
+                  <Bar name="間接工数" dataKey="間接工数" stackId="afsManpower" fill="#94a3b8" radius={[8, 8, 0, 0]} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -484,6 +518,7 @@ export default function ShowaReizoDashboardPage() {
               
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               let chartData = []; let dispAct = 0; let dispFct = 0;
+              
               const calcAvg = (arr) => { const valid = arr.filter(v => v > 0); return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0; };
               
               if (displayMode === 'daily') {
@@ -580,48 +615,74 @@ export default function ShowaReizoDashboardPage() {
               );
             })}
             
-            {/* 🚀 【大本命】月次タブ その他運営指標（前月比 ＆ 判定の導入） */}
+            {/* 🚀 月次タブのその他項目（修正完了版：evalTextのバグ解消） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="lg:col-span-2 space-y-6 pt-8 border-t-2 border-dashed border-slate-200">
                 <h3 className="text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {sortedMetrics.others.map((m, i) => {
-                    // 下がったらGoodになる項目のリスト
                     const monthlyLowerIsBetter = ['事故件数（流通）', '事故金額', '労災件数', '社員残業工数', 'スタッフ残業工数', 'スタッフ使用工数', '社員工数', '一般スタッフ採用時給', 'タイミー使用工数', '36協定違反者数', '事故'];
-                    // 表示のみでGood/Badの色付けをしない項目のリスト
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
-                    
                     const isMonthlyFixed = m.labels && m.labels.length > 0 && !m.labels[0].toString().includes('/');
                     
+                    const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || monthlyLowerIsBetter.some(k => m.title.includes(k));
+
                     let dispAct = 0; let prevVal = 0; let dispFct = 0;
 
                     if (isMonthlyFixed) {
                       const mIdx = m.labels.indexOf(globalSelectedMonth);
-                      // 前月のインデックスを探す（1月なら12月）
                       const prevMonthStr = (parseInt(globalSelectedMonth) - 1 || 12).toString();
                       const prevIdx = m.labels.indexOf(prevMonthStr);
-                      
                       dispAct = mIdx !== -1 ? n(m.actual[mIdx]) : 0;
                       prevVal = prevIdx !== -1 ? n(m.actual[prevIdx]) : 0;
-                      dispFct = prevVal; // 表示用（前月実績）
+                      dispFct = prevVal; 
                     } else {
-                      // 万が一、日次のものが混ざった時のフォールバック
                       const acts = currentMonthIndices.map(idx => n(m.actual[idx])); const fcts = currentMonthIndices.map(idx => n(m.forecast[idx]));
                       const calcAvg = (arr) => { const valid = arr.filter(v => v > 0); return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0; };
                       if (m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率")) { dispAct = calcAvg(acts); dispFct = calcAvg(fcts); } 
                       else { dispAct = acts.reduce((a, b) => a + b, 0); dispFct = fcts.reduce((a, b) => a + b, 0); }
                     }
                     
+                    const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : (dispAct === 0 ? 100 : 0);
+                    
                     const formatVal = (val, title) => {
                       if (title.includes("%") || title.includes("率")) return `${val.toFixed(1)}%`;
-                      if (/売上|原価|費|利益|金額|時給|賃金/.test(title)) return `¥${Math.round(val).toLocaleString()}`;
-                      return Number(val.toFixed(1)).toLocaleString();
+                      if (title.includes("生産性") || /時給|最低賃金|人数|在籍者|違反者/.test(title)) return Number(val.toFixed(1)).toLocaleString();
+                      if (/売上|原価|費|利益|金額/.test(title)) return `¥${Math.round(val).toLocaleString()}`;
+                      return Math.round(val).toLocaleString();
                     };
 
-                    let evalColor = 'bg-slate-50 border-slate-100 text-slate-500';
+                    // 💡 コメントとUI要素の生成
+                    const evalData = (() => {
+                      let shortComment = "";
+                      if (isMonthlyFixed) {
+                        if (monthlyDisplayOnly.some(k => m.title.includes(k))) shortComment = "月次モニタリング指標として記録されています。";
+                        else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
+                            if (prevVal > 0 && dispAct < prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から減少し、改善傾向にあります。`;
+                            else if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。注意が必要です。`;
+                            else shortComment = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
+                        } else {
+                            if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・良化しています。`;
+                            else if (prevVal > 0 && dispAct < prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から減少・悪化しています。`;
+                            else shortComment = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
+                        }
+                      } else {
+                        if (isCost) {
+                          if (currentRatio < 99) shortComment = "コスト管理は想定以上に良好です。現体制の効率化維持を推奨します。";
+                          else if (currentRatio > 101) shortComment = "警告：予算超過ペース。直ちにしきい値の見直しと人員配置の適正化が必要です。";
+                          else shortComment = "計画通り順調な推移です。現状のオペレーションを維持してください。";
+                        } else {
+                          if (currentRatio > 101) shortComment = "業績好調。数値が目標を突破し、限界利益の押し上げに貢献しています。";
+                          else if (currentRatio < 99) shortComment = "失速アラート。目標値に対し下振れ傾向。早急な原因分析を求む。";
+                          else shortComment = "手堅い計画達成ペース。着実なオペレーション管理が行われています。";
+                        }
+                      }
+                      return { shortComment };
+                    })();
+
+                    let evalColor = 'bg-slate-50 border-slate-100 text-slate-500'; 
                     let evalIcon = <Bot size={14} className="text-blue-500 shrink-0" />;
-                    let evalText = "当月固定運営指標としてマッピングされています。";
-                    let badgeColor = 'bg-slate-50 text-slate-500';
+                    let badgeColor = 'bg-slate-50 text-slate-500'; 
                     let badgeText = prevVal > 0 ? `${((dispAct / prevVal) * 100).toFixed(1)}%` : "前月比 --%";
 
                     if (isMonthlyFixed) {
@@ -629,44 +690,20 @@ export default function ShowaReizoDashboardPage() {
                         badgeText = prevVal > 0 ? `${ratio.toFixed(1)}%` : "前月データなし";
 
                         if (monthlyDisplayOnly.some(k => m.title.includes(k))) {
-                            evalText = "月次モニタリング指標として記録されています。";
                             badgeColor = 'bg-slate-100 text-slate-500';
                         } else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
-                            if (prevVal > 0 && dispAct < prevVal) {
-                                evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700';
-                                evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />;
-                                evalText = `前月（${formatVal(prevVal, m.title)}）から減少し、改善傾向にあります。`;
-                                badgeColor = 'bg-emerald-50 text-emerald-600';
-                            } else if (prevVal > 0 && dispAct > prevVal) {
-                                evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700';
-                                evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />;
-                                evalText = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。注意が必要です。`;
-                                badgeColor = 'bg-rose-50 text-rose-600';
-                            } else {
-                                evalText = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
-                                badgeColor = 'bg-slate-100 text-slate-500';
-                            }
+                            if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
+                            else if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; badgeColor = 'bg-rose-50 text-rose-600'; } 
+                            else { badgeColor = 'bg-slate-100 text-slate-500'; }
                         } else {
-                            if (prevVal > 0 && dispAct > prevVal) {
-                                evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700';
-                                evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />;
-                                evalText = `前月（${formatVal(prevVal, m.title)}）から増加・良化しています。`;
-                                badgeColor = 'bg-emerald-50 text-emerald-600';
-                            } else if (prevVal > 0 && dispAct < prevVal) {
-                                evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700';
-                                evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />;
-                                evalText = `前月（${formatVal(prevVal, m.title)}）から減少・悪化しています。`;
-                                badgeColor = 'bg-rose-50 text-rose-600';
-                            } else {
-                                evalText = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
-                                badgeColor = 'bg-slate-100 text-slate-500';
-                            }
+                            if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
+                            else if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; badgeColor = 'bg-rose-50 text-rose-600'; } 
+                            else { badgeColor = 'bg-slate-100 text-slate-500'; }
                         }
                     } else {
                        const ratio = dispFct > 0 ? (dispAct/dispFct)*100 : 0;
-                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績";
+                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; 
                        badgeColor = 'bg-slate-100 text-slate-500';
-                       evalText = "日次データの月次集計値です。";
                     }
 
                     return (
@@ -687,10 +724,10 @@ export default function ShowaReizoDashboardPage() {
                             </div>
                           </div>
                         </div>
-                        {/* 🚀 AIコンパクトコメント */}
+                        {/* 💡 完璧に修正されたAIコメント出力部分 */}
                         <div className={`rounded-xl p-3 text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
                           {evalIcon}
-                          <p className="line-clamp-2 leading-relaxed">{evalText}</p>
+                          <p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
                         </div>
                       </div>
                     );
@@ -751,32 +788,30 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 7. 営業履歴タブ */}
+        {/* 7. 営業履歴タブ（2列グリッド化） */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={20} /> 営業アプローチタイムライン</h2>
+              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={20} /> 営業アプローチ履歴</h2>
             </div>
-            <div className="relative border-l-2 border-slate-100 pl-6 ml-4 space-y-8 py-2">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 py-2">
               {historyItems.length === 0 ? (
-                <div className="text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
+                <div className="col-span-1 xl:col-span-2 text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
               ) : (
                 historyItems.map((log, index) => (
-                  <div key={index} className="relative group">
-                    <div className="absolute -left-[35px] top-0 bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500"><Building2 size={12} /></div>
-                    <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative">
-                      <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                        <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                        <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
-                        <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
-                        <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
-                      </div>
-                      {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
-                      {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
+                  <div key={index} className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative group hover:shadow-md transition-all">
+                    <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
+                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
+                      <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
                     </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500 shrink-0"><Building2 size={12} /></div>
+                      <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
+                      <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
+                      <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
+                    </div>
+                    {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
+                    {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
                   </div>
                 ))
               )}

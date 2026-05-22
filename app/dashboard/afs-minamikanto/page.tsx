@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2 } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Bar } from 'recharts';
 
@@ -22,7 +22,9 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 export default function AfsMinamikantoDashboardPage() {
+  // 🚀 IDをAFS南関東に変更
   const locationId = 'afs-minamikanto';
+  
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -100,6 +102,7 @@ export default function AfsMinamikantoDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
+    // 🚀 AFS南関東のGAS URL
     const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
@@ -160,7 +163,32 @@ export default function AfsMinamikantoDashboardPage() {
     await fetchSupabaseData();
   };
 
-  if (!data || !isMounted) return <div className="h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-mono animate-pulse uppercase tracking-[0.4em]">SYNCING_MANAGEMENT_BRAIN...</div>;
+  // 🚀 リッチなローディング画面（ロゴ白背景対応）
+  if (!data || !isMounted) {
+    return (
+      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400">
+            PAL Productivity Dashboard
+          </h1>
+          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
+          </div>
+          <div className="flex items-center gap-3 text-slate-400">
+            <Loader2 className="animate-spin text-blue-500" size={18} />
+            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
+        `}} />
+      </div>
+    );
+  }
 
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却"];
@@ -325,6 +353,7 @@ export default function AfsMinamikantoDashboardPage() {
     const logisticsItems = data["logisticsData"] || [];
     const colV_Total = logisticsItems.find(item => item && item.title && (item.title === "総工数" || item.title === "実績_総工数"));
     
+    // 🚀 AFS南関東向け：畜産と水産を抽出
     const colChikusan = logisticsItems.find(item => item && item.title && (item.title === "畜産工数" || item.title === "実績_畜産工数"));
     const colSuisan = logisticsItems.find(item => item && item.title && (item.title === "水産工数" || item.title === "実績_水産工数"));
     
@@ -363,6 +392,7 @@ export default function AfsMinamikantoDashboardPage() {
           </Link>
         </div>
         <div className="text-center">
+          {/* 🚀 タイトルを AFS南関東 に変更 */}
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
             {['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
@@ -585,7 +615,7 @@ export default function AfsMinamikantoDashboardPage() {
               );
             })}
             
-            {/* 月次タブのその他項目（Tier2 コンパクト表示） */}
+            {/* 🚀 月次タブのその他項目（修正完了版：evalTextのバグ解消） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="lg:col-span-2 space-y-6 pt-8 border-t-2 border-dashed border-slate-200">
                 <h3 className="text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
@@ -595,7 +625,6 @@ export default function AfsMinamikantoDashboardPage() {
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
                     const isMonthlyFixed = m.labels && m.labels.length > 0 && !m.labels[0].toString().includes('/');
                     
-                    // 🚀 ここでちゃんと isCost を定義！
                     const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || monthlyLowerIsBetter.some(k => m.title.includes(k));
 
                     let dispAct = 0; let prevVal = 0; let dispFct = 0;
@@ -623,6 +652,7 @@ export default function AfsMinamikantoDashboardPage() {
                       return Math.round(val).toLocaleString();
                     };
 
+                    // 💡 コメントとUI要素の生成
                     const evalData = (() => {
                       let shortComment = "";
                       if (isMonthlyFixed) {
@@ -650,8 +680,10 @@ export default function AfsMinamikantoDashboardPage() {
                       return { shortComment };
                     })();
 
-                    let evalColor = 'bg-slate-50 border-slate-100 text-slate-500'; let evalIcon = <Bot size={14} className="text-blue-500 shrink-0" />;
-                    let badgeColor = 'bg-slate-50 text-slate-500'; let badgeText = prevVal > 0 ? `${((dispAct / prevVal) * 100).toFixed(1)}%` : "前月比 --%";
+                    let evalColor = 'bg-slate-50 border-slate-100 text-slate-500'; 
+                    let evalIcon = <Bot size={14} className="text-blue-500 shrink-0" />;
+                    let badgeColor = 'bg-slate-50 text-slate-500'; 
+                    let badgeText = prevVal > 0 ? `${((dispAct / prevVal) * 100).toFixed(1)}%` : "前月比 --%";
 
                     if (isMonthlyFixed) {
                         const ratio = prevVal > 0 ? (dispAct / prevVal) * 100 : 0;
@@ -670,7 +702,8 @@ export default function AfsMinamikantoDashboardPage() {
                         }
                     } else {
                        const ratio = dispFct > 0 ? (dispAct/dispFct)*100 : 0;
-                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; badgeColor = 'bg-slate-100 text-slate-500';
+                       badgeText = dispFct > 0 ? `${ratio.toFixed(1)}%` : "確定実績"; 
+                       badgeColor = 'bg-slate-100 text-slate-500';
                     }
 
                     return (
@@ -691,6 +724,7 @@ export default function AfsMinamikantoDashboardPage() {
                             </div>
                           </div>
                         </div>
+                        {/* 💡 完璧に修正されたAIコメント出力部分 */}
                         <div className={`rounded-xl p-3 text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
                           {evalIcon}
                           <p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
@@ -754,7 +788,7 @@ export default function AfsMinamikantoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 7. 営業履歴タブ（2列グリッド） */}
+        {/* 7. 営業履歴タブ（2列グリッド化） */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
