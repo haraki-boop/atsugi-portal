@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2, Search } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Bar } from 'recharts';
 
@@ -22,15 +22,16 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 export default function AfsMinamikantoDashboardPage() {
-  // 🚀 IDをAFS南関東に変更
   const locationId = 'afs-minamikanto';
-  
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
+  
+  // 🚀 検索・絞り込み用ステート
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
@@ -102,7 +103,7 @@ export default function AfsMinamikantoDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
-    // 🚀 AFS南関東のGAS URL
+    // 🚀 AFS南関東専用のGAS URL
     const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
@@ -117,6 +118,7 @@ export default function AfsMinamikantoDashboardPage() {
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
+    setSearchQuery(''); // タブ切り替え時に検索バーをリセット
     if (tabId === 'monthly') setDisplayMode('monthly');
     else if (!['dx', 'env', 'history', 'accidents', 'manhours'].includes(tabId) && displayMode === 'monthly') setDisplayMode('daily');
   };
@@ -163,7 +165,6 @@ export default function AfsMinamikantoDashboardPage() {
     await fetchSupabaseData();
   };
 
-  // 🚀 リッチなローディング画面（ロゴ白背景対応）
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -255,6 +256,11 @@ export default function AfsMinamikantoDashboardPage() {
       const hiddenKeywords = ["本部費", "償却費", "社会保険", "雇用保険", "交通費", "有給"];
       result = result.filter(m => !hiddenKeywords.some(k => m.title.includes(k)));
     }
+    
+    // 🚀 検索フィルター適用
+    if (searchQuery) {
+      result = result.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
     return result;
   };
 
@@ -285,10 +291,16 @@ export default function AfsMinamikantoDashboardPage() {
       }
     });
 
-    const result = allCategoryNames.map(name => {
+    let result = allCategoryNames.map(name => {
       return { name: name, chaseOn: catMap[name]?.chaseOn || 0, chaseOff: catMap[name]?.chaseOff || 0, total: catMap[name]?.total || 0, lastDate: absoluteLastDateMap[name] || '履歴なし' };
     });
-    if (result.length === 0) return [{ name: "総合（全カテゴリ）", lastDate: "未取得", chaseOn: 0, chaseOff: 0, total: 0 }];
+    
+    // 🚀 検索フィルター適用
+    if (searchQuery) {
+      result = result.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    
+    if (result.length === 0) return [{ name: "該当データなし", lastDate: "-", chaseOn: 0, chaseOff: 0, total: 0 }];
     return result;
   })();
 
@@ -299,7 +311,7 @@ export default function AfsMinamikantoDashboardPage() {
   };
 
   const calculateDaysSince = (dateStr) => {
-    if (!dateStr || dateStr === "未取得" || dateStr === "履歴なし" || dateStr === "データなし") return 0;
+    if (!dateStr || dateStr === "未取得" || dateStr === "履歴なし" || dateStr === "データなし" || dateStr === "-") return 0;
     const last = new Date(dateStr); if (isNaN(last.getTime())) return 0;
     const today = new Date(); const diffTime = Math.abs(today.getTime() - last.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -360,10 +372,8 @@ export default function AfsMinamikantoDashboardPage() {
     return currentMonthIndices.map(idx => {
       const label = baseLabels[idx]; 
       const totalH = colV_Total && colV_Total.values ? n(colV_Total.values[idx]) : 0;
-      
       const chikusanH = colChikusan && colChikusan.values ? n(colChikusan.values[idx]) : 0; 
       const suisanH = colSuisan && colSuisan.values ? n(colSuisan.values[idx]) : 0; 
-      
       const directSum = chikusanH + suisanH;
       return { 
         name: label, 
@@ -381,6 +391,59 @@ export default function AfsMinamikantoDashboardPage() {
     return { top, others };
   })() : { top: allMetrics, others: [] };
 
+  // 🚀 DX/環境タブの検索フィルター処理
+  const filteredDxItems = dxItems.filter(item => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    item.effect.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredEnvItems = envItems.filter(item => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    item.effect.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // 🚀 営業履歴タブの検索フィルター処理
+  const filteredHistoryItems = historyItems.filter(item => 
+    item.client?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    item.proposal?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    item.detail?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // 🚀 AI評価コメントの自動生成ロジック（200文字インサイト）
+  const generateAiTabEvaluation = () => {
+    if (activeTab === 'dx' || activeTab === 'env') {
+      const items = activeTab === 'dx' ? filteredDxItems : filteredEnvItems;
+      if (items.length === 0) return "現在表示できるデータがありません。右上の「新規追加」ボタンから施策を登録して、進捗のトラッキングを開始しましょう。";
+      
+      const avgRatio = items.reduce((acc, curr) => acc + (Number(curr.ratio) || 0), 0) / items.length;
+      const customerFocusCount = items.filter(i => i.customer_related === 'あり').length;
+      
+      let insight = `現在、${items.length}件のプロジェクトが進行中で、全体の平均進捗率は${avgRatio.toFixed(1)}%です。`;
+      if (avgRatio >= 80) insight += "多くの施策が完了間近となっており、現場への高い定着と確実な効果創出が期待されます。";
+      else if (avgRatio >= 40) insight += "中盤のフェーズに入っており、実行フェーズへの移行が順調に進んでいます。ボトルネックの解消に注力してください。";
+      else insight += "初期の企画・導入フェーズにあります。まずはスモールスタートでの検証を通じて早期に成功事例を作ることが重要です。";
+
+      if (customerFocusCount > 0) insight += `また、顧客満足度やサービス品質に直結する「顧客関連」の施策が${customerFocusCount}件含まれており、攻めの事業改善が展開されています。`;
+      
+      return insight;
+    } else if (activeTab === 'history') {
+      const items = filteredHistoryItems;
+      if (items.length === 0) return "現在表示できる営業履歴がありません。右上の「新規追加」ボタンから顧客との対話ログを蓄積し、チームでのナレッジ共有を進めましょう。";
+      
+      const successCount = items.filter(i => i.result === '●').length;
+      const pendingCount = items.filter(i => i.result === '△').length;
+      const failCount = items.filter(i => i.result === '×').length;
+      
+      let insight = `計${items.length}件の営業アプローチが記録されています。`;
+      if (successCount > failCount) insight += `提案の成約（●）が${successCount}件と好調に推移しており、顧客ニーズを的確に捉えたアプローチが機能しています。`;
+      else insight += `成約は${successCount}件に対し、失注（×）が${failCount}件です。失注理由の分析を通じた提案シナリオのブラッシュアップが次なる成約への鍵となります。`;
+
+      if (pendingCount > 0) insight += `現在、検討中・保留（△）の案件が${pendingCount}件存在します。次月以降の収益の種となるため、適切なタイミングでの追走と、懸念事項の払拭に向けた追加提案を推奨します。`;
+      
+      return insight;
+    }
+    return "";
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
@@ -392,7 +455,6 @@ export default function AfsMinamikantoDashboardPage() {
           </Link>
         </div>
         <div className="text-center">
-          {/* 🚀 タイトルを AFS南関東 に変更 */}
           <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
             {['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
@@ -423,18 +485,57 @@ export default function AfsMinamikantoDashboardPage() {
         </div>
       </header>
       
-      <main className="p-10 max-w-[1800px] mx-auto space-y-8">
-        <div className="flex flex-wrap gap-2.5">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-6 py-3 rounded-2xl transition-all font-black text-xs ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
-          ))}
+      <main className="p-10 max-w-[1800px] mx-auto space-y-6">
+        {/* 🚀 タブボタン ＆ 検索フィルター の行 */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2.5">
+            {tabs.map((t) => (
+              <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-6 py-3 rounded-2xl transition-all font-black text-xs ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
+            ))}
+          </div>
+          {/* 🔍 全タブ対応の検索・絞り込みフィルターバー */}
+          <div className="relative w-full md:w-72 shrink-0">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="項目を絞り込み検索..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-slate-200 text-sm font-bold text-slate-700 pl-11 pr-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm transition-all"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
+
         {displayMode === 'weekly' && !['dx', 'env', 'history', 'manhours'].includes(activeTab) && (
           <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">月の週選択:</span>
             {weeklyGroups.map((g, idx) => (
               <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>
             ))}
+          </div>
+        )}
+
+        {/* 🚀 【新機能】DX/環境/営業履歴タブのAI評価インサイトパネル */}
+        {['dx', 'env', 'history'].includes(activeTab) && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-3xl shadow-sm flex items-start gap-4 mb-2 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+            <div className="bg-white p-3 rounded-2xl shadow-sm shrink-0 relative z-10">
+              <Bot size={24} className="text-blue-600" />
+            </div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-[13px] font-black text-blue-900 tracking-tight">AI Strategy Insight</h3>
+                <span className="text-[9px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm">Auto Generated</span>
+              </div>
+              <p className="text-xs font-bold text-slate-700 leading-relaxed max-w-4xl">
+                {generateAiTabEvaluation()}
+              </p>
+            </div>
           </div>
         )}
 
@@ -446,6 +547,7 @@ export default function AfsMinamikantoDashboardPage() {
               <p className="text-slate-400 text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {accidentCategories.length === 0 && <div className="col-span-full text-slate-400 font-bold">検索条件に一致するデータがありません。</div>}
               {accidentCategories.map((cat, i) => {
                 const styles = getLevelStyles(cat.total); const daysSince = calculateDaysSince(cat.lastDate);
                 return (
@@ -510,6 +612,7 @@ export default function AfsMinamikantoDashboardPage() {
         {/* 主要数値グラフ表示 */}
         {!['dx', 'env', 'history', 'accidents', 'manhours'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'xl:grid-cols-3 lg:grid-cols-2' : 'lg:grid-cols-2'} gap-8`}>
+            {sortedMetrics.top.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するグラフがありません。</div>}
             {sortedMetrics.top.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
               const isAvgMetric = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || activeTab === 'productivity';
@@ -615,11 +718,12 @@ export default function AfsMinamikantoDashboardPage() {
               );
             })}
             
-            {/* 🚀 月次タブのその他項目（修正完了版：evalTextのバグ解消） */}
+            {/* 月次タブのその他項目（Tier2 コンパクト表示） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="lg:col-span-2 space-y-6 pt-8 border-t-2 border-dashed border-slate-200">
                 <h3 className="text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {sortedMetrics.others.length === 0 && <div className="col-span-full text-slate-400 font-bold">検索条件に一致する項目がありません。</div>}
                   {sortedMetrics.others.map((m, i) => {
                     const monthlyLowerIsBetter = ['事故件数（流通）', '事故金額', '労災件数', '社員残業工数', 'スタッフ残業工数', 'スタッフ使用工数', '社員工数', '一般スタッフ採用時給', 'タイミー使用工数', '36協定違反者数', '事故'];
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
@@ -652,7 +756,6 @@ export default function AfsMinamikantoDashboardPage() {
                       return Math.round(val).toLocaleString();
                     };
 
-                    // 💡 コメントとUI要素の生成
                     const evalData = (() => {
                       let shortComment = "";
                       if (isMonthlyFixed) {
@@ -724,7 +827,6 @@ export default function AfsMinamikantoDashboardPage() {
                             </div>
                           </div>
                         </div>
-                        {/* 💡 完璧に修正されたAIコメント出力部分 */}
                         <div className={`rounded-xl p-3 text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
                           {evalIcon}
                           <p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
@@ -742,8 +844,8 @@ export default function AfsMinamikantoDashboardPage() {
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
-              const currentItems = activeTab === 'dx' ? dxItems : envItems;
-              if (currentItems.length === 0) return <div className="col-span-2 bg-white border p-12 rounded-[2.5rem] text-center text-slate-400 font-bold text-sm">💡 右上の「新規追加」ボタンから項目を入力・保存してください！</div>;
+              const currentItems = activeTab === 'dx' ? filteredDxItems : filteredEnvItems;
+              if (currentItems.length === 0) return <div className="col-span-2 bg-white border p-12 rounded-[2.5rem] text-center text-slate-400 font-bold text-sm">💡 該当する項目がありません。</div>;
               return currentItems.map((item, index) => {
                 const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio))));
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
@@ -795,10 +897,10 @@ export default function AfsMinamikantoDashboardPage() {
               <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={20} /> 営業アプローチ履歴</h2>
             </div>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 py-2">
-              {historyItems.length === 0 ? (
-                <div className="col-span-1 xl:col-span-2 text-slate-400 text-xs font-bold pl-2 py-4">💡 右上の「新規追加」ボタンから、商談ログを刻んでね！</div>
+              {filteredHistoryItems.length === 0 ? (
+                <div className="col-span-1 xl:col-span-2 text-slate-400 text-xs font-bold pl-2 py-4">💡 該当する商談ログがありません。</div>
               ) : (
-                historyItems.map((log, index) => (
+                filteredHistoryItems.map((log, index) => (
                   <div key={index} className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative group hover:shadow-md transition-all">
                     <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
                       <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
