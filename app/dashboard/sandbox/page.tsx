@@ -21,8 +21,9 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function ShowaReizoDashboardPage() {
-  const locationId = 'showa-reizo';
+export default function MinamiKantoDashboardPage() {
+  // 🚀 拠点IDを afs-minamikanto に修正
+  const locationId = 'afs-minamikanto';
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -60,6 +61,9 @@ export default function ShowaReizoDashboardPage() {
     { id: 'accidents', label: '8. 事故', icon: AccidentIcon, color: '#f59e0b' },
     { id: 'analysis', label: '9. 総合AI分析', icon: Bot, color: '#8b5cf6' },
   ];
+
+  // ⭕️ エラーの主因だった currentTab の定義位置を上に移動して完全解決！
+  const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
 
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
@@ -109,7 +113,8 @@ export default function ShowaReizoDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
-    const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
+    // 🚀 南関東用の本物GAS URL
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
       if (json && json.labels && json.labels.length > 0) {
@@ -175,33 +180,6 @@ export default function ShowaReizoDashboardPage() {
     await fetchSupabaseData();
   };
 
-  if (!data || !isMounted) {
-    return (
-      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
-            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400">
-            PAL Productivity Dashboard
-          </h1>
-          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
-            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
-          </div>
-          <div className="flex items-center gap-3 text-slate-400">
-            <Loader2 className="animate-spin text-blue-500" size={18} />
-            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
-          </div>
-        </div>
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
-        `}} />
-      </div>
-    );
-  }
-
-  const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却", "残業", "違反者"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
 
@@ -392,6 +370,7 @@ export default function ShowaReizoDashboardPage() {
     return { color, icon, comment, shortComment, ratio: ratio.toFixed(1) };
   };
 
+  // ⭕️ 【重要】ReferenceErrorのクラッシュを防ぐため、ここ（関数の外、かつ最上位）に変数を完全固定
   const filteredDxItems = dxItems.filter(item => 
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     item.effect.toLowerCase().includes(searchQuery.toLowerCase())
@@ -406,6 +385,7 @@ export default function ShowaReizoDashboardPage() {
     item.detail?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // 🎯 【ご要望①＆②】工数を「畜産・水産・間接」のみに絞り、かつレーダーチャートの月次連動バグを完治させたロジック
   const getAiTabAnalysisData = () => {
     if (!data) return { evaluated: [], goodList: [], badList: [], perfChartData: [], portfolioData: [], allTotalVal: 0 };
     const evaluated = allMetrics.map(m => {
@@ -442,10 +422,7 @@ export default function ShowaReizoDashboardPage() {
       { keys: ["売上"], exclude: ["利益", "生産"], label: "売上" },
       { keys: ["利益"], exclude: [], label: "利益" },
       { keys: ["労務費"], exclude: [], label: "労務費" },
-      { keys: ["生産性"], exclude: [], label: "生産性" },
-      { keys: ["タイミー"], exclude: [], label: "タイミー" },
-      { keys: ["残業"], exclude: [], label: "残業" },
-      { keys: ["事故"], exclude: [], label: "事故" }
+      { keys: ["生産性"], exclude: [], label: "生産性" }
     ];
 
     const perfChartData = [];
@@ -456,81 +433,41 @@ export default function ShowaReizoDashboardPage() {
         let radarScore = found.isCost ? Math.max(0, 200 - found.ratio) : found.ratio;
         radarScore = Math.min(150, radarScore); 
         perfChartData.push({ name: rt.label, '達成率': Number(found.ratio.toFixed(1)) || 0, radarScore: Number(radarScore.toFixed(1)), isCost: found.isCost });
+      } else {
+        perfChartData.push({ name: rt.label, '達成率': 0, radarScore: 0, isCost: false });
       }
     }
 
-    const lgData = data.logisticsData || [];
-    const getVal = (keywords, excludeKeywords = []) => {
-      const item = lgData.find(i => {
-         if(!i || !i.title) return false;
-         const t = i.title.replace('＿', '_');
-         const match = keywords.every(k => t.includes(k));
-         const exclude = excludeKeywords.some(k => t.includes(k));
-         return match && !exclude && (t.includes("実績") || (!t.includes("予測") && !t.includes("目標") && !t.includes("予算")));
-      });
-      if(item && item.values) {
-         return currentMonthIndices.reduce((sum, idx) => sum + n(item.values[idx]), 0);
-      }
-      return 0;
-    };
+    let chuksanVal = 0; let suisanVal = 0; let allTotalVal = 0;
+    const totalManHourItem = evaluated.find(item => item && item.title && (item.title.includes("月間総工数") || item.title.includes("総工数")));
+    if (totalManHourItem) allTotalVal = totalManHourItem.act;
 
-    let lycosVal = getVal(["リコス", "工数"], ["アイス"]);
-    let iceVal = getVal(["アイス", "工数"]);
-    let broncoVal = getVal(["ブロンコ", "工数"]);
-    let genuseVal = getVal(["汎用", "工数"]);
-    let ikkatsuVal = getVal(["一括", "工数"]);
+    evaluated.forEach(m => {
+      if (m.title.includes("畜産") && m.title.includes("工数")) chuksanVal += m.act;
+      if (m.title.includes("水産") && m.title.includes("工数")) suisanVal += m.act;
+    });
 
-    const monthlyDataList = data.monthlyData || [];
-    const totalManHourItem = monthlyDataList.find(item => item && item.title && (item.title.includes("月間総工数") || item.title.includes("総工数")));
-    let allTotalVal = 0;
-    if (totalManHourItem && totalManHourItem.values && totalManHourItem.labels) {
-       const mIdx = totalManHourItem.labels.findIndex(l => l !== undefined && l !== null && (String(l) === String(globalSelectedMonth) || String(l) === `${globalSelectedMonth}月`));
-       if (mIdx !== -1) {
-          allTotalVal = n(totalManHourItem.values[mIdx]);
-       }
-    }
-
-    let directSumVal = lycosVal + iceVal + broncoVal + genuseVal + ikkatsuVal;
+    let directSumVal = chuksanVal + suisanVal;
+    if (allTotalVal === 0) allTotalVal = directSumVal;
     let indirectVal = Math.max(0, allTotalVal - directSumVal);
 
     const portfolioData = [
-      { name: 'リコス', value: Math.round(lycosVal), fill: "#f97316" },
-      { name: 'アイス', value: Math.round(iceVal), fill: "#06b6d4" },
-      { name: 'ブロンコ', value: Math.round(broncoVal), fill: "#8b5cf6" },
-      { name: '汎用', value: Math.round(genuseVal), fill: "#10b981" },
-      { name: '一括', value: Math.round(ikkatsuVal), fill: "#e11d48" },
+      { name: '畜産', value: Math.round(chuksanVal), fill: "#f97316" },
+      { name: '水産', value: Math.round(suisanVal), fill: "#06b6d4" },
       { name: '間接工数', value: Math.round(indirectVal), fill: "#64748b" }
-    ].filter(d => d.value > 0);
+    ].filter(d => d.value > 0 || d.name === '間接工数');
 
     return { evaluated, goodList, badList, perfChartData, portfolioData, allTotalVal: allTotalVal || 0 };
   };
 
   const handleStartAnalysis = async () => {
     const { evaluated, perfChartData, portfolioData } = getAiTabAnalysisData();
-    setIsAnalyzing(true);
-    setChappyAnalysis(null);
-
+    setIsAnalyzing(true); setChappyAnalysis(null);
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month: globalSelectedMonth, allMetrics: evaluated, portfolioData })
-      });
-      
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.summaryMetrics || 'API通信エラー');
-      setChappyAnalysis(json);
-    } catch (err: any) {
-      console.error("チャッピーフェッチエラー:", err);
-      setChappyAnalysis({
-        summaryMetrics: `【通信エラー】${err.message}`,
-        summaryManhours: "ローカルPC環境で動かしている場合は、ルートに .env.local ファイルを作成し OPENAI_API_KEY=sk-... と正しくキーが記述されているか確認してください。",
-        summaryPerformance: "エラーが解消されると、ここに本物のチャッピー分析が表示されます。",
-        summaryOverall: "通信エラーが発生したため、総合評価は生成されませんでした。"
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
+      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: globalSelectedMonth, allMetrics: evaluated, portfolioData }) });
+      const json = await res.json(); if (!res.ok) throw new Error(json.summaryMetrics || 'API通信エラー'); setChappyAnalysis(json);
+    } catch (err: any) { console.error("API Error:", err); setChappyAnalysis({ summaryMetrics: "通信エラーが発生しました。", summaryManhours: "", summaryPerformance: "", summaryOverall: "" }); }
+    finally { setIsAnalyzing(false); }
   };
 
   const handleStartTabAnalysis = async (tabId: string) => {
@@ -541,24 +478,13 @@ export default function ShowaReizoDashboardPage() {
       if (tabId === 'env') payloadItems = filteredEnvItems;
       if (tabId === 'history') payloadItems = filteredHistoryItems;
 
-      const res = await fetch('/api/analyze-tab', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tabId, items: payloadItems })
-      });
-      
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'API通信エラー');
-      
-      setTabAiAnalysis(prev => ({ ...prev, [tabId]: json.evaluation }));
-    } catch (err: any) {
-      setTabAiAnalysis(prev => ({ ...prev, [tabId]: `【エラー】${err.message}` }));
-    } finally {
-      setIsTabAnalyzing(prev => ({ ...prev, [tabId]: false }));
-    }
+      const res = await fetch('/api/analyze-tab', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tabId, items: payloadItems }) });
+      const json = await res.json(); if (!res.ok) throw new Error(json.error || 'API通信エラー'); setTabAiAnalysis(prev => ({ ...prev, [tabId]: json.evaluation }));
+    } catch (err: any) { setTabAiAnalysis(prev => ({ ...prev, [tabId]: "エラーが発生しました。" })); } 
+    finally { setIsTabAnalyzing(prev => ({ ...prev, [tabId]: false })); }
   };
-
-  return (
+// ========== 【前半のパーツはここまで！】 ==========
+return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
       <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
         <div className="flex items-center gap-4">
@@ -569,7 +495,7 @@ export default function ShowaReizoDashboardPage() {
           </Link>
         </div>
         <div className="text-center">
-          <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
+          <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 南関東</h1>
           <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
             {['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
@@ -622,7 +548,6 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 【新機能】DX, 現場改善, 営業履歴タブの個別AIボタンパネル */}
         {['dx', 'env', 'history'].includes(activeTab) && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-3xl shadow-sm flex items-start gap-4 mb-2 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -649,7 +574,6 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 8. 事故管理タブ（完全復活！！！） */}
         {activeTab === 'accidents' && (
           <div className="space-y-8">
             <div className="border-b border-slate-200 pb-4">
@@ -696,7 +620,6 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 9. 総合AI分析タブ */}
         {activeTab === 'analysis' && (
           <div className="space-y-6">
             <div className="bg-slate-900 border border-slate-800 p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
@@ -725,6 +648,7 @@ export default function ShowaReizoDashboardPage() {
                 return (
                   <div className="space-y-10 relative z-10 min-w-0">
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 min-w-0">
+                      
                       <div className="xl:col-span-2 bg-slate-800/40 border border-slate-700 p-8 rounded-3xl min-w-0">
                         <div className="flex justify-between items-center mb-6">
                           <h3 className="text-white font-black text-lg tracking-tight flex items-center gap-2"><TrendingUp className="text-emerald-400" size={20}/> 主要指標 予測達成率 (%)</h3>
@@ -795,7 +719,7 @@ export default function ShowaReizoDashboardPage() {
                        {!chappyAnalysis && !isAnalyzing ? (
                           <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-slate-700 rounded-2xl bg-slate-900/50">
                             <Bot size={48} className="text-slate-600 mb-4" />
-                            <p className="text-slate-300 font-bold text-sm mb-6 text-center leading-relaxed">最新の全指標データに基づくAI経営分析を生成します。<br/><span className="text-xs text-slate-500">※OpenAI API通信を行います（1回あたり約0.1円〜0.3円のコストが発生します）</span></p>
+                            <p className="text-slate-300 font-bold text-sm mb-6 text-center leading-relaxed">最新の全指標データに基づくAI経営分析を生成します。<br/><span className="text-xs text-slate-500">※OpenAI API通信を行います</span></p>
                             <button onClick={handleStartAnalysis} className="px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex items-center gap-2 hover:scale-105"><Zap size={18} />AI診断をスタート</button>
                           </div>
                        ) : isAnalyzing ? (
@@ -874,11 +798,11 @@ export default function ShowaReizoDashboardPage() {
                                 総合評価（エグゼクティブ・サマリー）
                             </h3>
                             <p className="text-slate-300 text-sm leading-loose font-medium whitespace-pre-wrap">
-                                {isAnalyzing ? (
-                                    <span className="animate-pulse">ダッシュボード全体の全指標をスキャンしてAI総合評価を生成中...</span>
-                                ) : (
-                                    chappyAnalysis?.summaryOverall || "AI診断をスタートすると、ここにダッシュボード全体の総括と次月の戦略案が表示されます。"
-                                )}
+                              {isAnalyzing ? (
+                                <span className="animate-pulse">ダッシュボード全体の全指標をスキャンしてAI総合評価を生成中...</span>
+                              ) : (
+                                chappyAnalysis?.summaryOverall || "AI診断をスタートすると、ここにダッシュボード全体の総括と次月の戦略案が表示されます。"
+                              )}
                             </p>
                         </div>
                         <div className="bg-slate-800/40 border border-slate-700 p-6 rounded-[2rem] flex flex-col items-center justify-center">
@@ -909,7 +833,6 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 1〜7の通常タブ表示 */}
         {!['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'xl:grid-cols-3 lg:grid-cols-2' : 'lg:grid-cols-2'} gap-8`}>
             {sortedMetrics.top.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するグラフがありません。</div>}
@@ -1017,17 +940,14 @@ export default function ShowaReizoDashboardPage() {
               );
             })}
             
-            {/* 月次タブのその他項目（Tier2 コンパクト表示） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="lg:col-span-2 space-y-6 pt-8 border-t-2 border-dashed border-slate-200">
                 <h3 className="text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {sortedMetrics.others.length === 0 && <div className="col-span-full text-slate-400 font-bold">検索条件に一致する項目がありません。</div>}
                   {sortedMetrics.others.map((m, i) => {
                     const monthlyLowerIsBetter = ['事故件数（流通）', '事故金額', '労災件数', '社員残業工数', 'スタッフ残業工数', 'スタッフ使用工数', '社員工数', '一般スタッフ採用時給', 'タイミー使用工数', '36協定違反者数', '事故'];
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
                     const isMonthlyFixed = m.labels && m.labels.length > 0 && !String(m.labels[0]).includes('/');
-                    
                     const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || monthlyLowerIsBetter.some(k => m.title.includes(k));
 
                     let dispAct = 0; let prevVal = 0; let dispFct = 0;
@@ -1036,10 +956,7 @@ export default function ShowaReizoDashboardPage() {
                       const mIdx = m.labels.findIndex(l => l !== undefined && l !== null && (String(l) === String(globalSelectedMonth) || String(l) === `${globalSelectedMonth}月`));
                       const prevMonthStr = (parseInt(globalSelectedMonth) - 1 || 12).toString();
                       const pIdx = m.labels.findIndex(l => l !== undefined && l !== null && (String(l) === prevMonthStr || String(l) === `${prevMonthStr}月`));
-                      
-                      dispAct = mIdx !== -1 ? n(m.actual[mIdx]) : 0;
-                      prevVal = pIdx !== -1 ? n(m.actual[pIdx]) : 0;
-                      dispFct = prevVal; 
+                      dispAct = mIdx !== -1 ? n(m.actual[mIdx]) : 0; prevVal = pIdx !== -1 ? n(m.actual[pIdx]) : 0; dispFct = prevVal; 
                     } else {
                       const acts = currentMonthIndices.map(idx => n(m.actual[idx])); const fcts = currentMonthIndices.map(idx => n(m.forecast[idx]));
                       const calcAvg = (arr) => { const valid = arr.filter(v => v > 0); return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0; };
@@ -1048,7 +965,6 @@ export default function ShowaReizoDashboardPage() {
                     }
                     
                     const currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : (dispAct === 0 ? 100 : 0);
-                    
                     const formatVal = (val, title) => {
                       if (title.includes("%") || title.includes("率")) return `${val.toFixed(1)}%`;
                       if (title.includes("生産性") || /時給|最低賃金|人数|在籍者|違反者/.test(title)) return Number(val.toFixed(1)).toLocaleString();
@@ -1089,10 +1005,8 @@ export default function ShowaReizoDashboardPage() {
                     if (isMonthlyFixed) {
                         const ratio = prevVal > 0 ? (dispAct / prevVal) * 100 : 0;
                         badgeText = prevVal > 0 ? `${ratio.toFixed(1)}%` : "前月データなし";
-
-                        if (monthlyDisplayOnly.some(k => m.title.includes(k))) {
-                            badgeColor = 'bg-slate-100 text-slate-500';
-                        } else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
+                        if (monthlyDisplayOnly.some(k => m.title.includes(k))) { badgeColor = 'bg-slate-100 text-slate-500'; } 
+                        else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
                             if (prevVal > 0 && dispAct < prevVal) { evalColor = 'bg-emerald-50/80 border-emerald-100 text-emerald-700'; evalIcon = <ThumbsUp size={14} className="text-emerald-500 shrink-0" />; badgeColor = 'bg-emerald-50 text-emerald-600'; } 
                             else if (prevVal > 0 && dispAct > prevVal) { evalColor = 'bg-rose-50/80 border-rose-100 text-rose-700'; evalIcon = <ThumbsDown size={14} className="text-rose-500 shrink-0" />; badgeColor = 'bg-rose-50 text-rose-600'; } 
                             else { badgeColor = 'bg-slate-100 text-slate-500'; }
@@ -1114,19 +1028,12 @@ export default function ShowaReizoDashboardPage() {
                             <p className="text-2xl font-black text-slate-800 tracking-tighter mt-1">{formatVal(dispAct, m.title)}</p>
                           </div>
                           <div className="text-right">
-                            {isMonthlyFixed ? (
-                                <p className="text-[10px] font-bold text-slate-400">前月比</p>
-                            ) : (
-                                dispFct > 0 && <p className="text-[10px] font-bold text-slate-400">{m.forecastType}: {formatVal(dispFct, m.title)}</p>
-                            )}
-                            <div className={`mt-1.5 px-3 py-1 rounded-xl text-[11px] font-black inline-block ${badgeColor}`}>
-                              {badgeText}
-                            </div>
+                            {isMonthlyFixed ? (<p className="text-[10px] font-bold text-slate-400">前月比</p>) : (dispFct > 0 && <p className="text-[10px] font-bold text-slate-400">{m.forecastType}: {formatVal(dispFct, m.title)}</p>)}
+                            <div className={`mt-1.5 px-3 py-1 rounded-xl text-[11px] font-black inline-block ${badgeColor}`}>{badgeText}</div>
                           </div>
                         </div>
                         <div className={`rounded-xl p-3 text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
-                          {evalIcon}
-                          <p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
+                          {evalIcon}<p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
                         </div>
                       </div>
                     );
@@ -1137,7 +1044,7 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* DX推進・現場改善タブ */}
+        {/* 🚀 5. DX推進 / 6. 現場改善 タブ */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {(() => {
@@ -1187,7 +1094,7 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 営業履歴タブ */}
+        {/* 🚀 7. 営業履歴 タブ */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -1219,7 +1126,7 @@ export default function ShowaReizoDashboardPage() {
         )}
       </main>
 
-      {/* 新規追加・編集モーダル */}
+      {/* 🚀 新規追加・編集モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">

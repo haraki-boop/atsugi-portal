@@ -438,14 +438,11 @@ export default function ShowaReizoDashboardPage() {
     const goodList = [...evaluated].sort((a,b) => b.score - a.score).filter(m => m.score > 2).slice(0, 3);
     const badList = [...evaluated].sort((a,b) => a.score - b.score).filter(m => m.score < -2).slice(0, 3);
     
-    const radarTargets = [
+     const radarTargets = [
       { keys: ["売上"], exclude: ["利益", "生産"], label: "売上" },
       { keys: ["利益"], exclude: [], label: "利益" },
       { keys: ["労務費"], exclude: [], label: "労務費" },
-      { keys: ["生産性"], exclude: [], label: "生産性" },
-      { keys: ["タイミー"], exclude: [], label: "タイミー" },
-      { keys: ["残業"], exclude: [], label: "残業" },
-      { keys: ["事故"], exclude: [], label: "事故" }
+      { keys: ["生産性"], exclude: [], label: "生産性" }
     ];
 
     const perfChartData = [];
@@ -456,6 +453,8 @@ export default function ShowaReizoDashboardPage() {
         let radarScore = found.isCost ? Math.max(0, 200 - found.ratio) : found.ratio;
         radarScore = Math.min(150, radarScore); 
         perfChartData.push({ name: rt.label, '達成率': Number(found.ratio.toFixed(1)) || 0, radarScore: Number(radarScore.toFixed(1)), isCost: found.isCost });
+      } else {
+        perfChartData.push({ name: rt.label, '達成率': 0, radarScore: 0, isCost: false });
       }
     }
 
