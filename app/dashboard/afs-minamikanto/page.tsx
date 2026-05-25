@@ -110,7 +110,7 @@ export default function MinamiKantoDashboardPage() {
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
     // 🚨🚨🚨 南関東用のGAS URLに書き換えてください！ 🚨🚨🚨
-    const gasUrl = "ここに南関東のGASのURLを貼り付けてください";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
