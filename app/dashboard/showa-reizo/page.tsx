@@ -48,6 +48,9 @@ export default function ShowaReizoDashboardPage() {
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [contractSelectedMonth, setContractSelectedMonth] = useState<string>(''); 
   
+  // 🚀 【追加】請負予実で0の項目を非表示にするステート
+  const [hideZeroContracts, setHideZeroContracts] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [showHiddenItems, setShowHiddenItems] = useState(false);
 
@@ -130,20 +133,14 @@ export default function ShowaReizoDashboardPage() {
       if (!isReload && json && json.labels && json.labels.length > 0) {
         const months = getAvailableMonths(json.labels);
         const today = new Date(); const currentMonth = (today.getMonth() + 1).toString();
-        if (months.includes(currentMonth)) {
-           setGlobalSelectedMonth(currentMonth);
-        } else {
-           setGlobalSelectedMonth(months[0]);
-        }
+        if (months.includes(currentMonth)) setGlobalSelectedMonth(currentMonth);
+        else setGlobalSelectedMonth(months[0]);
         
         if (json.contractYojitsuData && json.contractYojitsuData.length > 0) {
           const cLabels = json.contractYojitsuData[0].labels || [];
           const cleanCLabels = cLabels.map((l: any) => String(l).replace('月', ''));
-          if (cleanCLabels.includes(currentMonth)) {
-            setContractSelectedMonth(currentMonth);
-          } else {
-            setContractSelectedMonth(cleanCLabels[0] || '4');
-          }
+          if (cleanCLabels.includes(currentMonth)) setContractSelectedMonth(currentMonth);
+          else setContractSelectedMonth(cleanCLabels[0] || '4');
         }
       }
       if (isReload) showToast('最新データを取得しました', 'success');
@@ -279,7 +276,6 @@ export default function ShowaReizoDashboardPage() {
     return groups;
   })();
 
-  // 🚀 【バグ修正】ここで事故タブ用のヘルパー関数を確実に定義しています！
   const getLevelStyles = (count: number) => {
     if (count >= 3) return { cardBorder: 'border-rose-100', bg: 'bg-rose-50', text: 'text-rose-600', meterBorder: 'border-rose-400', icon: <ShieldAlert className="text-rose-500" size={22} /> };
     if (count === 2) return { cardBorder: 'border-amber-100', bg: 'bg-amber-50', text: 'text-amber-600', meterBorder: 'border-amber-400', icon: <AlertTriangle className="text-amber-500" size={22} /> };
@@ -680,7 +676,6 @@ if (!data || !isMounted) {
           </Link>
         </div>
         
-        {/* 🚀 昭和冷蔵のタイトル文字を元の美しく上品なイタリックデザインに完全固定 */}
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
           <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">
@@ -714,7 +709,6 @@ if (!data || !isMounted) {
             <ChevronDown size={11} className="absolute right-3 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* 🚀 タブの分離：1,2,3表示時は日次/週次のみ、月次タブ表示時は月次のみ */}
           {['sales', 'logistics', 'productivity'].includes(activeTab) && (
             <div className="flex bg-white md:bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shadow-sm md:shadow-none w-[48%] md:w-auto justify-between">
               <button onClick={() => setDisplayMode('daily')} className={`flex-1 md:flex-none px-2 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'daily' ? 'bg-slate-900 md:bg-white text-white md:text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>日次</button>
@@ -753,13 +747,12 @@ if (!data || !isMounted) {
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
             {['dx', 'env', 'history'].includes(activeTab) && (
-              // 🚀 ここ！「whitespace-nowrap shrink-0」を追加してボタン文字の縦潰れを完全防止！
+              // 🚀 ここに whitespace-nowrap shrink-0 を追加し、ボタンの縦潰れを完全防止！
               <button 
                 onClick={() => setShowHiddenItems(!showHiddenItems)} 
                 className={`w-full sm:w-auto whitespace-nowrap shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black border transition-all ${showHiddenItems ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-inner' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
-                {showHiddenItems ? <EyeOff size={14} /> : <Eye size={14} />}
-                <span>{showHiddenItems ? '非表示項目を隠す' : '非表示項目を表示'}</span>
+                {showHiddenItems ? <EyeOff size={14} /> : <Eye size={14} />} <span>{showHiddenItems ? '非表示項目を隠す' : '非表示項目を表示'}</span>
               </button>
             )}
             <div className="relative w-full sm:w-72 shrink-0">
@@ -778,9 +771,7 @@ if (!data || !isMounted) {
           </div>
         )}
 
-        {/* =========================================================
-            🚀 5,6,7,10タブ共通 AI Strategy Insight (チャッピー本物AI)
-        ========================================================= */}
+        {/* 5,6,7,10タブ共通 AI Strategy Insight */}
         {['dx', 'env', 'history', 'contract'].includes(activeTab) && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm flex flex-col md:flex-row items-start gap-3 md:gap-4 mb-2 relative overflow-hidden print-avoid-break print:bg-white print:border-slate-300 print:shadow-none">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none print:hidden"></div>
@@ -808,7 +799,7 @@ if (!data || !isMounted) {
         )}
 
         {/* =========================================
-            【10】請負予実ダッシュボード (グラフなし・8列・専用全月)
+            【10】請負予実ダッシュボード (グラフなし・8列)
         ========================================= */}
         {activeTab === 'contract' && (
           <div className="space-y-4 md:space-y-6">
@@ -819,18 +810,28 @@ if (!data || !isMounted) {
                 </h2>
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Contract Performance vs Budget</p>
               </div>
-              <div className="flex items-center gap-2 bg-sky-50 border border-sky-100 px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl print:bg-transparent print:border-none print:p-0">
-                <span className="text-[10px] md:text-xs font-black text-sky-700 print:text-slate-500">請負予実専用フィルター：</span>
-                <select 
-                  value={contractSelectedMonth} 
-                  onChange={(e) => setContractSelectedMonth(e.target.value)}
-                  className="bg-white border border-sky-200 text-sky-800 text-[10px] md:text-xs font-black px-2 py-1 md:px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer print:appearance-none print:bg-transparent print:border-none print:p-0 print:text-slate-800 print:text-lg"
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                {/* 🚀 【新機能】0の項目を隠すトグルボタン */}
+                <button
+                  onClick={() => setHideZeroContracts(!hideZeroContracts)}
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${hideZeroContracts ? 'bg-sky-600 text-white border-sky-700 shadow-inner' : 'bg-white text-sky-600 border-sky-200 hover:bg-sky-50'}`}
                 >
-                  {contractAvailableMonths.map((m, idx) => (
-                    <option key={idx} value={m}>{m}月度 データ</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="text-sky-400 print:hidden" />
+                  {hideZeroContracts ? '0の項目を隠す(ON)' : '0の項目も表示'}
+                </button>
+                
+                <div className="flex items-center gap-2 bg-sky-50 border border-sky-100 px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl print:bg-transparent print:border-none print:p-0">
+                  <span className="text-[10px] md:text-xs font-black text-sky-700 print:text-slate-500 whitespace-nowrap shrink-0">請負専用フィルター：</span>
+                  <select 
+                    value={contractSelectedMonth} 
+                    onChange={(e) => setContractSelectedMonth(e.target.value)}
+                    className="bg-white border border-sky-200 text-sky-800 text-[10px] md:text-xs font-black px-2 py-1 md:px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer print:appearance-none print:bg-transparent print:border-none print:p-0 print:text-slate-800 print:text-lg"
+                  >
+                    {contractAvailableMonths.map((m, idx) => (
+                      <option key={idx} value={m}>{m}月度 データ</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="text-sky-400 print:hidden" />
+                </div>
               </div>
             </div>
             
@@ -840,6 +841,10 @@ if (!data || !isMounted) {
                 const targetIdx = m.labels.findIndex(lbl => String(lbl).replace('月', '') === String(contractSelectedMonth));
                 const actVal = targetIdx !== -1 ? n(m.actual[targetIdx]) : 0;
                 const fctVal = targetIdx !== -1 ? n(m.forecast[targetIdx]) : 0;
+                
+                // 🚀 トグルがONの時、実績も予算も0なら描画しない（スキップ）
+                if (hideZeroContracts && actVal === 0 && fctVal === 0) return null;
+
                 const diffVal = actVal - fctVal;
                 const ratioVal = fctVal > 0 ? (actVal / fctVal) * 100 : 0;
 
@@ -881,7 +886,7 @@ if (!data || !isMounted) {
             【1〜4】売上・物量・生産性・月次グラフ
         ========================================= */}
         {!['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) && (
-          // 🚀 ノートPC（lg/xl）最適化：日次は3列維持、週次/月次は2列で横幅のみ縮小！
+          // 🚀 ノートPC最適化：日次は3列維持、週次/月次は2列で横幅のみ縮小！
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'lg:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2'} gap-4 md:gap-8 print:grid-cols-2 print:gap-8`}>
             {sortedMetrics.top.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するグラフがありません。</div>}
             
@@ -946,7 +951,7 @@ if (!data || !isMounted) {
                     )}
                   </div>
                   
-                  {/* 🚀 ノートPC最適化：グラフの縦幅（h-260px）は絶対維持！右側パネルの横幅だけを調整して2列崩れを防止！ */}
+                  {/* 🚀 ノートPC最適化：グラフ縦幅（h-260px）は絶対維持！右側パネルの横幅だけを調整（xl:w-[220px] 2xl:w-[260px]）して崩れを防止 */}
                   <div className={displayMode !== 'daily' ? 'flex flex-col xl:flex-row gap-4 items-stretch min-w-0 print:flex-col print:gap-4' : 'w-full min-w-0'}>
                     <div className="flex-1 h-[180px] md:h-[260px] bg-slate-50/50 p-2 md:p-4 rounded-2xl border border-slate-100 min-w-0 print:h-[220px] print:bg-white print:border-slate-200">
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -984,7 +989,7 @@ if (!data || !isMounted) {
               );
             })}
             
-            {/* 🚀 月次タブのその他項目（Compact View 診断コメント枠） */}
+            {/* 月次タブのその他項目（Compact View） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="col-span-full space-y-4 md:space-y-6 pt-6 md:pt-8 border-t-2 border-dashed border-slate-200 print:pt-6 print:mt-4 print:break-inside-avoid">
                 <h3 className="text-lg md:text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-3 md:pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
@@ -1191,7 +1196,7 @@ if (!data || !isMounted) {
           </div>
         )}
 
-        {/* 🚀 8. 事故管理タブ */}
+        {/* 🚀 8. 事故管理タブ（ノートPC最適化済！） */}
         {activeTab === 'accidents' && (
           <div className="space-y-6 md:space-y-8">
             <div className="border-b border-slate-200 pb-3 md:pb-4">
