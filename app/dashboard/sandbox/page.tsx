@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2, Search, BrainCircuit, BarChart3, PieChart as PieChartIcon, ActivitySquare } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, ShieldAlert, Edit2, Loader2, Search, BrainCircuit, BarChart3, PieChart as PieChartIcon, ActivitySquare, RefreshCw, Printer, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 
@@ -21,9 +21,8 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function MinamiKantoDashboardPage() {
-  // 🚀 拠点IDを afs-minamikanto に指定
-  const locationId = 'afs-minamikanto';
+export default function ShowaReizoDashboardPage() {
+  const locationId = 'showa-reizo';
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -32,11 +31,9 @@ export default function MinamiKantoDashboardPage() {
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 🚀 総合分析用ステート
   const [chappyAnalysis, setChappyAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 🚀 各タブ（DX, 現場改善, 営業）の個別AI分析用ステート
   const [tabAiAnalysis, setTabAiAnalysis] = useState<{ [key: string]: string }>({});
   const [isTabAnalyzing, setIsTabAnalyzing] = useState<{ [key: string]: boolean }>({});
 
@@ -50,6 +47,27 @@ export default function MinamiKantoDashboardPage() {
     name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●'
   });
 
+  const [toastInfo, setToastInfo] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({show: false, msg: '', type: 'success'});
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastInfo({ show: true, msg, type });
+    setTimeout(() => setToastInfo({ show: false, msg: '', type: 'success' }), 3000);
+  };
+
+  const handleReloadData = async () => {
+    setData(null); 
+    await fetchSupabaseData();
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
+    try {
+      const res = await fetch(gasUrl);
+      const json = await res.json();
+      setData(json);
+      showToast('最新データを取得しました', 'success');
+    } catch (err) {
+      showToast('データの取得に失敗しました', 'error');
+    }
+  };
+
   const tabs = [
     { id: 'sales', label: '1. 売上・原価', icon: Calculator, color: '#2563eb' },
     { id: 'logistics', label: '2. 物量・工数', icon: Activity, color: '#059669' },
@@ -60,9 +78,9 @@ export default function MinamiKantoDashboardPage() {
     { id: 'history', label: '7. 営業履歴', icon: MessageSquare, color: '#e11d48' },
     { id: 'accidents', label: '8. 事故', icon: AccidentIcon, color: '#f59e0b' },
     { id: 'analysis', label: '9. 総合AI分析', icon: Bot, color: '#8b5cf6' },
+    { id: 'contract', label: '10. 請負予実', icon: FileText, color: '#0ea5e9' },
   ];
 
-  // ⭕️ エラーの主因だった currentTab の定義位置を上に移動して完全解決！
   const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
 
   const supabaseRequest = async (table: string, method: string, body?: any) => {
@@ -113,8 +131,7 @@ export default function MinamiKantoDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true); fetchSupabaseData();
-    // 🚀 南関東用の本物GAS URL
-    const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
     fetch(gasUrl).then(res => res.json()).then(json => {
       setData(json);
       if (json && json.labels && json.labels.length > 0) {
@@ -135,7 +152,7 @@ export default function MinamiKantoDashboardPage() {
     setActiveTab(tabId);
     setSearchQuery(''); 
     if (tabId === 'monthly') setDisplayMode('monthly');
-    else if (!['dx', 'env', 'history', 'accidents', 'analysis'].includes(tabId) && displayMode === 'monthly') setDisplayMode('daily');
+    else if (!['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(tabId) && displayMode === 'monthly') setDisplayMode('daily');
   };
 
   const handleOpenAddModal = () => {
@@ -279,6 +296,35 @@ export default function MinamiKantoDashboardPage() {
     return { top, others };
   })() : { top: allMetrics, others: [] };
 
+  // 🚀 請負予実タブのデータ抽出ロジック
+  const contractList = (() => {
+    if (!data || !data.contractYojitsuData) return [];
+    const cMap = new Map();
+    
+    data.contractYojitsuData.forEach(item => {
+      if (!item.title) return;
+      const isYosan = item.title.startsWith('予算_');
+      const isJisseki = item.title.startsWith('実績_');
+      const cleanTitle = item.title.replace('予算_', '').replace('実績_', '');
+      
+      if (!cMap.has(cleanTitle)) {
+        cMap.set(cleanTitle, {
+          title: cleanTitle,
+          labels: item.labels || [],
+          actual: new Array((item.labels || []).length).fill(0),
+          forecast: new Array((item.labels || []).length).fill(0)
+        });
+      }
+      const entry = cMap.get(cleanTitle);
+      if (isJisseki) entry.actual = item.values;
+      if (isYosan) entry.forecast = item.values;
+    });
+    
+    let list = Array.from(cMap.values());
+    if (searchQuery) list = list.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    return list;
+  })();
+
   const accidentCategories = (() => {
     if (!data) return [];
     const rawRecords = data.accidentData || [];
@@ -370,7 +416,6 @@ export default function MinamiKantoDashboardPage() {
     return { color, icon, comment, shortComment, ratio: ratio.toFixed(1) };
   };
 
-  // ⭕️ 【重要】ReferenceErrorのクラッシュを防ぐため、最上位に配置
   const filteredDxItems = dxItems.filter(item => 
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     item.effect.toLowerCase().includes(searchQuery.toLowerCase())
@@ -385,7 +430,6 @@ export default function MinamiKantoDashboardPage() {
     item.detail?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // 🎯 南関東固有ロジック：工数を「畜産・水産・間接」のみに絞り、レーダーチャートを4軸固定
   const getAiTabAnalysisData = () => {
     if (!data) return { evaluated: [], goodList: [], badList: [], perfChartData: [], portfolioData: [], allTotalVal: 0 };
     const evaluated = allMetrics.map(m => {
@@ -418,7 +462,6 @@ export default function MinamiKantoDashboardPage() {
     const goodList = [...evaluated].sort((a,b) => b.score - a.score).filter(m => m.score > 2).slice(0, 3);
     const badList = [...evaluated].sort((a,b) => a.score - b.score).filter(m => m.score < -2).slice(0, 3);
     
-    // 南関東：レーダー4軸
     const radarTargets = [
       { keys: ["売上"], exclude: ["利益", "生産"], label: "売上" },
       { keys: ["利益"], exclude: [], label: "利益" },
@@ -439,37 +482,78 @@ export default function MinamiKantoDashboardPage() {
       }
     }
 
-    // 南関東：円グラフ（畜産・水産・間接工数）
-    let chuksanVal = 0; let suisanVal = 0; let allTotalVal = 0;
-    const totalManHourItem = evaluated.find(item => item && item.title && (item.title.includes("月間総工数") || item.title.includes("総工数")));
-    if (totalManHourItem) allTotalVal = totalManHourItem.act;
+    const lgData = data.logisticsData || [];
+    const getVal = (keywords, excludeKeywords = []) => {
+      const item = lgData.find(i => {
+         if(!i || !i.title) return false;
+         const t = i.title.replace('＿', '_');
+         const match = keywords.every(k => t.includes(k));
+         const exclude = excludeKeywords.some(k => t.includes(k));
+         return match && !exclude && (t.includes("実績") || (!t.includes("予測") && !t.includes("目標") && !t.includes("予算")));
+      });
+      if(item && item.values) {
+         return currentMonthIndices.reduce((sum, idx) => sum + n(item.values[idx]), 0);
+      }
+      return 0;
+    };
 
-    evaluated.forEach(m => {
-      if (m.title.includes("畜産") && m.title.includes("工数")) chuksanVal += m.act;
-      if (m.title.includes("水産") && m.title.includes("工数")) suisanVal += m.act;
-    });
+    let lycosVal = getVal(["リコス", "工数"], ["アイス"]);
+    let iceVal = getVal(["アイス", "工数"]);
+    let broncoVal = getVal(["ブロンコ", "工数"]);
+    let genuseVal = getVal(["汎用", "工数"]);
+    let ikkatsuVal = getVal(["一括", "工数"]);
 
-    let directSumVal = chuksanVal + suisanVal;
-    if (allTotalVal === 0) allTotalVal = directSumVal;
+    const monthlyDataList = data.monthlyData || [];
+    const totalManHourItem = monthlyDataList.find(item => item && item.title && (item.title.includes("月間総工数") || item.title.includes("総工数")));
+    let allTotalVal = 0;
+    if (totalManHourItem && totalManHourItem.values && totalManHourItem.labels) {
+       const mIdx = totalManHourItem.labels.findIndex(l => l !== undefined && l !== null && (String(l) === String(globalSelectedMonth) || String(l) === `${globalSelectedMonth}月`));
+       if (mIdx !== -1) {
+          allTotalVal = n(totalManHourItem.values[mIdx]);
+       }
+    }
+
+    let directSumVal = lycosVal + iceVal + broncoVal + genuseVal + ikkatsuVal;
     let indirectVal = Math.max(0, allTotalVal - directSumVal);
 
     const portfolioData = [
-      { name: '畜産', value: Math.round(chuksanVal), fill: "#f97316" },
-      { name: '水産', value: Math.round(suisanVal), fill: "#06b6d4" },
+      { name: 'リコス', value: Math.round(lycosVal), fill: "#f97316" },
+      { name: 'アイス', value: Math.round(iceVal), fill: "#06b6d4" },
+      { name: 'ブロンコ', value: Math.round(broncoVal), fill: "#8b5cf6" },
+      { name: '汎用', value: Math.round(genuseVal), fill: "#10b981" },
+      { name: '一括', value: Math.round(ikkatsuVal), fill: "#e11d48" },
       { name: '間接工数', value: Math.round(indirectVal), fill: "#64748b" }
-    ].filter(d => d.value > 0 || d.name === '間接工数');
+    ].filter(d => d.value > 0);
 
     return { evaluated, goodList, badList, perfChartData, portfolioData, allTotalVal: allTotalVal || 0 };
   };
 
   const handleStartAnalysis = async () => {
     const { evaluated, perfChartData, portfolioData } = getAiTabAnalysisData();
-    setIsAnalyzing(true); setChappyAnalysis(null);
+    setIsAnalyzing(true);
+    setChappyAnalysis(null);
+
     try {
-      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: globalSelectedMonth, allMetrics: evaluated, portfolioData }) });
-      const json = await res.json(); if (!res.ok) throw new Error(json.summaryMetrics || 'API通信エラー'); setChappyAnalysis(json);
-    } catch (err: any) { console.error("API Error:", err); setChappyAnalysis({ summaryMetrics: "通信エラーが発生しました。", summaryManhours: "", summaryPerformance: "", summaryOverall: "" }); }
-    finally { setIsAnalyzing(false); }
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month: globalSelectedMonth, allMetrics: evaluated, portfolioData })
+      });
+      
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.summaryMetrics || 'API通信エラー');
+      setChappyAnalysis(json);
+    } catch (err: any) {
+      console.error("チャッピーフェッチエラー:", err);
+      setChappyAnalysis({
+        summaryMetrics: `【通信エラー】${err.message}`,
+        summaryManhours: "ローカルPC環境で動かしている場合は、ルートに .env.local ファイルを作成し OPENAI_API_KEY=sk-... と正しくキーが記述されているか確認してください。",
+        summaryPerformance: "エラーが解消されると、ここに本物のチャッピー分析が表示されます。",
+        summaryOverall: "通信エラーが発生したため、総合評価は生成されませんでした。"
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleStartTabAnalysis = async (tabId: string) => {
@@ -480,13 +564,23 @@ export default function MinamiKantoDashboardPage() {
       if (tabId === 'env') payloadItems = filteredEnvItems;
       if (tabId === 'history') payloadItems = filteredHistoryItems;
 
-      const res = await fetch('/api/analyze-tab', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tabId, items: payloadItems }) });
-      const json = await res.json(); if (!res.ok) throw new Error(json.error || 'API通信エラー'); setTabAiAnalysis(prev => ({ ...prev, [tabId]: json.evaluation }));
-    } catch (err: any) { setTabAiAnalysis(prev => ({ ...prev, [tabId]: "エラーが発生しました。" })); } 
-    finally { setIsTabAnalyzing(prev => ({ ...prev, [tabId]: false })); }
+      const res = await fetch('/api/analyze-tab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tabId, items: payloadItems })
+      });
+      
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'API通信エラー');
+      
+      setTabAiAnalysis(prev => ({ ...prev, [tabId]: json.evaluation }));
+    } catch (err: any) {
+      setTabAiAnalysis(prev => ({ ...prev, [tabId]: `【エラー】${err.message}` }));
+    } finally {
+      setIsTabAnalyzing(prev => ({ ...prev, [tabId]: false }));
+    }
   };
 
-  // 🚀 【復活】ローディング画面
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -512,11 +606,10 @@ export default function MinamiKantoDashboardPage() {
       </div>
     );
   }
-// ========== 【前半のパーツはここまで！】 ==========
-return (
+
+  return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
-      {/* 🚀 ヘッダーもスマホ時は折り返してコンパクトに表示 */}
-      <header className="bg-white border-b border-slate-200 px-4 md:px-10 py-3 md:py-0 md:h-20 flex flex-col md:flex-row justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80 gap-3 md:gap-0">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-10 py-3 md:py-0 md:h-20 flex flex-col md:flex-row justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80 gap-3 md:gap-0 print:hidden">
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
           <div className="flex items-center gap-3">
             <img src="/pal-logo.png" alt="PAL Logo" className="h-6 md:h-7 w-auto object-contain shrink-0" />
@@ -527,13 +620,25 @@ return (
           </Link>
         </div>
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
-          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 南関東</h1>
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
-            {['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
+            {['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 md:gap-3 items-center w-full md:w-auto">
-          <div className="relative flex items-center group">
+          {/* 🚀 データ更新＆PDF出力ボタン */}
+          <div className="flex gap-1 md:gap-2 mr-1">
+            <button onClick={handleReloadData} className="p-2 md:px-3 md:py-2 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg md:rounded-xl transition-all shadow-sm flex items-center gap-1.5 border border-slate-200">
+              <RefreshCw size={13} />
+              <span className="hidden md:inline text-[10px] font-black tracking-wider">データ更新</span>
+            </button>
+            <button onClick={() => window.print()} className="p-2 md:px-3 md:py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg md:rounded-xl transition-all shadow-md flex items-center gap-1.5">
+              <Printer size={13} />
+              <span className="hidden md:inline text-[10px] font-black tracking-wider">PDF出力</span>
+            </button>
+          </div>
+
+          <div className="relative flex items-center group hidden md:flex">
             <Calendar size={13} className="absolute left-3 text-slate-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
             <select 
               value={globalSelectedMonth}
@@ -549,17 +654,16 @@ return (
           {['dx', 'env', 'history'].includes(activeTab) && (
             <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 px-3 md:px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] md:text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"><Plus size={14} /> 新規追加</button>
           )}
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1">
-            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
-            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>週次</button>
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 hidden md:flex">
+            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
+            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>週次</button>
             <button disabled={activeTab !== 'monthly'} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-amber-500 text-white shadow-sm' : 'hidden'}`}>月次確定</button>
           </div>
         </div>
       </header>
       
-      {/* 🚀 メインコンテンツ：スマホ時は余白をp-4に削減して広く使う */}
       <main className="p-4 md:p-10 max-w-[1800px] mx-auto space-y-4 md:space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
           <div className="flex flex-wrap gap-2">
             {tabs.map((t) => (
               <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl transition-all font-black text-[10px] md:text-xs flex-grow md:flex-grow-0 text-center ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
@@ -572,8 +676,8 @@ return (
           </div>
         </div>
 
-        {displayMode === 'weekly' && !['dx', 'env', 'history', 'analysis'].includes(activeTab) && (
-          <div className="bg-white border border-slate-200 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
+        {displayMode === 'weekly' && !['dx', 'env', 'history', 'analysis', 'contract'].includes(activeTab) && (
+          <div className="bg-white border border-slate-200 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-sm flex flex-wrap gap-2 items-center print:hidden">
             <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-wider mr-1 md:mr-2 ml-1">月の週選択:</span>
             {weeklyGroups.map((g, idx) => (
               <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-4 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl font-black text-[10px] md:text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>
@@ -581,9 +685,74 @@ return (
           </div>
         )}
 
-        {/* DX, 現場改善, 営業履歴タブの個別AIボタンパネル */}
+        {/* 🚀 【追加】10. 請負予実タブ (5列表記) */}
+        {activeTab === 'contract' && (
+          <div className="space-y-4 md:space-y-6">
+            <div className="border-b border-slate-200 pb-3 md:pb-4">
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3">
+                <FileText className="text-sky-500" size={24} /> 請負予実ダッシュボード
+              </h2>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 print:grid-cols-5 print:gap-4">
+              {contractList.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">データがありません。GAS側で「請負予実データを転写」を実行してください。</div>}
+              {contractList.map((m, i) => {
+                const chartData = m.labels.map((lbl, idx) => ({ 
+                  name: lbl + '月', 
+                  "実績": n(m.actual[idx]), 
+                  "予算": n(m.forecast[idx]) 
+                }));
+                
+                const totalAct = m.actual.reduce((a, b) => a + n(b), 0);
+                const totalFct = m.forecast.reduce((a, b) => a + n(b), 0);
+                const ratio = totalFct > 0 ? (totalAct / totalFct) * 100 : 0;
+                
+                const formatVal = (val) => {
+                  if (m.title.includes("%") || m.title.includes("率")) return `${val.toFixed(1)}%`;
+                  if (/人数|時間|工数|件/.test(m.title)) return Number(val.toFixed(1)).toLocaleString();
+                  if (/売上|原価|費|利益|金額|単価/.test(m.title)) return `¥${Math.round(val).toLocaleString()}`;
+                  return Math.round(val).toLocaleString();
+                };
+
+                return (
+                  <div key={i} className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col gap-3 min-w-0 transition-all hover:shadow-md print:break-inside-avoid print:shadow-none print:border-slate-300">
+                    <div className="border-b border-slate-100 pb-2">
+                      <h4 className="text-[11px] md:text-xs font-black text-slate-800 tracking-tight line-clamp-1" title={m.title}>{m.title}</h4>
+                    </div>
+                    <div className="h-[120px] md:h-[140px] w-full min-w-0">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                        <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id={`colorActC-${i}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/></linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={8} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={8} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 10000 ? `${Math.round(v/10000)}万` : v} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '10px' }} />
+                          <Area type="monotone" name="実績" dataKey="実績" stroke="#0ea5e9" strokeWidth={2} fillOpacity={1} fill={`url(#colorActC-${i})`} activeDot={{ r: 4 }} />
+                          <Area type="step" name="予算" dataKey="予算" stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" fill="none" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-between items-end border-t border-slate-50 pt-2">
+                      <div>
+                        <p className="text-[8px] md:text-[9px] text-slate-400 font-bold uppercase">累計実績</p>
+                        <p className="text-[11px] md:text-xs font-black text-slate-800 tracking-tighter">{formatVal(totalAct)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[8px] md:text-[9px] text-slate-400 font-bold uppercase">達成率</p>
+                        <p className={`text-[11px] md:text-xs font-black tracking-tighter ${ratio >= 100 ? 'text-emerald-500' : 'text-rose-500'}`}>{ratio.toFixed(1)}%</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {['dx', 'env', 'history'].includes(activeTab) && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm flex flex-col md:flex-row items-start gap-3 md:gap-4 mb-2 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm flex flex-col md:flex-row items-start gap-3 md:gap-4 mb-2 relative overflow-hidden print:hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
             <div className="bg-white p-2.5 md:p-3 rounded-xl md:rounded-2xl shadow-sm shrink-0 relative z-10 hidden md:block"><Bot size={24} className="text-blue-600" /></div>
             <div className="relative z-10 w-full">
@@ -609,7 +778,6 @@ return (
           </div>
         )}
 
-        {/* 事故管理タブ */}
         {activeTab === 'accidents' && (
           <div className="space-y-6 md:space-y-8">
             <div className="border-b border-slate-200 pb-3 md:pb-4">
@@ -656,7 +824,6 @@ return (
           </div>
         )}
 
-        {/* 総合AI分析タブ */}
         {activeTab === 'analysis' && (
           <div className="space-y-4 md:space-y-6">
             <div className="bg-slate-900 border border-slate-800 p-5 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-2xl relative overflow-hidden">
@@ -673,7 +840,7 @@ return (
                 </div>
                 <div className="text-left md:text-right w-full md:w-auto">
                   <span className={`inline-block border px-3 md:px-4 py-1.5 rounded-full text-[10px] md:text-xs font-black tracking-wider w-full md:w-auto text-center ${isAnalyzing ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse' : (chappyAnalysis ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border-blue-500/30')}`}>
-                    {isAnalyzing ? 'CHAPPY THINKING...' : (chappyAnalysis ? 'OPENAI CONNECTED' : 'READY TOZE')}
+                    {isAnalyzing ? 'CHAPPY THINKING...' : (chappyAnalysis ? 'OPENAI CONNECTED' : 'READY TO ANALYZE')}
                   </span>
                 </div>
               </div>
@@ -694,8 +861,8 @@ return (
                           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <ComposedChart data={perfChartData.slice(0, 5)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#2c3e50" vertical={false} />
-                              <XAxis dataKey="name" stroke="#607d8b" fontSize={9} axisLine={false} tickLine={false} />
-                              <YAxis stroke="#607d8b" fontSize={9} axisLine={false} tickLine={false} domain={[0, 140]} unit="%"/>
+                              <XAxis dataKey="name" stroke="#607d8b" fontSize={10} axisLine={false} tickLine={false} />
+                              <YAxis stroke="#607d8b" fontSize={10} axisLine={false} tickLine={false} domain={[0, 140]} unit="%"/>
                               <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1f2937', color: 'white', fontSize: '12px' }} cursor={{fill: '#2c3e50', opacity: 0.4}}/>
                               <Bar name="達成率 (%)" dataKey="達成率" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25}>
                                  {perfChartData.slice(0, 5).map((entry, index) => {
@@ -755,7 +922,7 @@ return (
                        {!chappyAnalysis && !isAnalyzing ? (
                           <div className="flex flex-col items-center justify-center py-8 md:py-10 border-2 border-dashed border-slate-700 rounded-xl md:rounded-2xl bg-slate-900/50 px-4">
                             <Bot size={40} className="text-slate-600 mb-3 md:mb-4" />
-                            <p className="text-slate-300 font-bold text-xs md:text-sm mb-4 md:mb-6 text-center leading-relaxed">最新の全指標データに基づくAI経営分析を生成します。<br/><span className="text-[10px] md:text-xs text-slate-500">※OpenAI API通信を行います（1回約0.1円〜0.3円）</span></p>
+                            <p className="text-slate-300 font-bold text-xs md:text-sm mb-4 md:mb-6 text-center leading-relaxed">最新の全指標データに基づくAI経営分析を生成します。</p>
                             <button onClick={handleStartAnalysis} className="w-full md:w-auto px-6 md:px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex justify-center items-center gap-2 hover:scale-105"><Zap size={16} />AI診断をスタート</button>
                           </div>
                        ) : isAnalyzing ? (
@@ -763,7 +930,7 @@ return (
                             {[1, 2, 3].map(i => (
                               <div key={i} className="bg-slate-900/30 border border-slate-800 p-4 md:p-5 rounded-xl md:rounded-2xl space-y-3">
                                 <div className="h-3 md:h-4 bg-slate-700 rounded-md w-1/3"></div>
-                                <div className="space-y-2"><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-full"></div><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-full"></div><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-4/5"></div></div>
+                                <div className="space-y-2"><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-full"></div><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-full"></div></div>
                               </div>
                             ))}
                           </div>
@@ -847,7 +1014,7 @@ return (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadarChart cx="50%" cy="50%" outerRadius="60%" data={perfChartData}>
                                         <PolarGrid stroke="#475569" />
-                                        <PolarAngleAxis dataKey="name" tick={{ fill: '#cbd5e1', fontSize: 9, fontWeight: 'bold' }} />
+                                        <PolarAngleAxis dataKey="name" tick={{ fill: '#cbd5e1', fontSize: 10, fontWeight: 'bold' }} />
                                         <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
                                         <Radar name="評価スコア" dataKey="radarScore" stroke="#8b5cf6" strokeWidth={2} fill="#8b5cf6" fillOpacity={0.4} />
                                         <Tooltip 
@@ -869,8 +1036,7 @@ return (
           </div>
         )}
 
-        {/* 1〜7の通常タブ表示 */}
-        {!['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) && (
+        {!['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) && (
           <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'xl:grid-cols-3 lg:grid-cols-2' : 'lg:grid-cols-2'} gap-4 md:gap-8`}>
             {sortedMetrics.top.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するグラフがありません。</div>}
             {sortedMetrics.top.map((m, i) => {
@@ -977,7 +1143,6 @@ return (
               );
             })}
             
-            {/* 月次タブのその他項目（Tier2 コンパクト表示） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
               <div className="lg:col-span-2 space-y-4 md:space-y-6 pt-6 md:pt-8 border-t-2 border-dashed border-slate-200">
                 <h3 className="text-lg md:text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-3 md:pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
@@ -1097,7 +1262,6 @@ return (
           </div>
         )}
 
-        {/* DX推進・現場改善タブ */}
         {['dx', 'env'].includes(activeTab) && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-8">
             {(() => {
@@ -1117,7 +1281,6 @@ return (
                     <div className="w-[120px] h-[120px] md:w-[160px] md:h-[160px] relative shrink-0 min-w-0 mt-4 md:mt-0">
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
-                          {/* 🚀 CSSクラスを使わずパーセント指定に変更 */}
                           <Pie data={chartPieData} cx="50%" cy="50%" innerRadius="65%" outerRadius="85%" startAngle={90} endAngle={-270} dataKey="value">
                             <Cell fill={themeColor} /> <Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
                           </Pie>
@@ -1148,7 +1311,6 @@ return (
           </div>
         )}
 
-        {/* 営業履歴タブ */}
         {activeTab === 'history' && (
           <div className="bg-white border border-slate-200 p-5 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-md space-y-4 md:space-y-6">
             <div className="border-b border-slate-100 pb-3 md:pb-4">
@@ -1180,7 +1342,13 @@ return (
         )}
       </main>
 
-      {/* 新規追加・編集モーダル (スマホ時に画面外に飛ばないよう高さを制限しスクロール可能に) */}
+      {toastInfo.show && (
+        <div className={`fixed bottom-6 right-6 md:bottom-10 md:right-10 z-50 px-5 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 print:hidden ${toastInfo.type === 'success' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-rose-600 border-rose-700 text-white'}`}>
+          {toastInfo.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-400" /> : <AlertTriangle size={20} className="text-white" />}
+          <span className="text-xs md:text-sm font-bold tracking-wider">{toastInfo.msg}</span>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-2xl space-y-4 md:space-y-6">
