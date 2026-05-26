@@ -31,11 +31,9 @@ export default function ShowaReizoDashboardPage() {
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 🚀 総合分析用ステート
   const [chappyAnalysis, setChappyAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 🚀 各タブ（DX, 現場改善, 営業）の個別AI分析用ステート
   const [tabAiAnalysis, setTabAiAnalysis] = useState<{ [key: string]: string }>({});
   const [isTabAnalyzing, setIsTabAnalyzing] = useState<{ [key: string]: boolean }>({});
 
@@ -60,6 +58,9 @@ export default function ShowaReizoDashboardPage() {
     { id: 'accidents', label: '8. 事故', icon: AccidentIcon, color: '#f59e0b' },
     { id: 'analysis', label: '9. 総合AI分析', icon: Bot, color: '#8b5cf6' },
   ];
+
+  // 🚀 クラッシュ防止！変数は上部に固定
+  const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
 
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
@@ -175,33 +176,6 @@ export default function ShowaReizoDashboardPage() {
     await fetchSupabaseData();
   };
 
-  if (!data || !isMounted) {
-    return (
-      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
-            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400">
-            PAL Productivity Dashboard
-          </h1>
-          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
-            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
-          </div>
-          <div className="flex items-center gap-3 text-slate-400">
-            <Loader2 className="animate-spin text-blue-500" size={18} />
-            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
-          </div>
-        </div>
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
-        `}} />
-      </div>
-    );
-  }
-
-  const currentTab = tabs.find(t => t.id === activeTab) || tabs[1];
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却", "残業", "違反者"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
 
@@ -438,7 +412,8 @@ export default function ShowaReizoDashboardPage() {
     const goodList = [...evaluated].sort((a,b) => b.score - a.score).filter(m => m.score > 2).slice(0, 3);
     const badList = [...evaluated].sort((a,b) => a.score - b.score).filter(m => m.score < -2).slice(0, 3);
     
-     const radarTargets = [
+    // 🚀 レーダーチャートは指定通り「4軸」で固定
+    const radarTargets = [
       { keys: ["売上"], exclude: ["利益", "生産"], label: "売上" },
       { keys: ["利益"], exclude: [], label: "利益" },
       { keys: ["労務費"], exclude: [], label: "労務費" },
@@ -557,90 +532,121 @@ export default function ShowaReizoDashboardPage() {
     }
   };
 
-  return (
+  if (!data || !isMounted) {
+    return (
+      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 text-center px-4">
+            PAL Productivity Dashboard
+          </h1>
+          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
+          </div>
+          <div className="flex items-center gap-3 text-slate-400">
+            <Loader2 className="animate-spin text-blue-500" size={18} />
+            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
+        `}} />
+      </div>
+    );
+  }
+// ========== 【前半のパーツはここまで！】 ==========
+return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate" translate="no">
-      <header className="h-20 bg-white border-b border-slate-200 px-10 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80">
-        <div className="flex items-center gap-4">
-          <img src="/pal-logo.png" alt="PAL Logo" className="h-7 w-auto object-contain shrink-0" />
-          <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
-          <Link href="/" className="flex items-center gap-2 text-slate-400 no-underline font-black hover:text-blue-600 transition-colors">
-            <ArrowLeft size={15} /> <span className="text-xs tracking-tight">拠点MAPに戻る</span>
+      {/* 🚀 ヘッダーもスマホ時は折り返してコンパクトに表示 */}
+      <header className="bg-white border-b border-slate-200 px-4 md:px-10 py-3 md:py-0 md:h-20 flex flex-col md:flex-row justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80 gap-3 md:gap-0">
+        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+          <div className="flex items-center gap-3">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-6 md:h-7 w-auto object-contain shrink-0" />
+            <div className="h-4 w-[1px] bg-slate-200 shrink-0 hidden md:block" />
+          </div>
+          <Link href="/" className="flex items-center gap-1.5 text-slate-400 no-underline font-black hover:text-blue-600 transition-colors">
+            <ArrowLeft size={15} /> <span className="text-[11px] md:text-xs tracking-tight">MAPへ</span>
           </Link>
         </div>
-        <div className="text-center">
-          <h1 className="text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
-          <p className="text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
+        <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
+          <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase">
             {['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
         </div>
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-wrap justify-center gap-2 md:gap-3 items-center w-full md:w-auto">
           <div className="relative flex items-center group">
-            <Calendar size={14} className="absolute left-3 text-slate-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
+            <Calendar size={13} className="absolute left-3 text-slate-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
             <select 
               value={globalSelectedMonth}
               onChange={(e) => { setGlobalSelectedMonth(e.target.value); setSelectedWeek(0); }}
-              className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-black pl-9 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all cursor-pointer hover:border-slate-300"
+              className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-black pl-8 pr-7 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all cursor-pointer hover:border-slate-300"
             >
               {availableMonths.map((m, idx) => (
                 <option key={idx} value={m}>{m}月度を表示</option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-3 text-slate-400 pointer-events-none" />
+            <ChevronDown size={11} className="absolute right-2.5 text-slate-400 pointer-events-none" />
           </div>
           {['dx', 'env', 'history'].includes(activeTab) && (
-            <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"><Plus size={14} /> 新規追加</button>
+            <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 px-3 md:px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] md:text-xs font-black tracking-wider transition-all shadow-md transform hover:scale-[1.02]"><Plus size={14} /> 新規追加</button>
           )}
-          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 gap-1">
-            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
-            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>週次</button>
-            <button disabled={activeTab !== 'monthly'} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-amber-500 text-white shadow-sm' : 'hidden'}`}>月次確定</button>
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1">
+            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab)} onClick={() => setDisplayMode('daily')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'daily' && !['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 disabled:opacity-30'}`}>日次</button>
+            <button disabled={['monthly', 'dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab)} onClick={() => setDisplayMode('weekly')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'weekly' && !['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>週次</button>
+            <button disabled={activeTab !== 'monthly'} className={`px-3 md:px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-amber-500 text-white shadow-sm' : 'hidden'}`}>月次確定</button>
           </div>
         </div>
       </header>
       
-      <main className="p-10 max-w-[1800px] mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-wrap gap-2.5">
+      {/* 🚀 メインコンテンツ：スマホ時は余白をp-4に削減して広く使う */}
+      <main className="p-4 md:p-10 max-w-[1800px] mx-auto space-y-4 md:space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2">
             {tabs.map((t) => (
-              <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-6 py-3 rounded-2xl transition-all font-black text-xs ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
+              <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl transition-all font-black text-[10px] md:text-xs flex-grow md:flex-grow-0 text-center ${activeTab === t.id ? `bg-slate-900 text-white shadow-lg` : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>
             ))}
           </div>
-          <div className="relative w-full md:w-72 shrink-0">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="項目を絞り込み検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-sm font-bold text-slate-700 pl-11 pr-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm transition-all" />
+          <div className="relative w-full lg:w-72 shrink-0">
+            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input type="text" placeholder="項目を絞り込み検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-xs md:text-sm font-bold text-slate-700 pl-10 md:pl-11 pr-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm transition-all" />
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={14} /></button>}
           </div>
         </div>
 
         {displayMode === 'weekly' && !['dx', 'env', 'history', 'analysis'].includes(activeTab) && (
-          <div className="bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">月の週選択:</span>
+          <div className="bg-white border border-slate-200 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-sm flex flex-wrap gap-2 items-center">
+            <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-wider mr-1 md:mr-2 ml-1">月の週選択:</span>
             {weeklyGroups.map((g, idx) => (
-              <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>
+              <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-4 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl font-black text-[10px] md:text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>
             ))}
           </div>
         )}
 
-        {/* 🚀 【新機能】DX, 現場改善, 営業履歴タブの個別AIボタンパネル */}
+        {/* DX, 現場改善, 営業履歴タブの個別AIボタンパネル */}
         {['dx', 'env', 'history'].includes(activeTab) && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-3xl shadow-sm flex items-start gap-4 mb-2 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm flex flex-col md:flex-row items-start gap-3 md:gap-4 mb-2 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-            <div className="bg-white p-3 rounded-2xl shadow-sm shrink-0 relative z-10"><Bot size={24} className="text-blue-600" /></div>
+            <div className="bg-white p-2.5 md:p-3 rounded-xl md:rounded-2xl shadow-sm shrink-0 relative z-10 hidden md:block"><Bot size={24} className="text-blue-600" /></div>
             <div className="relative z-10 w-full">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <h3 className="text-[13px] font-black text-blue-900 tracking-tight">AI Strategy Insight (chatGPT)</h3>
+              <div className="flex items-center gap-2 mb-3">
+                <Bot size={18} className="text-blue-600 md:hidden" />
+                <h3 className="text-xs md:text-[13px] font-black text-blue-900 tracking-tight">AI Strategy Insight (chatGPT)</h3>
               </div>
               
               {!tabAiAnalysis[activeTab] && !isTabAnalyzing[activeTab] ? (
-                 <button onClick={() => handleStartTabAnalysis(activeTab)} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 hover:scale-[1.02]">
+                 <button onClick={() => handleStartTabAnalysis(activeTab)} className="w-full md:w-auto px-4 md:px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[11px] md:text-xs shadow-md transition-all flex justify-center items-center gap-2 hover:scale-[1.02]">
                    <Zap size={14}/> {currentTab.label} の登録テキストをAIに診断させる
                  </button>
               ) : isTabAnalyzing[activeTab] ? (
-                 <div className="flex items-center gap-2 text-blue-600 text-xs font-bold animate-pulse py-2">
+                 <div className="flex items-center justify-center md:justify-start gap-2 text-blue-600 text-[11px] md:text-xs font-bold animate-pulse py-2">
                    <BrainCircuit size={16} className="animate-spin" /> AIが現場のテキストデータを読み解いています...
                  </div>
               ) : (
-                 <div className="text-xs font-bold text-slate-700 leading-relaxed max-w-4xl whitespace-pre-wrap bg-white/60 p-4 rounded-xl border border-white/50">
+                 <div className="text-[11px] md:text-xs font-bold text-slate-700 leading-relaxed max-w-4xl whitespace-pre-wrap bg-white/60 p-3 md:p-4 rounded-xl border border-white/50">
                    {tabAiAnalysis[activeTab]}
                  </div>
               )}
@@ -648,46 +654,46 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 8. 事故管理タブ（完全復活！！！） */}
+        {/* 事故管理タブ */}
         {activeTab === 'accidents' && (
-          <div className="space-y-8">
-            <div className="border-b border-slate-200 pb-4">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3"><AccidentIcon className="text-amber-500" size={28} /> カテゴリ別 事故件数 ({globalSelectedMonth}月度)</h2>
-              <p className="text-slate-400 text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
+          <div className="space-y-6 md:space-y-8">
+            <div className="border-b border-slate-200 pb-3 md:pb-4">
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3"><AccidentIcon className="text-amber-500" size={24} /> カテゴリ別 事故件数 ({globalSelectedMonth}月度)</h2>
+              <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
               {accidentCategories.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するデータがありません。</div>}
               {accidentCategories.map((cat, i) => {
                 const styles = getLevelStyles(cat.total); const daysSince = calculateDaysSince(cat.lastDate);
                 return (
-                  <div key={i} className={`bg-white border-2 ${styles.cardBorder} p-6 rounded-[2rem] shadow-sm relative transition-all flex flex-col justify-between`}>
-                    <div className="flex justify-between items-start mb-6">
+                  <div key={i} className={`bg-white border-2 ${styles.cardBorder} p-5 md:p-6 rounded-3xl md:rounded-[2rem] shadow-sm relative transition-all flex flex-col justify-between`}>
+                    <div className="flex justify-between items-start mb-5 md:mb-6">
                       <div className="flex items-center gap-2">
-                        {styles.icon} <h3 className="text-lg font-black text-slate-800">{cat.name}</h3>
+                        {styles.icon} <h3 className="text-base md:text-lg font-black text-slate-800">{cat.name}</h3>
                       </div>
-                      <div className="bg-slate-900 text-white px-4 py-1.5 rounded-2xl flex items-center gap-2 shadow-md">
-                        <span className="text-[9px] font-bold text-blue-400 tracking-wider">無事故</span>
-                        <span className="text-xl font-black italic tracking-tighter"><AnimatedNumber value={daysSince} /></span>
-                        <span className="text-[9px] font-bold">DAYS</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-center mb-8 relative">
-                      <div className={`w-40 h-40 rounded-full border-[12px] flex flex-col items-center justify-center bg-white shadow-inner z-10 relative ${styles.meterBorder} ${styles.text}`}>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-[-5px]">当月事故</span>
-                        <span className="text-6xl font-black tracking-tighter"><AnimatedNumber value={cat.total} /></span>
+                      <div className="bg-slate-900 text-white px-3 md:px-4 py-1.5 rounded-xl md:rounded-2xl flex items-center gap-1.5 md:gap-2 shadow-md">
+                        <span className="text-[8px] md:text-[9px] font-bold text-blue-400 tracking-wider">無事故</span>
+                        <span className="text-lg md:text-xl font-black italic tracking-tighter"><AnimatedNumber value={daysSince} /></span>
+                        <span className="text-[8px] md:text-[9px] font-bold">DAYS</span>
                       </div>
                     </div>
-                    <div className="flex justify-center gap-3 text-xs font-bold">
-                      <div className="flex-1 flex flex-col items-center justify-center p-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100">
-                        <span className="text-[9px] uppercase tracking-wider mb-1">追走あり</span>
-                        <div className="flex items-baseline gap-1"><span className="text-2xl font-black"><AnimatedNumber value={cat.chaseOn}/></span><span className="text-xs">件</span></div>
-                      </div>
-                      <div className="flex-1 flex flex-col items-center justify-center p-3 bg-slate-50 text-slate-500 rounded-xl border border-slate-200">
-                        <span className="text-[9px] uppercase tracking-wider mb-1">追走なし</span>
-                        <div className="flex items-baseline gap-1"><span className="text-lg font-black"><AnimatedNumber value={cat.chaseOff}/></span><span className="text-[10px]">件</span></div>
+                    <div className="flex justify-center mb-6 md:mb-8 relative">
+                      <div className={`w-32 h-32 md:w-40 h-40 rounded-full border-8 md:border-[12px] flex flex-col items-center justify-center bg-white shadow-inner z-10 relative ${styles.meterBorder} ${styles.text}`}>
+                        <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-[-2px] md:mb-[-5px]">当月事故</span>
+                        <span className="text-5xl md:text-6xl font-black tracking-tighter"><AnimatedNumber value={cat.total} /></span>
                       </div>
                     </div>
-                    <div className="text-center mt-6 border-t border-slate-100 pt-4"><p className="text-[10px] font-bold text-slate-400">最終発生日: {cat.lastDate}</p></div>
+                    <div className="flex justify-center gap-2 md:gap-3 text-[10px] md:text-xs font-bold">
+                      <div className="flex-1 flex flex-col items-center justify-center p-2.5 md:p-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100">
+                        <span className="text-[8px] md:text-[9px] uppercase tracking-wider mb-1">追走あり</span>
+                        <div className="flex items-baseline gap-1"><span className="text-xl md:text-2xl font-black"><AnimatedNumber value={cat.chaseOn}/></span><span className="text-[10px] md:text-xs">件</span></div>
+                      </div>
+                      <div className="flex-1 flex flex-col items-center justify-center p-2.5 md:p-3 bg-slate-50 text-slate-500 rounded-xl border border-slate-200">
+                        <span className="text-[8px] md:text-[9px] uppercase tracking-wider mb-1">追走なし</span>
+                        <div className="flex items-baseline gap-1"><span className="text-base md:text-lg font-black"><AnimatedNumber value={cat.chaseOff}/></span><span className="text-[9px] md:text-[10px]">件</span></div>
+                      </div>
+                    </div>
+                    <div className="text-center mt-5 md:mt-6 border-t border-slate-100 pt-3 md:pt-4"><p className="text-[9px] md:text-[10px] font-bold text-slate-400">最終発生日: {cat.lastDate}</p></div>
                   </div>
                 );
               })}
@@ -695,23 +701,23 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🚀 9. 総合AI分析タブ */}
+        {/* 総合AI分析タブ */}
         {activeTab === 'analysis' && (
-          <div className="space-y-6">
-            <div className="bg-slate-900 border border-slate-800 p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none"></div>
-              <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none"></div>
+          <div className="space-y-4 md:space-y-6">
+            <div className="bg-slate-900 border border-slate-800 p-5 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 md:w-96 md:h-96 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none"></div>
               
-              <div className="relative z-10 border-b border-slate-800 pb-6 mb-8 flex justify-between items-end">
+              <div className="relative z-10 border-b border-slate-800 pb-4 md:pb-6 mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
-                  <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                    <BrainCircuit className="text-blue-400" size={36} /> 
+                  <h2 className="text-xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2 md:gap-3">
+                    <BrainCircuit className="text-blue-400" size={28} /> 
                     AI診断結果 (chatGPT)
                   </h2>
-                  <p className="text-blue-300/60 text-sm font-bold mt-2 uppercase tracking-widest">Executive AI Analysis & Predictive Insights</p>
+                  <p className="text-blue-300/60 text-[10px] md:text-sm font-bold mt-1 md:mt-2 uppercase tracking-widest">Executive AI Analysis & Predictive Insights</p>
                 </div>
-                <div className="text-right hidden md:block">
-                  <span className={`inline-block border px-4 py-1.5 rounded-full text-xs font-black tracking-wider ${isAnalyzing ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse' : (chappyAnalysis ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border-blue-500/30')}`}>
+                <div className="text-left md:text-right w-full md:w-auto">
+                  <span className={`inline-block border px-3 md:px-4 py-1.5 rounded-full text-[10px] md:text-xs font-black tracking-wider w-full md:w-auto text-center ${isAnalyzing ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse' : (chappyAnalysis ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border-blue-500/30')}`}>
                     {isAnalyzing ? 'CHAPPY THINKING...' : (chappyAnalysis ? 'OPENAI CONNECTED' : 'READY TO ANALYZE')}
                   </span>
                 </div>
@@ -722,21 +728,21 @@ export default function ShowaReizoDashboardPage() {
                 const formatVal = (v, t) => (t.includes("%")||t.includes("率")) ? `${v.toFixed(1)}%` : (/売上|原価|費|金額/.test(t) ? `¥${Math.round(v).toLocaleString()}` : Math.round(v).toLocaleString());
 
                 return (
-                  <div className="space-y-10 relative z-10 min-w-0">
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 min-w-0">
-                      <div className="xl:col-span-2 bg-slate-800/40 border border-slate-700 p-8 rounded-3xl min-w-0">
-                        <div className="flex justify-between items-center mb-6">
-                          <h3 className="text-white font-black text-lg tracking-tight flex items-center gap-2"><TrendingUp className="text-emerald-400" size={20}/> 主要指標 予測達成率 (%)</h3>
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">vs Goals Matrix</span>
+                  <div className="space-y-6 md:space-y-10 relative z-10 min-w-0">
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8 min-w-0">
+                      <div className="xl:col-span-2 bg-slate-800/40 border border-slate-700 p-5 md:p-8 rounded-2xl md:rounded-3xl min-w-0">
+                        <div className="flex justify-between items-center mb-4 md:mb-6">
+                          <h3 className="text-white font-black text-sm md:text-lg tracking-tight flex items-center gap-2"><TrendingUp className="text-emerald-400" size={18}/> 主要指標 予測達成率 (%)</h3>
+                          <span className="text-[9px] md:text-[10px] text-slate-500 font-bold uppercase tracking-widest">vs Goals</span>
                         </div>
-                        <div className="h-[260px] min-w-0">
+                        <div className="h-[200px] md:h-[260px] min-w-0">
                           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <ComposedChart data={perfChartData.slice(0, 5)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#2c3e50" vertical={false} />
                               <XAxis dataKey="name" stroke="#607d8b" fontSize={10} axisLine={false} tickLine={false} />
                               <YAxis stroke="#607d8b" fontSize={10} axisLine={false} tickLine={false} domain={[0, 140]} unit="%"/>
-                              <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#1f2937', color: 'white' }} cursor={{fill: '#2c3e50', opacity: 0.4}}/>
-                              <Bar name="達成率 (%)" dataKey="達成率" fill="#3b82f6" radius={[8, 8, 0, 0]} barSize={35}>
+                              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1f2937', color: 'white', fontSize: '12px' }} cursor={{fill: '#2c3e50', opacity: 0.4}}/>
+                              <Bar name="達成率 (%)" dataKey="達成率" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25}>
                                  {perfChartData.slice(0, 5).map((entry, index) => {
                                     const val = entry['達成率'];
                                     let barFill = '#3b82f6';
@@ -745,38 +751,39 @@ export default function ShowaReizoDashboardPage() {
                                     return <Cell key={index} fill={barFill} />;
                                  })}
                               </Bar>
-                              <ReferenceLine y={100} stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" label={{ value: '100% Goal', fill: '#8b5cf6', fontSize: 10, position: 'insideTopLeft', fontWeight: 'bold' }} />
+                              <ReferenceLine y={100} stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" label={{ value: '100%', fill: '#8b5cf6', fontSize: 9, position: 'insideTopLeft', fontWeight: 'bold' }} />
                             </ComposedChart>
                           </ResponsiveContainer>
                         </div>
                       </div>
 
-                      <div className="bg-slate-800/40 border border-slate-700 p-8 rounded-3xl min-w-0">
+                      <div className="bg-slate-800/40 border border-slate-700 p-5 md:p-8 rounded-2xl md:rounded-3xl min-w-0">
                         <div className="flex justify-between items-center mb-1">
-                          <h3 className="text-white font-black text-lg tracking-tight flex items-center gap-2"><Clock className="text-slate-400" size={20}/> 月間工数内訳</h3>
+                          <h3 className="text-white font-black text-sm md:text-lg tracking-tight flex items-center gap-2"><Clock className="text-slate-400" size={18}/> 月間工数内訳</h3>
                         </div>
-                        <div className="h-[240px] min-w-0 relative">
+                        <div className="h-[180px] md:h-[240px] min-w-0 relative">
                           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
-                              <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={65} outerRadius={95} paddingAngle={5} dataKey="value" cornerRadius={8}>
+                              {/* 🚀 CSSクラスが使えない部分はパーセントで可変に */}
+                              <Pie data={portfolioData} cx="50%" cy="50%" innerRadius="65%" outerRadius="85%" paddingAngle={3} dataKey="value" cornerRadius={6}>
                                 {portfolioData.map((entry, index) => <Cell key={index} fill={entry.fill} stroke="none"/>)}
                               </Pie>
-                              <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#1f2937', color: 'white' }} formatter={(value) => { const pct = allTotalVal > 0 ? ((value / allTotalVal) * 100).toFixed(1) : 0; return [`${value.toLocaleString()} H (${pct}%)`, '工数']; }} />
+                              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1f2937', color: 'white', fontSize: '12px' }} formatter={(value) => { const pct = allTotalVal > 0 ? ((value / allTotalVal) * 100).toFixed(1) : 0; return [`${value.toLocaleString()} H (${pct}%)`, '工数']; }} />
                             </PieChart>
                           </ResponsiveContainer>
                           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
-                            <span className="text-3xl font-black text-white tracking-tighter"><AnimatedNumber value={allTotalVal} /></span>
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Total Hours</span>
+                            <span className="text-xl md:text-3xl font-black text-white tracking-tighter"><AnimatedNumber value={allTotalVal} /></span>
+                            <span className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 md:mt-1">Total Hours</span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-x-2 gap-y-2 justify-center mt-2 relative z-10">
+                        <div className="flex flex-wrap gap-x-1.5 gap-y-1.5 justify-center mt-2 relative z-10">
                            {portfolioData.map(d => {
                              const pct = allTotalVal > 0 ? ((d.value / allTotalVal) * 100).toFixed(1) : 0;
                              return (
-                               <div key={d.name} className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 shadow-sm">
-                                 <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: d.fill}}/>
-                                 <span className="text-slate-300 text-[10px] font-bold">{d.name}</span>
-                                 <span className="text-white text-[11px] font-black ml-1">{pct}%</span>
+                               <div key={d.name} className="flex items-center gap-1 bg-slate-800/80 px-2 py-0.5 md:py-1 rounded-md md:rounded-lg border border-slate-700 shadow-sm">
+                                 <div className="w-2 h-2 rounded-full" style={{backgroundColor: d.fill}}/>
+                                 <span className="text-slate-300 text-[9px] md:text-[10px] font-bold">{d.name}</span>
+                                 <span className="text-white text-[10px] md:text-[11px] font-black ml-0.5 md:ml-1">{pct}%</span>
                                </div>
                              );
                            })}
@@ -784,59 +791,59 @@ export default function ShowaReizoDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-3xl relative overflow-hidden">
-                       <div className="absolute top-0 right-0 bg-blue-500/10 px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl text-blue-300">OpenAI Completions</div>
-                       <div className="flex items-center gap-3 mb-6">
-                         <div className="bg-white p-2.5 rounded-2xl shadow-xl shrink-0"><BrainCircuit size={24} className="text-blue-600" /></div>
-                         <h3 className="text-lg font-black text-white tracking-tight">AI診断結果 (chatGPT)</h3>
+                    <div className="bg-slate-800/50 border border-slate-700 p-5 md:p-8 rounded-2xl md:rounded-3xl relative overflow-hidden">
+                       <div className="absolute top-0 right-0 bg-blue-500/10 px-3 md:px-4 py-1 text-[8px] md:text-[9px] font-black tracking-widest uppercase rounded-bl-xl md:rounded-bl-2xl text-blue-300">OpenAI Completions</div>
+                       <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
+                         <div className="bg-white p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-xl shrink-0"><BrainCircuit size={20} className="text-blue-600" /></div>
+                         <h3 className="text-base md:text-lg font-black text-white tracking-tight">AI診断結果 (chatGPT)</h3>
                        </div>
 
                        {!chappyAnalysis && !isAnalyzing ? (
-                          <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-slate-700 rounded-2xl bg-slate-900/50">
-                            <Bot size={48} className="text-slate-600 mb-4" />
-                            <p className="text-slate-300 font-bold text-sm mb-6 text-center leading-relaxed">最新の全指標データに基づくAI経営分析を生成します。<br/><span className="text-xs text-slate-500">※OpenAI API通信を行います（1回あたり約0.1円〜0.3円のコストが発生します）</span></p>
-                            <button onClick={handleStartAnalysis} className="px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex items-center gap-2 hover:scale-105"><Zap size={18} />AI診断をスタート</button>
+                          <div className="flex flex-col items-center justify-center py-8 md:py-10 border-2 border-dashed border-slate-700 rounded-xl md:rounded-2xl bg-slate-900/50 px-4">
+                            <Bot size={40} className="text-slate-600 mb-3 md:mb-4" />
+                            <p className="text-slate-300 font-bold text-xs md:text-sm mb-4 md:mb-6 text-center leading-relaxed">最新の全指標データに基づくAI経営分析を生成します。<br/><span className="text-[10px] md:text-xs text-slate-500">※OpenAI API通信を行います（1回約0.1円〜0.3円）</span></p>
+                            <button onClick={handleStartAnalysis} className="w-full md:w-auto px-6 md:px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex justify-center items-center gap-2 hover:scale-105"><Zap size={16} />AI診断をスタート</button>
                           </div>
                        ) : isAnalyzing ? (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 animate-pulse">
                             {[1, 2, 3].map(i => (
-                              <div key={i} className="bg-slate-900/30 border border-slate-800 p-5 rounded-2xl space-y-3">
-                                <div className="h-4 bg-slate-700 rounded-md w-1/3"></div>
-                                <div className="space-y-2"><div className="h-3 bg-slate-800 rounded-md w-full"></div><div className="h-3 bg-slate-800 rounded-md w-full"></div><div className="h-3 bg-slate-800 rounded-md w-4/5"></div></div>
+                              <div key={i} className="bg-slate-900/30 border border-slate-800 p-4 md:p-5 rounded-xl md:rounded-2xl space-y-3">
+                                <div className="h-3 md:h-4 bg-slate-700 rounded-md w-1/3"></div>
+                                <div className="space-y-2"><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-full"></div><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-full"></div><div className="h-2.5 md:h-3 bg-slate-800 rounded-md w-4/5"></div></div>
                               </div>
                             ))}
                           </div>
                        ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-slate-900/50 border border-slate-700 p-5 rounded-2xl">
-                              <h4 className="flex items-center gap-2 text-sm font-black text-emerald-400 mb-3"><BarChart3 size={16}/> 1. 主要・コスト指標 評価</h4>
-                              <p className="text-slate-300 text-xs leading-loose font-medium">{chappyAnalysis.summaryMetrics}</p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                            <div className="bg-slate-900/50 border border-slate-700 p-4 md:p-5 rounded-xl md:rounded-2xl">
+                              <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-emerald-400 mb-2 md:mb-3"><BarChart3 size={14}/> 1. 主要・コスト指標 評価</h4>
+                              <p className="text-slate-300 text-[11px] md:text-xs leading-loose font-medium">{chappyAnalysis.summaryMetrics}</p>
                             </div>
-                            <div className="bg-slate-900/50 border border-slate-700 p-5 rounded-2xl">
-                              <h4 className="flex items-center gap-2 text-sm font-black text-amber-400 mb-3"><PieChartIcon size={16}/> 2. 工数内訳 評価</h4>
-                              <p className="text-slate-300 text-xs leading-loose font-medium">{chappyAnalysis.summaryManhours}</p>
+                            <div className="bg-slate-900/50 border border-slate-700 p-4 md:p-5 rounded-xl md:rounded-2xl">
+                              <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-amber-400 mb-2 md:mb-3"><PieChartIcon size={14}/> 2. 工数内訳 評価</h4>
+                              <p className="text-slate-300 text-[11px] md:text-xs leading-loose font-medium">{chappyAnalysis.summaryManhours}</p>
                             </div>
-                            <div className="bg-slate-900/50 border border-slate-700 p-5 rounded-2xl">
-                              <h4 className="flex items-center gap-2 text-sm font-black text-purple-400 mb-3"><ActivitySquare size={16}/> 3. パフォーマンス 評価</h4>
-                              <p className="text-slate-300 text-xs leading-loose font-medium">{chappyAnalysis.summaryPerformance}</p>
+                            <div className="bg-slate-900/50 border border-slate-700 p-4 md:p-5 rounded-xl md:rounded-2xl">
+                              <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-purple-400 mb-2 md:mb-3"><ActivitySquare size={14}/> 3. パフォーマンス 評価</h4>
+                              <p className="text-slate-300 text-[11px] md:text-xs leading-loose font-medium">{chappyAnalysis.summaryPerformance}</p>
                             </div>
                           </div>
                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                      <div className="bg-emerald-950/20 border border-emerald-900/50 p-8 rounded-[2rem]">
-                        <h3 className="text-emerald-400 font-black text-lg flex items-center gap-2 mb-6"><ThumbsUp size={20} /> 優秀パフォーマンス指標 (Goal Achieved)</h3>
-                        <div className="space-y-4">
-                          {goodList.length === 0 ? <p className="text-slate-500 text-sm font-bold">目立った上振れ指標は現在ありません。</p> : goodList.map((m, i) => (
-                            <div key={i} className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl flex justify-between items-center group hover:border-emerald-800 transition-colors">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
+                      <div className="bg-emerald-950/20 border border-emerald-900/50 p-5 md:p-8 rounded-2xl md:rounded-[2rem]">
+                        <h3 className="text-emerald-400 font-black text-sm md:text-lg flex items-center gap-2 mb-4 md:mb-6"><ThumbsUp size={18} /> 優秀パフォーマンス指標 (Goal Achieved)</h3>
+                        <div className="space-y-3 md:space-y-4">
+                          {goodList.length === 0 ? <p className="text-slate-500 text-xs md:text-sm font-bold">目立った上振れ指標は現在ありません。</p> : goodList.map((m, i) => (
+                            <div key={i} className="bg-slate-900/50 border border-slate-800 p-4 md:p-5 rounded-xl md:rounded-2xl flex justify-between items-center group hover:border-emerald-800 transition-colors">
                               <div>
-                                <p className="text-xs text-slate-400 font-bold mb-1">{m.title}</p>
-                                <p className="text-xl text-emerald-300 font-black tracking-tight">{formatVal(m.act, m.title)}</p>
+                                <p className="text-[10px] md:text-xs text-slate-400 font-bold mb-0.5 md:mb-1">{m.title}</p>
+                                <p className="text-lg md:text-xl text-emerald-300 font-black tracking-tight">{formatVal(m.act, m.title)}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] text-slate-500 mb-1">目標: {formatVal(m.fct, m.title)}</p>
-                                <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-xl text-xs font-black">
+                                <p className="text-[9px] md:text-[10px] text-slate-500 mb-1">目標: {formatVal(m.fct, m.title)}</p>
+                                <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 md:px-3 py-0.5 md:py-1 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black">
                                   {m.isCost ? `コスト ${(100-m.ratio).toFixed(1)}% 削減` : `目標比 ${m.ratio.toFixed(1)}%`}
                                 </span>
                               </div>
@@ -845,18 +852,18 @@ export default function ShowaReizoDashboardPage() {
                         </div>
                       </div>
 
-                      <div className="bg-rose-950/20 border border-rose-900/50 p-8 rounded-[2rem]">
-                        <h3 className="text-rose-400 font-black text-lg flex items-center gap-2 mb-6"><AlertTriangle size={20} /> リスク・悪化指標 (Underperformed)</h3>
-                        <div className="space-y-4">
-                          {badList.length === 0 ? <p className="text-slate-500 text-sm font-bold">現在警告を出すべき悪化指標はありません。</p> : badList.map((m, i) => (
-                            <div key={i} className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl flex justify-between items-center group hover:border-rose-800 transition-colors">
+                      <div className="bg-rose-950/20 border border-rose-900/50 p-5 md:p-8 rounded-2xl md:rounded-[2rem]">
+                        <h3 className="text-rose-400 font-black text-sm md:text-lg flex items-center gap-2 mb-4 md:mb-6"><AlertTriangle size={18} /> リスク・悪化指標 (Underperformed)</h3>
+                        <div className="space-y-3 md:space-y-4">
+                          {badList.length === 0 ? <p className="text-slate-500 text-xs md:text-sm font-bold">現在警告を出すべき悪化指標はありません。</p> : badList.map((m, i) => (
+                            <div key={i} className="bg-slate-900/50 border border-slate-800 p-4 md:p-5 rounded-xl md:rounded-2xl flex justify-between items-center group hover:border-rose-800 transition-colors">
                               <div>
-                                <p className="text-xs text-slate-400 font-bold mb-1">{m.title}</p>
-                                <p className="text-xl text-rose-300 font-black tracking-tight">{formatVal(m.act, m.title)}</p>
+                                <p className="text-[10px] md:text-xs text-slate-400 font-bold mb-0.5 md:mb-1">{m.title}</p>
+                                <p className="text-lg md:text-xl text-rose-300 font-black tracking-tight">{formatVal(m.act, m.title)}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] text-slate-500 mb-1">目標: {formatVal(m.fct, m.title)}</p>
-                                <span className="inline-block bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-xl text-xs font-black">
+                                <p className="text-[9px] md:text-[10px] text-slate-500 mb-1">目標: {formatVal(m.fct, m.title)}</p>
+                                <span className="inline-block bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 md:px-3 py-0.5 md:py-1 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black">
                                   {m.isCost ? `コスト ${(m.ratio - 100).toFixed(1)}% 超過` : `未達 ${(100 - m.ratio).toFixed(1)}%`}
                                 </span>
                               </div>
@@ -866,13 +873,13 @@ export default function ShowaReizoDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mt-8">
-                        <div className="xl:col-span-2 bg-slate-900 border border-slate-800 p-8 rounded-[2rem] flex flex-col justify-center shadow-xl">
-                            <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
-                                <Bot size={24} className="text-blue-400" />
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8 mt-6 md:mt-8">
+                        <div className="xl:col-span-2 bg-slate-900 border border-slate-800 p-5 md:p-8 rounded-2xl md:rounded-[2rem] flex flex-col justify-center shadow-xl">
+                            <h3 className="text-lg md:text-xl font-black text-white mb-3 md:mb-4 flex items-center gap-2">
+                                <Bot size={20} className="text-blue-400" />
                                 総合評価（エグゼクティブ・サマリー）
                             </h3>
-                            <p className="text-slate-300 text-sm leading-loose font-medium whitespace-pre-wrap">
+                            <p className="text-slate-300 text-xs md:text-sm leading-loose font-medium whitespace-pre-wrap">
                                 {isAnalyzing ? (
                                     <span className="animate-pulse">ダッシュボード全体の全指標をスキャンしてAI総合評価を生成中...</span>
                                 ) : (
@@ -880,9 +887,9 @@ export default function ShowaReizoDashboardPage() {
                                 )}
                             </p>
                         </div>
-                        <div className="bg-slate-800/40 border border-slate-700 p-6 rounded-[2rem] flex flex-col items-center justify-center">
-                            <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Performance Radar</h4>
-                            <div className="w-full h-[220px]">
+                        <div className="bg-slate-800/40 border border-slate-700 p-5 md:p-6 rounded-2xl md:rounded-[2rem] flex flex-col items-center justify-center">
+                            <h4 className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2">Performance Radar</h4>
+                            <div className="w-full h-[180px] md:h-[220px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadarChart cx="50%" cy="50%" outerRadius="60%" data={perfChartData}>
                                         <PolarGrid stroke="#475569" />
@@ -890,7 +897,7 @@ export default function ShowaReizoDashboardPage() {
                                         <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
                                         <Radar name="評価スコア" dataKey="radarScore" stroke="#8b5cf6" strokeWidth={2} fill="#8b5cf6" fillOpacity={0.4} />
                                         <Tooltip 
-                                          contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#1f2937', color: 'white' }} 
+                                          contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1f2937', color: 'white', fontSize: '11px' }} 
                                           formatter={(value, name, props) => {
                                             const originalTitle = props.payload.isCost ? "(コスト抑制スコア)" : "(vs目標達成率)";
                                             return [`${props.payload['達成率']}%`, originalTitle];
@@ -910,7 +917,7 @@ export default function ShowaReizoDashboardPage() {
 
         {/* 1〜7の通常タブ表示 */}
         {!['dx', 'env', 'history', 'accidents', 'analysis'].includes(activeTab) && (
-          <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'xl:grid-cols-3 lg:grid-cols-2' : 'lg:grid-cols-2'} gap-8`}>
+          <div className={`grid grid-cols-1 ${displayMode === 'daily' ? 'xl:grid-cols-3 lg:grid-cols-2' : 'lg:grid-cols-2'} gap-4 md:gap-8`}>
             {sortedMetrics.top.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するグラフがありません。</div>}
             {sortedMetrics.top.map((m, i) => {
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k));
@@ -958,28 +965,28 @@ export default function ShowaReizoDashboardPage() {
               };
               
               return (
-                <div key={i} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-md flex flex-col gap-6 min-w-0">
-                  <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+                <div key={i} className="bg-white border border-slate-200 p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-md flex flex-col gap-4 md:gap-6 min-w-0">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-3 md:pb-4">
                     <div>
-                      <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
+                      <h4 className="text-base md:text-lg font-black text-slate-900 tracking-tighter uppercase">{m.title}</h4>
+                      <p className="text-[9px] md:text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">vs {m.forecastType} Matrix</p>
                     </div>
                     {displayMode === 'daily' && (
-                      <div className="flex gap-6 text-right items-center">
-                        <div className="border-r pr-4 border-slate-100">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月 本日まで</p>
-                          <p className="text-xl font-black text-slate-800 tracking-tight">{formatVal(dispAct)}</p>
+                      <div className="flex gap-4 md:gap-6 text-right items-center">
+                        <div className="border-r pr-3 md:pr-4 border-slate-100 hidden md:block">
+                          <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase">{globalSelectedMonth}月 本日まで</p>
+                          <p className="text-lg md:text-xl font-black text-slate-800 tracking-tight">{formatVal(dispAct)}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">今日現在の進捗率</p>
-                          <p className={`text-xl font-black ${currentRatio >= 101 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (currentRatio < 99 ? (isCost ? 'text-emerald-600' : 'text-rose-600') : 'text-slate-600')}`}>{currentRatio.toFixed(1)}%</p>
+                          <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase">進捗率</p>
+                          <p className={`text-lg md:text-xl font-black ${currentRatio >= 101 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (currentRatio < 99 ? (isCost ? 'text-emerald-600' : 'text-rose-600') : 'text-slate-600')}`}>{currentRatio.toFixed(1)}%</p>
                         </div>
                       </div>
                     )}
                   </div>
                   
-                  <div className={displayMode !== 'daily' ? 'grid grid-cols-1 xl:grid-cols-3 gap-8 items-start min-w-0' : 'w-full min-w-0'}>
-                    <div className={displayMode !== 'daily' ? 'xl:col-span-2 h-[320px] bg-slate-50/50 p-4 rounded-3xl border border-slate-100 min-w-0' : 'h-[280px] w-full bg-slate-50/50 p-4 rounded-3xl border border-slate-100 min-w-0'}>
+                  <div className={displayMode !== 'daily' ? 'flex flex-col lg:grid lg:grid-cols-3 gap-4 md:gap-8 items-start min-w-0' : 'w-full min-w-0'}>
+                    <div className={displayMode !== 'daily' ? 'w-full lg:col-span-2 h-[200px] md:h-[320px] bg-slate-50/50 p-3 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 min-w-0' : 'h-[200px] md:h-[280px] w-full bg-slate-50/50 p-3 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 min-w-0'}>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <defs>
@@ -987,30 +994,31 @@ export default function ShowaReizoDashboardPage() {
                             <linearGradient id={`colorFct-${i}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={secondaryColor} stopOpacity={0.15}/><stop offset="95%" stopColor={secondaryColor} stopOpacity={0}/></linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
+                          {/* 🚀 md: は使わず固定値に */}
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
-                          <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                          <Area type="monotone" name="実績" dataKey="実績" stroke={primaryColor} strokeWidth={4} fillOpacity={1} fill={`url(#colorAct-${i})`} activeDot={{ r: 6 }} />
-                          <Area type="monotone" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2.5} strokeDasharray="5 5" fillOpacity={1} fill={`url(#colorFct-${i})`} />
+                          <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} />
+                          <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', paddingBottom: '10px' }} />
+                          <Area type="monotone" name="実績" dataKey="実績" stroke={primaryColor} strokeWidth={3} fillOpacity={1} fill={`url(#colorAct-${i})`} activeDot={{ r: 5 }} />
+                          <Area type="monotone" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill={`url(#colorFct-${i})`} />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
                     
                     {displayMode !== 'daily' && (
-                      <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-inner h-[320px] flex flex-col justify-between">
-                        <div className="border-b border-slate-800 pb-2"><p className="text-[10px] font-black tracking-widest text-blue-400 uppercase">当{displayMode === 'weekly' ? '週' : '月'}{isAvgMetric ? '平均' : (isTotalType ? '合計' : '平均')}確認パネル</p></div>
-                        <div className="space-y-4 my-auto">
-                          <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-slate-400">{isAvgMetric ? '平均実績' : (isTotalType ? `${displayMode === 'weekly' ? '合計実績' : '当月合計実績'}` : '平均実績')}</span><span className="text-2xl font-black tracking-tight text-white">{formatVal(dispAct)}</span></div>
-                          <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-slate-400">{isAvgMetric ? `平均${m.forecastType}` : (isTotalType ? `${displayMode === 'weekly' ? '合計' : '当月合計'}${m.forecastType}` : `平均${m.forecastType}`)}</span><span className="text-xl font-bold tracking-tight text-slate-300">{formatVal(dispFct)}</span></div>
-                          <div className="flex justify-between items-baseline border-t border-slate-800 pt-3"><span className="text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span><span className={`text-3xl font-black tracking-tighter ${currentRatio >= 101 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (currentRatio < 99 ? (isCost ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-300')}`}>{currentRatio.toFixed(1)}%</span></div>
+                      <div className="w-full bg-slate-900 text-white p-5 md:p-6 rounded-2xl md:rounded-3xl shadow-inner md:h-[320px] flex flex-col justify-between">
+                        <div className="border-b border-slate-800 pb-2"><p className="text-[9px] md:text-[10px] font-black tracking-widest text-blue-400 uppercase">当{displayMode === 'weekly' ? '週' : '月'}{isAvgMetric ? '平均' : (isTotalType ? '合計' : '平均')}確認パネル</p></div>
+                        <div className="space-y-3 md:space-y-4 my-3 md:my-auto">
+                          <div className="flex justify-between items-baseline"><span className="text-[11px] md:text-xs font-bold text-slate-400">{isAvgMetric ? '平均実績' : (isTotalType ? `${displayMode === 'weekly' ? '合計実績' : '当月合計実績'}` : '平均実績')}</span><span className="text-xl md:text-2xl font-black tracking-tight text-white">{formatVal(dispAct)}</span></div>
+                          <div className="flex justify-between items-baseline"><span className="text-[11px] md:text-xs font-bold text-slate-400">{isAvgMetric ? `平均${m.forecastType}` : (isTotalType ? `${displayMode === 'weekly' ? '合計' : '当月合計'}${m.forecastType}` : `平均${m.forecastType}`)}</span><span className="text-lg md:text-xl font-bold tracking-tight text-slate-300">{formatVal(dispFct)}</span></div>
+                          <div className="flex justify-between items-baseline border-t border-slate-800 pt-2 md:pt-3"><span className="text-[11px] md:text-xs font-black text-blue-400">達成率 ({m.forecastType}比)</span><span className={`text-2xl md:text-3xl font-black tracking-tighter ${currentRatio >= 101 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (currentRatio < 99 ? (isCost ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-300')}`}>{currentRatio.toFixed(1)}%</span></div>
                         </div>
-                        <div className="text-[9px] text-slate-500 font-bold text-center uppercase tracking-wider">Executive Management DB</div>
+                        <div className="text-[8px] md:text-[9px] text-slate-500 font-bold text-center uppercase tracking-wider hidden md:block">Executive Management DB</div>
                       </div>
                     )}
                   </div>
                   {(displayMode === 'weekly' || displayMode === 'monthly') && (
-                    <div className={`p-5 rounded-3xl border text-[11px] font-medium flex items-start gap-4 shadow-sm leading-relaxed ${evalData.color}`}><div className="p-2 bg-white rounded-xl shadow-sm shrink-0 mt-0.5 flex items-center justify-center">{evalData.icon}</div><p>{evalData.comment}</p></div>
+                    <div className={`p-4 md:p-5 rounded-2xl md:rounded-3xl border text-[10px] md:text-[11px] font-medium flex items-start gap-3 md:gap-4 shadow-sm leading-relaxed ${evalData.color}`}><div className="p-1.5 md:p-2 bg-white rounded-lg md:rounded-xl shadow-sm shrink-0 mt-0.5 flex items-center justify-center">{evalData.icon}</div><p>{evalData.comment}</p></div>
                   )}
                 </div>
               );
@@ -1018,10 +1026,10 @@ export default function ShowaReizoDashboardPage() {
             
             {/* 月次タブのその他項目（Tier2 コンパクト表示） */}
             {activeTab === 'monthly' && sortedMetrics.others.length > 0 && (
-              <div className="lg:col-span-2 space-y-6 pt-8 border-t-2 border-dashed border-slate-200">
-                <h3 className="text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {sortedMetrics.others.length === 0 && <div className="col-span-full text-slate-400 font-bold">検索条件に一致する項目がありません。</div>}
+              <div className="lg:col-span-2 space-y-4 md:space-y-6 pt-6 md:pt-8 border-t-2 border-dashed border-slate-200">
+                <h3 className="text-lg md:text-xl font-black text-slate-400 border-l-4 border-slate-300 pl-3 md:pl-4 tracking-tighter">その他 運営指標 (Compact View)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+                  {sortedMetrics.others.length === 0 && <div className="col-span-full text-slate-400 font-bold text-sm">検索条件に一致する項目がありません。</div>}
                   {sortedMetrics.others.map((m, i) => {
                     const monthlyLowerIsBetter = ['事故件数（流通）', '事故金額', '労災件数', '社員残業工数', 'スタッフ残業工数', 'スタッフ使用工数', '社員工数', '一般スタッフ採用時給', 'タイミー使用工数', '36協定違反者数', '事故'];
                     const monthlyDisplayOnly = ['社員人数', 'スタッフ在籍者数', '最低賃金'];
@@ -1061,7 +1069,7 @@ export default function ShowaReizoDashboardPage() {
                         if (monthlyDisplayOnly.some(k => m.title.includes(k))) shortComment = "月次モニタリング指標として記録されています。";
                         else if (monthlyLowerIsBetter.some(k => m.title.includes(k))) {
                             if (prevVal > 0 && dispAct < prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から減少し、改善傾向にあります。`;
-                            else if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。注意が必要です。`;
+                            else if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・悪化しています。`;
                             else shortComment = prevVal > 0 ? `前月（${formatVal(prevVal, m.title)}）と同水準を維持しています。` : "当月データのみ登録されています。";
                         } else {
                             if (prevVal > 0 && dispAct > prevVal) shortComment = `前月（${formatVal(prevVal, m.title)}）から増加・良化しています。`;
@@ -1070,8 +1078,8 @@ export default function ShowaReizoDashboardPage() {
                         }
                       } else {
                         if (isCost) {
-                          if (currentRatio < 99) shortComment = "コスト管理は想定以上に良好です。現体制の効率化維持を推奨します。";
-                          else if (currentRatio > 101) shortComment = "警告：予算超過ペース。直ちにしきい値の見直しと人員配置の適正化が必要です。";
+                          if (currentRatio < 99) shortComment = "コスト管理は想定以上に良好です。現体制の効率化を推奨。";
+                          else if (currentRatio > 101) shortComment = "警告：予算超過ペース。直ちに人員配置の見直しが必要です。";
                           else shortComment = "計画通り順調な推移です。現状のオペレーションを維持してください。";
                         } else {
                           if (currentRatio > 101) shortComment = "業績好調。数値が目標を突破し、限界利益の押し上げに貢献しています。";
@@ -1106,24 +1114,24 @@ export default function ShowaReizoDashboardPage() {
                     }
 
                     return (
-                      <div key={i} className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4 group">
+                      <div key={i} className="bg-white border border-slate-200 p-5 md:p-6 rounded-2xl md:rounded-3xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-3 md:gap-4 group">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{m.title}</p>
-                            <p className="text-2xl font-black text-slate-800 tracking-tighter mt-1">{formatVal(dispAct, m.title)}</p>
+                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">{m.title}</p>
+                            <p className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter mt-0.5 md:mt-1">{formatVal(dispAct, m.title)}</p>
                           </div>
                           <div className="text-right">
                             {isMonthlyFixed ? (
-                                <p className="text-[10px] font-bold text-slate-400">前月比</p>
+                                <p className="text-[9px] md:text-[10px] font-bold text-slate-400">前月比</p>
                             ) : (
-                                dispFct > 0 && <p className="text-[10px] font-bold text-slate-400">{m.forecastType}: {formatVal(dispFct, m.title)}</p>
+                                dispFct > 0 && <p className="text-[9px] md:text-[10px] font-bold text-slate-400">{m.forecastType}: {formatVal(dispFct, m.title)}</p>
                             )}
-                            <div className={`mt-1.5 px-3 py-1 rounded-xl text-[11px] font-black inline-block ${badgeColor}`}>
+                            <div className={`mt-1 md:mt-1.5 px-2.5 md:px-3 py-1 rounded-lg md:rounded-xl text-[10px] md:text-[11px] font-black inline-block ${badgeColor}`}>
                               {badgeText}
                             </div>
                           </div>
                         </div>
-                        <div className={`rounded-xl p-3 text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
+                        <div className={`rounded-xl p-2.5 md:p-3 text-[9px] md:text-[10px] font-medium flex items-center gap-2 transition-colors ${evalColor}`}>
                           {evalIcon}
                           <p className="line-clamp-2 leading-relaxed">{evalData.shortComment}</p>
                         </div>
@@ -1138,43 +1146,44 @@ export default function ShowaReizoDashboardPage() {
 
         {/* DX推進・現場改善タブ */}
         {['dx', 'env'].includes(activeTab) && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-8">
             {(() => {
               const currentItems = activeTab === 'dx' ? filteredDxItems : filteredEnvItems;
-              if (currentItems.length === 0) return <div className="col-span-2 bg-white border p-12 rounded-[2.5rem] text-center text-slate-400 font-bold text-sm">💡 該当する項目がありません。</div>;
+              if (currentItems.length === 0) return <div className="col-span-1 xl:col-span-2 bg-white border p-8 md:p-12 rounded-2xl md:rounded-[2.5rem] text-center text-slate-400 font-bold text-xs md:text-sm">💡 該当する項目がありません。</div>;
               return currentItems.map((item, index) => {
                 const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio))));
                 const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                 const themeColor = currentTab.color;
                 return (
-                  <div key={index} className={`bg-white border p-8 rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
-                    {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-4 py-1 text-[9px] font-black tracking-widest uppercase rounded-bl-2xl">🚨 顧客関連</div>}
-                    <div className="absolute bottom-4 right-4 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                      <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
+                  <div key={index} className={`bg-white border p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-md flex flex-col md:flex-row gap-4 md:gap-6 items-center transition-all relative overflow-hidden ${item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
+                    {item.customer_related === 'あり' && <div className="absolute top-0 right-0 bg-rose-600 text-white px-3 md:px-4 py-1 text-[8px] md:text-[9px] font-black tracking-widest uppercase rounded-bl-xl md:rounded-bl-2xl">🚨 顧客関連</div>}
+                    <div className="absolute top-4 right-4 md:top-auto md:bottom-4 md:right-4 flex gap-2 md:gap-3 text-[9px] md:text-[10px] font-black tracking-wider uppercase">
+                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> <span className="hidden md:inline">編集</span></button>
+                      <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500"><X size={14} className="md:hidden"/><span className="hidden md:inline">削除</span></button>
                     </div>
-                    <div className="w-[160px] h-[160px] relative shrink-0 min-w-0">
+                    <div className="w-[120px] h-[120px] md:w-[160px] md:h-[160px] relative shrink-0 min-w-0 mt-4 md:mt-0">
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
-                          <Pie data={chartPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} startAngle={90} endAngle={-270} dataKey="value">
+                          {/* 🚀 CSSクラスを使わずパーセント指定に変更 */}
+                          <Pie data={chartPieData} cx="50%" cy="50%" innerRadius="65%" outerRadius="85%" startAngle={90} endAngle={-270} dataKey="value">
                             <Cell fill={themeColor} /> <Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
                           </Pie>
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-black tracking-tighter" style={{ color: themeColor }}>{itemRatio}%</span>
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{itemRatio === 100 ? '完了' : '進捗率'}</span>
+                        <span className="text-xl md:text-2xl font-black tracking-tighter" style={{ color: themeColor }}>{itemRatio}%</span>
+                        <span className="text-[7px] md:text-[8px] font-bold text-slate-400 uppercase tracking-widest">{itemRatio === 100 ? '完了' : '進捗率'}</span>
                       </div>
                     </div>
-                    <div className="flex-1 space-y-4 w-full pb-3 md:pb-0">
+                    <div className="flex-1 space-y-3 md:space-y-4 w-full">
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[9px] font-black px-2 py-0.5 rounded-md text-white" style={{ backgroundColor: themeColor }}>施策 {index + 1}</span>
-                          {item.start_date && <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">📅 {item.start_date} ～ {item.end_date || '未定'}</span>}
+                          <span className="text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-md text-white" style={{ backgroundColor: themeColor }}>施策 {index + 1}</span>
+                          {item.start_date && <span className="text-[8px] md:text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">📅 {item.start_date} ～ {item.end_date || '未定'}</span>}
                         </div>
-                        <h3 className="text-base font-black text-slate-900 tracking-tight pt-1 leading-snug">{item.name}</h3>
+                        <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight pt-1.5 md:pt-1 leading-snug">{item.name}</h3>
                       </div>
-                      {item.effect && item.effect !== "未入力" && <div className="text-[11px] font-medium text-slate-600 bg-slate-50 border p-3 rounded-xl"><span className="text-amber-500 font-black">💡 狙う効果:</span> {item.effect}</div>}
+                      {item.effect && item.effect !== "未入力" && <div className="text-[10px] md:text-[11px] font-medium text-slate-600 bg-slate-50 border p-2.5 md:p-3 rounded-xl"><span className="text-amber-500 font-black">💡 狙う効果:</span> {item.effect}</div>}
                       <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${itemRatio}%`, backgroundColor: themeColor }}></div>
                       </div>
@@ -1188,28 +1197,28 @@ export default function ShowaReizoDashboardPage() {
 
         {/* 営業履歴タブ */}
         {activeTab === 'history' && (
-          <div className="bg-white border border-slate-200 p-10 rounded-[2.5rem] shadow-md space-y-6">
-            <div className="border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={20} /> 営業アプローチ履歴</h2>
+          <div className="bg-white border border-slate-200 p-5 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-md space-y-4 md:space-y-6">
+            <div className="border-b border-slate-100 pb-3 md:pb-4">
+              <h2 className="text-base md:text-lg font-black text-slate-900 tracking-tighter flex items-center gap-2"><MessageSquare className="text-rose-600" size={18} /> 営業アプローチ履歴</h2>
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 py-2">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 py-2">
               {filteredHistoryItems.length === 0 ? (
-                <div className="col-span-1 xl:col-span-2 text-slate-400 text-xs font-bold pl-2 py-4">💡 該当する商談ログがありません。</div>
+                <div className="col-span-1 xl:col-span-2 text-slate-400 text-[11px] md:text-xs font-bold pl-2 py-4">💡 該当する商談ログがありません。</div>
               ) : (
                 filteredHistoryItems.map((log, index) => (
-                  <div key={index} className="bg-slate-50 border border-slate-100 p-6 rounded-3xl space-y-3 relative group hover:shadow-md transition-all">
-                    <div className="absolute top-4 right-6 flex gap-3 text-[10px] font-black tracking-wider uppercase">
-                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> 編集</button>
-                      <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500">削除</button>
+                  <div key={index} className="bg-slate-50 border border-slate-100 p-4 md:p-6 rounded-2xl md:rounded-3xl space-y-3 relative group hover:shadow-md transition-all">
+                    <div className="absolute top-4 right-4 flex gap-2 md:gap-3 text-[9px] md:text-[10px] font-black tracking-wider uppercase">
+                      <button onClick={() => handleOpenEditModal(index)} className="text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-all"><Edit2 size={11} /> <span className="hidden md:inline">編集</span></button>
+                      <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(index); }} className="text-slate-300 hover:text-rose-500"><X size={14} className="md:hidden"/><span className="hidden md:inline">削除</span></button>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="bg-white border-2 border-rose-500 p-1.5 rounded-full text-rose-500 shrink-0"><Building2 size={12} /></div>
-                      <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
-                      <h4 className="text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
-                      <span className={`text-[11px] font-black px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3 pr-12">
+                      <div className="bg-white border-2 border-rose-500 p-1 md:p-1.5 rounded-full text-rose-500 shrink-0"><Building2 size={10} className="md:w-3 md:h-3" /></div>
+                      <span className="text-[10px] md:text-xs bg-slate-900 text-white px-2 md:px-2.5 py-0.5 rounded-lg font-mono font-black">{log.date || '日付未設定'}</span>
+                      <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tight">{log.client}</h4>
+                      <span className={`text-[9px] md:text-[11px] font-black px-2 md:px-3 py-0.5 rounded-full border ${log.result === '●' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>結果: {log.result}</span>
                     </div>
-                    {log.proposal && <div className="text-xs font-black text-slate-800 bg-white border px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
-                    {log.detail && <p className="text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
+                    {log.proposal && <div className="text-[10px] md:text-xs font-black text-slate-800 bg-white border px-2.5 md:px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
+                    {log.detail && <p className="text-[11px] md:text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
                   </div>
                 ))
               )}
@@ -1221,39 +1230,39 @@ export default function ShowaReizoDashboardPage() {
       {/* 新規追加・編集モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+          <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-2xl space-y-4 md:space-y-6">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingIndex !== null ? '編集上書き' : '新規追加'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={18} /></button>
+              <h3 className="text-sm md:text-base font-black text-slate-900">【{tabs.find(t=>t.id===activeTab)?.label}】データの{editingIndex !== null ? '編集上書き' : '新規追加'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 bg-slate-100 p-1.5 rounded-full"><X size={16} /></button>
             </div>
             {activeTab === 'history' ? (
-              <div className="space-y-4 text-xs font-bold text-slate-700">
-                <div className="space-y-1"><label className="text-slate-400">1. 日付 *必須</label><input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
-                <div className="space-y-1"><label className="text-slate-400">2. 誰に *必須</label><input type="text" value={newItem.client} onChange={(e) => setNewItem({...newItem, client: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
-                <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
-                <div className="space-y-1"><label className="text-slate-400">4. 内容詳細</label><textarea value={newItem.detail} onChange={(e) => setNewItem({...newItem, detail: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 h-24 resize-none font-semibold text-slate-900" /></div>
+              <div className="space-y-3 md:space-y-4 text-[11px] md:text-xs font-bold text-slate-700">
+                <div className="space-y-1"><label className="text-slate-400">1. 日付 *必須</label><input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+                <div className="space-y-1"><label className="text-slate-400">2. 誰に *必須</label><input type="text" value={newItem.client} onChange={(e) => setNewItem({...newItem, client: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+                <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+                <div className="space-y-1"><label className="text-slate-400">4. 内容詳細</label><textarea value={newItem.detail} onChange={(e) => setNewItem({...newItem, detail: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-20 md:h-24 resize-none font-semibold text-slate-900" /></div>
                 <div className="space-y-1">
                   <label className="text-slate-400">5. 商談結果</label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-2 md:gap-3">
                     {['●', '×', '△'].map(res => (
-                      <button key={res} type="button" onClick={() => setNewItem({...newItem, result: res})} className={`py-2.5 rounded-xl font-black border transition-all ${newItem.result === res ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600'}`}>{res}</button>
+                      <button key={res} type="button" onClick={() => setNewItem({...newItem, result: res})} className={`py-2 md:py-2.5 rounded-xl font-black border transition-all ${newItem.result === res ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600'}`}>{res}</button>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-4 text-xs font-bold text-slate-700">
-                <div className="space-y-1"><label className="text-slate-400">項目名 *必須</label><input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" /></div>
-                <div className="space-y-1"><label className="text-slate-400">想定効果</label><textarea value={newItem.effect} onChange={(e) => setNewItem({...newItem, effect: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 h-16 resize-none font-semibold text-slate-900" /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" />
-                  <input type="date" value={newItem.endDate} onChange={(e) => setNewItem({...newItem, endDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 font-semibold text-slate-900" />
+              <div className="space-y-3 md:space-y-4 text-[11px] md:text-xs font-bold text-slate-700">
+                <div className="space-y-1"><label className="text-slate-400">項目名 *必須</label><input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+                <div className="space-y-1"><label className="text-slate-400">想定効果</label><textarea value={newItem.effect} onChange={(e) => setNewItem({...newItem, effect: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-16 resize-none font-semibold text-slate-900" /></div>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" />
+                  <input type="date" value={newItem.endDate} onChange={(e) => setNewItem({...newItem, endDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" />
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
-                  <input type="checkbox" checked={newItem.customerRelated} onChange={() => {}} className="accent-slate-900" />
-                  <span className="text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</span>
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 md:p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
+                  <input type="checkbox" checked={newItem.customerRelated} onChange={() => {}} className="accent-slate-900 w-4 h-4" />
+                  <span className="text-[11px] md:text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</span>
                 </div>
-                <div className="space-y-1 bg-slate-50 p-3 rounded-xl border">
+                <div className="space-y-1 bg-slate-50 p-2.5 md:p-3 rounded-xl border">
                   <div className="flex justify-between font-black">
                     <label className="text-slate-400">進捗</label>
                     <span className="text-slate-900">{newItem.ratio}%</span>
@@ -1262,9 +1271,9 @@ export default function ShowaReizoDashboardPage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-700">キャンセル</button>
-              <button onClick={handleSaveItem} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black shadow-md">データを安全に保存</button>
+            <div className="flex gap-2 md:gap-3 pt-2">
+              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 md:py-3 bg-slate-100 rounded-xl font-bold text-slate-700 text-xs">キャンセル</button>
+              <button onClick={handleSaveItem} className="flex-1 py-2.5 md:py-3 bg-slate-900 text-white rounded-xl font-black shadow-md text-xs">データを安全に保存</button>
             </div>
           </div>
         </div>
