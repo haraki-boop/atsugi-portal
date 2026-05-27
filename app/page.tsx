@@ -1,14 +1,16 @@
 // @ts-nocheck
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { MapPin, Navigation, Building2, ChevronRight } from 'lucide-react';
 
 export default function MapPortalPage() {
   const [map, setMap] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  
+  // 🚀 ピンの重なり順（前後）を操作するために、全ピンを保存しておく箱
+  const markersRef = useRef<{ [key: string]: any }>({});
 
-  // 📍 お兄ちゃんの指定通りのデータ配列（1文字も改変せず完全ホールド）
   const locations = [
     { id: 'showa-reizo', name: '昭和冷蔵', address: '神奈川県厚木市', lat: 35.4430, lng: 139.3640, type: 'hub', desc: '' },
     { id: 'afs-minamikanto', name: 'AFS南関東センター', address: '〒千葉県船橋市高瀬町24番12号', lat: 35.6717, lng: 139.9924, type: 'center', desc: '' },
@@ -19,7 +21,12 @@ export default function MapPortalPage() {
     { id: 'yamanaka-shionagi', name: 'ヤマナカ しおなぎ生鮮センター', address: '愛知県名古屋市港区潮凪町1-3', lat: 35.0797, lng: 136.8618, type: 'center', desc: '' },
     { id: 'mitsui-chubu', name: '三井食品 中部物流センター（高根山）', address: '愛知県名古屋市緑区高根山2丁目108', lat: 35.0461, lng: 136.9485, type: 'center', desc: '' },
     { id: 'cainz-kobe', name: 'カインズ 神戸流通センター', address: '兵庫県神戸市須磨区弥栄台', lat: 34.6860, lng: 135.0750, type: 'center', desc: '' },
-    { id: 'cainz-fukuoka', name: 'カインズ 福岡流通センター', address: '福岡県糟屋郡久山町久原2940', lat: 33.6420, lng: 130.5050, type: 'center', desc: '' }
+    { id: 'cainz-fukuoka', name: 'カインズ 福岡流通センター', address: '福岡県糟屋郡久山町久原2940', lat: 33.6420, lng: 130.5050, type: 'center', desc: '' },
+    
+    // 🌸 ピンク指定の3現場
+    { id: 'afs-bisai-seiso', name: 'AFS尾西_清掃', address: '愛知県一宮市明地南茱之木25-1', lat: 35.286934, lng: 136.739061, type: 'center', desc: '', isPink: true },
+    { id: 'himeji-afs-seiso', name: '兵庫姫路_AFS_清掃', address: '兵庫県姫路市白浜町甲841-51', lat: 34.778469, lng: 134.703810, type: 'center', desc: '', isPink: true },
+    { id: 'mandai-saito', name: '万代彩都', address: '大阪府茨木市彩都あかね3-1', lat: 34.861370, lng: 135.534495, type: 'center', desc: '万代 彩都物流センター', isPink: true }
   ];
 
   useEffect(() => {
@@ -33,6 +40,14 @@ export default function MapPortalPage() {
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.onload = () => {
         const L = window.L;
+
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+
         const leafMap = L.map('leaflet-map-container', {
           zoomControl: true,
           attributionControl: true
@@ -42,12 +57,30 @@ export default function MapPortalPage() {
           attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
         }).addTo(leafMap);
 
+        const pinkIcon = new L.Icon({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+          className: 'pink-map-pin' 
+        });
+
         locations.forEach(loc => {
-          const marker = L.marker([loc.lat, loc.lng]).addTo(leafMap);
+          const markerOptions = loc.isPink ? { icon: pinkIcon } : {};
+          const marker = L.marker([loc.lat, loc.lng], markerOptions).addTo(leafMap);
+          
+          // 作成したピンをRefに保存
+          markersRef.current[loc.id] = marker;
           
           marker.on('click', () => {
             setSelectedLocation(loc);
             leafMap.panTo([loc.lat, loc.lng]);
+            
+            // 🚀 クリックされたピンを最前面（一番上）に持ってくる
+            Object.values(markersRef.current).forEach((m: any) => m.setZIndexOffset(0));
+            marker.setZIndexOffset(1000);
           });
         });
 
@@ -61,14 +94,27 @@ export default function MapPortalPage() {
     setSelectedLocation(loc);
     if (map && window.L) {
       map.setView([loc.lat, loc.lng], 11, { animate: true, duration: 1 });
+      
+      // 🚀 サイドバーから選んだ時も、該当のピンを最前面に持ってくる
+      if (markersRef.current) {
+        Object.values(markersRef.current).forEach((m: any) => m.setZIndexOffset(0));
+        if (markersRef.current[loc.id]) {
+          markersRef.current[loc.id].setZIndexOffset(1000);
+        }
+      }
     }
   };
 
   return (
-    // 🚀 【修正】flex-col md:flex-row でスマホ時は上下分割、PC時は左右分割に
     <div className="h-[100dvh] w-screen bg-slate-50 text-slate-900 flex flex-col md:flex-row overflow-hidden font-sans">
       
-      {/* 🚀 【修正】スマホ時は高さを画面の35% (h-[35vh]) に制限し、PC時は100%に */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .pink-map-pin {
+          filter: hue-rotate(140deg) saturate(200%) brightness(110%);
+        }
+      `}} />
+
+      {/* サイドバーエリア */}
       <div className="w-full md:w-[400px] h-[35vh] md:h-full bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col justify-between z-20 shadow-lg shrink-0">
         <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto flex-1">
           <div className="border-b border-slate-100 pb-3 md:pb-4">
@@ -97,11 +143,18 @@ export default function MapPortalPage() {
                   }`}
                 >
                   <div className="space-y-1 flex-1 pr-2">
-                    <h3 className={`text-sm md:text-base font-black tracking-tighter leading-snug ${selectedLocation?.id === loc.id ? 'text-white' : 'text-slate-900'}`}>
-                      {loc.name}
-                    </h3>
-                    <p className={`text-[10px] md:text-[11px] font-medium flex items-center gap-1 ${selectedLocation?.id === loc.id ? 'text-slate-400' : 'text-slate-500'}`}>
-                      <MapPin size={11} /> {loc.address}
+                    <div className="flex items-center gap-2">
+                      <h3 className={`text-sm md:text-base font-black tracking-tighter leading-snug ${selectedLocation?.id === loc.id ? 'text-white' : 'text-slate-900'}`}>
+                        {loc.name}
+                      </h3>
+                      {/* バッジは削除してスッキリ！ */}
+                    </div>
+                    <p className={`text-[10px] md:text-[11px] font-medium flex items-center gap-1.5 ${selectedLocation?.id === loc.id ? 'text-slate-300' : 'text-slate-500'}`}>
+                      <MapPin 
+                        size={13} 
+                        className={selectedLocation?.id === loc.id ? "text-white" : (loc.isPink ? "text-pink-500" : "text-blue-500")} 
+                      /> 
+                      {loc.address}
                     </p>
                   </div>
                   <ChevronRight size={14} className={selectedLocation?.id === loc.id ? 'text-white' : 'text-slate-400'} />
@@ -115,21 +168,20 @@ export default function MapPortalPage() {
         </div>
       </div>
 
-      {/* 🚀 【修正】スマホ時は残りの高さ (h-[65vh]) をフルに使用 */}
+      {/* 地図エリア */}
       <div className="flex-1 w-full h-[65vh] md:h-full bg-slate-100 relative overflow-hidden">
-        
-        {/* 地図コンテナ */}
         <div id="leaflet-map-container" className="w-full h-full z-10"></div>
 
         {/* 拠点ポップアップ */}
         {selectedLocation && (
-          // 🚀 【修正】スマホ時は左右のマージンを取って画面下部に横幅いっぱい配置、PC時は右下に固定
           <div className="absolute bottom-4 left-4 right-4 md:bottom-8 md:right-8 md:left-auto md:w-[360px] bg-white/95 border border-slate-200 p-4 md:p-5 rounded-[2rem] shadow-2xl animate-in slide-in-from-bottom-2 duration-150 z-30 space-y-4 backdrop-blur-md">
             <div className="flex justify-between items-start border-b border-slate-100 pb-2">
               <div className="space-y-0.5">
-                <h2 className="text-base md:text-lg font-black text-slate-900 tracking-tighter leading-tight">
-                  {selectedLocation.name}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base md:text-lg font-black text-slate-900 tracking-tighter leading-tight">
+                    {selectedLocation.name}
+                  </h2>
+                </div>
                 <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Navigation size={10} /> LAT: {selectedLocation.lat.toFixed(4)} / LNG: {selectedLocation.lng.toFixed(4)}
                 </p>
@@ -143,8 +195,9 @@ export default function MapPortalPage() {
                   {selectedLocation.desc}
                 </div>
               )}
-              <div className="text-[10px] md:text-[11px] text-slate-500 font-medium">
-                <span className="text-slate-400 font-bold">住所:</span> {selectedLocation.address}
+              <div className="text-[10px] md:text-[11px] text-slate-500 font-medium flex items-start gap-1">
+                <MapPin size={12} className={`mt-0.5 shrink-0 ${selectedLocation.isPink ? 'text-pink-500' : 'text-blue-500'}`} /> 
+                <span>{selectedLocation.address}</span>
               </div>
             </div>
 
