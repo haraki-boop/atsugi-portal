@@ -20,6 +20,11 @@ export default function MapPortalPage() {
     { id: 'afs-bisai', name: 'AFS尾西_流通', address: '愛知県一宮市明地南茱之木25-1', lat: 35.2869, lng: 136.7391, type: 'center', desc: '' },
     { id: 'yamanaka-shionagi', name: 'ヤマナカ しおなぎ生鮮センター', address: '愛知県名古屋市港区潮凪町1-3', lat: 35.0797, lng: 136.8618, type: 'center', desc: '' },
     { id: 'mitsui-chubu', name: '三井食品 中部物流センター（高根山）', address: '愛知県名古屋市緑区高根山2丁目108', lat: 35.0461, lng: 136.9485, type: 'center', desc: '' },
+    
+    // 💡 新規追加：三井とカインズの間に挿入（青ピン）
+    { id: 'oie-hannan', name: '尾家産業 阪南支店', address: '大阪府貝塚市二色中町5-1', lat: 34.454641, lng: 135.344908, type: 'center', desc: '' },
+    { id: 'medi-entrance', name: 'メディエントランス', address: '大阪府箕面市森町西2丁目4-1', lat: 34.885, lng: 135.443, type: 'center', desc: '' },
+
     { id: 'cainz-kobe', name: 'カインズ 神戸流通センター', address: '兵庫県神戸市須磨区弥栄台', lat: 34.6860, lng: 135.0750, type: 'center', desc: '' },
     { id: 'cainz-fukuoka', name: 'カインズ 福岡流通センター', address: '福岡県糟屋郡久山町久原2940', lat: 33.6420, lng: 130.5050, type: 'center', desc: '' },
     
@@ -147,7 +152,6 @@ export default function MapPortalPage() {
                       <h3 className={`text-sm md:text-base font-black tracking-tighter leading-snug ${selectedLocation?.id === loc.id ? 'text-white' : 'text-slate-900'}`}>
                         {loc.name}
                       </h3>
-                      {/* バッジは削除してスッキリ！ */}
                     </div>
                     <p className={`text-[10px] md:text-[11px] font-medium flex items-center gap-1.5 ${selectedLocation?.id === loc.id ? 'text-slate-300' : 'text-slate-500'}`}>
                       <MapPin 
