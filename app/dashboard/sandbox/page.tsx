@@ -37,8 +37,8 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function ShowaReizoDashboardPage() {
-  const locationId = 'showa-reizo';
+export default function AfsMinamiKantoDashboardPage() {
+  const locationId = 'afs-minamikanto';
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -48,7 +48,6 @@ export default function ShowaReizoDashboardPage() {
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [contractSelectedMonth, setContractSelectedMonth] = useState<string>(''); 
   
-  // 🚀 【追加】請負予実で0の項目を非表示にするステート
   const [hideZeroContracts, setHideZeroContracts] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,8 +70,8 @@ export default function ShowaReizoDashboardPage() {
 
   const [toastInfo, setToastInfo] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({show: false, msg: '', type: 'success'});
 
-  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却", "残業", "違反者"];
-  const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン"];
+  const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却", "残業", "違反者", "総工数"];
+  const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン", "総工数"];
 
   const formatVal = (val: number, title?: string) => {
     if (val === undefined || val === null || isNaN(val)) return '0';
@@ -125,7 +124,7 @@ export default function ShowaReizoDashboardPage() {
 
   const fetchDashboardData = async (isReload = false) => {
     fetchSupabaseData();
-    const gasUrl = "https://script.google.com/macros/s/AKfycbyVf5S7jBstov79oOaHbFtJwxO7IXDsnFFwyJEOOeirzb9T5szZjd-lUk6FtdI1NpVK/exec";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyxsQ8srjM3gWc057pmopweW2vE78_-S9_E5_NS0omcvwvPGcJSObDJQPl41FqLjLVOxw/exec";
     try {
       const res = await fetch(gasUrl);
       const json = await res.json();
@@ -199,7 +198,7 @@ export default function ShowaReizoDashboardPage() {
         const targetList = activeTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
       } else { await supabaseRequest(targetTable, 'POST', payload); }
     }
-    await fetchSupabaseData(); setIsModalOpen(false);
+    await fetchDashboardData(); setIsModalOpen(false);
     showToast('データを保存しました', 'success');
   };
 
@@ -207,14 +206,14 @@ export default function ShowaReizoDashboardPage() {
     if (activeTab === 'history') await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
     else if (activeTab === 'dx') await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
     else await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
-    await fetchSupabaseData();
+    await fetchDashboardData();
     showToast('データを削除しました', 'success');
   };
 
   const handleToggleHideItem = async (item: any, table: string) => {
     const payload = { id: item.id, is_hidden: !item.is_hidden };
     await supabaseRequest(table, 'PATCH', payload);
-    await fetchSupabaseData();
+    await fetchDashboardData();
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
 
@@ -325,6 +324,7 @@ export default function ShowaReizoDashboardPage() {
     return { color, icon, comment, shortComment, ratio: ratio.toFixed(1) };
   };
 
+  // 🚀 【完全復旧】ここが前回消してしまった変数・関数の定義群です！
   const getCombinedMetrics = () => {
     if (!data) return [];
     const targetTabId = activeTab === 'monthly' ? 'sales' : (activeTab === 'accidents' ? 'logistics' : currentTab.id);
@@ -571,11 +571,8 @@ export default function ShowaReizoDashboardPage() {
       return 0;
     };
 
-    let lycosVal = getVal(["リコス", "工数"], ["アイス"]);
-    let iceVal = getVal(["アイス", "工数"]);
-    let broncoVal = getVal(["ブロンコ", "工数"]);
-    let genuseVal = getVal(["汎用", "工数"]);
-    let ikkatsuVal = getVal(["一括", "工数"]);
+    let chikusanVal = getVal(["畜産", "工数"]);
+    let suisanVal = getVal(["水産", "工数"]);
 
     const monthlyDataList = data.monthlyData || [];
     const totalManHourItem = monthlyDataList.find((item: any) => item && item.title && (item.title.includes("月間総工数") || item.title.includes("総工数")));
@@ -585,15 +582,12 @@ export default function ShowaReizoDashboardPage() {
        if (mIdx !== -1) allTotalVal = n(totalManHourItem.values[mIdx]);
     }
 
-    let directSumVal = lycosVal + iceVal + broncoVal + genuseVal + ikkatsuVal;
+    let directSumVal = chikusanVal + suisanVal;
     let indirectVal = Math.max(0, allTotalVal - directSumVal);
 
     const portfolioData = [
-      { name: 'リコス', value: Math.round(lycosVal), fill: "#f97316" },
-      { name: 'アイス', value: Math.round(iceVal), fill: "#06b6d4" },
-      { name: 'ブロンコ', value: Math.round(broncoVal), fill: "#8b5cf6" },
-      { name: '汎用', value: Math.round(genuseVal), fill: "#10b981" },
-      { name: '一括', value: Math.round(ikkatsuVal), fill: "#e11d48" },
+      { name: '畜産', value: Math.round(chikusanVal), fill: "#f97316" },
+      { name: '水産', value: Math.round(suisanVal), fill: "#06b6d4" },
       { name: '間接工数', value: Math.round(indirectVal), fill: "#64748b" }
     ].filter(d => d.value > 0);
 
@@ -625,7 +619,7 @@ export default function ShowaReizoDashboardPage() {
       setIsAnalyzing(false);
     }
   };
-// ========== 前半ロジックここまで ==========
+// ========== 前半ロジック部分ここまで ==========
 if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -676,8 +670,9 @@ if (!data || !isMounted) {
           </Link>
         </div>
         
+        {/* 🚀 AFS南関東に変更 */}
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
-          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">
             {['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
@@ -728,7 +723,7 @@ if (!data || !isMounted) {
       </header>
 
       <div className="hidden print:block text-center pt-8 pb-6 border-b-2 border-slate-900 mb-8">
-        <h1 className="text-3xl font-black italic tracking-tighter uppercase text-slate-900">経営ダッシュボード : 昭和冷蔵</h1>
+        <h1 className="text-3xl font-black italic tracking-tighter uppercase text-slate-900">経営ダッシュボード : AFS南関東</h1>
         <p className="text-base font-bold text-blue-600 tracking-[0.2em] uppercase mt-1">
           {['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
         </p>
@@ -747,7 +742,7 @@ if (!data || !isMounted) {
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
             {['dx', 'env', 'history'].includes(activeTab) && (
-              // 🚀 ここに whitespace-nowrap shrink-0 を追加し、ボタンの縦潰れを完全防止！
+              // 🚀 ここに whitespace-nowrap shrink-0 を追加し、ボタンの縦潰れを完全防止
               <button 
                 onClick={() => setShowHiddenItems(!showHiddenItems)} 
                 className={`w-full sm:w-auto whitespace-nowrap shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black border transition-all ${showHiddenItems ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-inner' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
@@ -799,7 +794,7 @@ if (!data || !isMounted) {
         )}
 
         {/* =========================================
-            【10】請負予実ダッシュボード (グラフなし・8列)
+            【10】請負予実ダッシュボード (0非表示機能搭載)
         ========================================= */}
         {activeTab === 'contract' && (
           <div className="space-y-4 md:space-y-6">
@@ -842,7 +837,7 @@ if (!data || !isMounted) {
                 const actVal = targetIdx !== -1 ? n(m.actual[targetIdx]) : 0;
                 const fctVal = targetIdx !== -1 ? n(m.forecast[targetIdx]) : 0;
                 
-                // 🚀 トグルがONの時、実績も予算も0なら描画しない（スキップ）
+                // 🚀 トグルがONの時、実績も予算も0なら描画スキップ
                 if (hideZeroContracts && actVal === 0 && fctVal === 0) return null;
 
                 const diffVal = actVal - fctVal;
@@ -951,7 +946,7 @@ if (!data || !isMounted) {
                     )}
                   </div>
                   
-                  {/* 🚀 ノートPC最適化：グラフ縦幅（h-260px）は絶対維持！右側パネルの横幅だけを調整（xl:w-[220px] 2xl:w-[260px]）して崩れを防止 */}
+                  {/* 🚀 ノートPC最適化：グラフ縦幅（h-260px）は絶対維持。右側パネルの横幅だけを調整（xl:w-[220px] 2xl:w-[260px]） */}
                   <div className={displayMode !== 'daily' ? 'flex flex-col xl:flex-row gap-4 items-stretch min-w-0 print:flex-col print:gap-4' : 'w-full min-w-0'}>
                     <div className="flex-1 h-[180px] md:h-[260px] bg-slate-50/50 p-2 md:p-4 rounded-2xl border border-slate-100 min-w-0 print:h-[220px] print:bg-white print:border-slate-200">
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
