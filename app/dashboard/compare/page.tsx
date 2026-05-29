@@ -285,12 +285,14 @@ export default function CompareDashboardPage() {
               </div>
               <div className="flex-1 w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barChartData} layout="vertical" margin={{ top: 5, right: 140, left: 0, bottom: 5 }} animationDuration={1000}>
+                  {/* 💡 【修正】BarChartタグから animationDuration を削除し、型エラーを解消しました */}
+                  <BarChart data={barChartData} layout="vertical" margin={{ top: 5, right: 140, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
                     <RechartsTooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px' }} />
-                    <Bar dataKey="value" fill={rankingMode === 'sales' ? "#1d70b8" : "#c2410c"} radius={[0, 2, 2, 0]} barSize={12}>
+                    {/* 💡 アニメーション設定はここ（Barタグ側）に持たせるのが正解です */}
+                    <Bar dataKey="value" fill={rankingMode === 'sales' ? "#1d70b8" : "#c2410c"} radius={[0, 2, 2, 0]} barSize={12} animationDuration={1000}>
                       <LabelList dataKey="label" position="right" fill="#475569" fontSize={10} fontWeight="bold" offset={10} />
                     </Bar>
                   </BarChart>
@@ -361,7 +363,6 @@ export default function CompareDashboardPage() {
               </div>
             </div>
 
-            {/* 💡 右下: AI診断結果カード（横長の3段並びへ変更） */}
             <div className="w-1/2 flex flex-col">
               <div className="flex-1 bg-white border border-slate-200 p-5 md:p-6 rounded-2xl relative overflow-hidden flex flex-col shadow-sm">
                 <div className="flex items-center gap-2 md:gap-3 mb-4 shrink-0">
@@ -380,7 +381,6 @@ export default function CompareDashboardPage() {
                     </div>
                   ) 
                   : isAnalyzing ? (
-                    // 💡 【修正】読み込み中スケルトンも「横長の3枚積み」へ
                     <div className="h-full flex flex-col gap-3">
                       {[1, 2, 3].map(i => (
                         <div key={i} className="flex-1 bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
@@ -390,9 +390,7 @@ export default function CompareDashboardPage() {
                         </div>
                       ))}
                     </div>
-                  ) 
-                  : (
-                    // 💡 【修正】3つのカードを「flex-col」で縦に積み、横長に表示
+                  ) : (
                     <div className="h-full flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
                       <div className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm">
                         <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-emerald-700 mb-2"><BarChart3 size={16}/> 1. 主要・コスト指標 評価</h4>
