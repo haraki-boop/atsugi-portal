@@ -141,6 +141,7 @@ export default function CompareDashboardPage() {
     }
   };
 
+  // 💡 【大修正】タイトル通り「TOP 15」で、15件目以降は下からしっかり削るように制限
   const sortedRankingData = [...filteredData]
     .sort((a, b) => {
       if (rankingMode === 'sales') {
@@ -148,7 +149,8 @@ export default function CompareDashboardPage() {
       } else {
         return (b["実績_売上生産性"] || 0) - (a["実績_売上生産性"] || 0);
       }
-    });
+    })
+    .slice(0, 15);
 
   const barChartData = sortedRankingData.map(item => {
     if (rankingMode === 'sales') {
@@ -285,14 +287,22 @@ export default function CompareDashboardPage() {
               </div>
               <div className="flex-1 w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  {/* 💡 【修正】BarChartタグから animationDuration を削除し、型エラーを解消しました */}
                   <BarChart data={barChartData} layout="vertical" margin={{ top: 5, right: 140, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    {/* 💡 【大復活】現場名が長い場合は後ろ（下）を綺麗に削って「…」にする処理を再搭載 */}
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      width={90} 
+                      interval={0} 
+                      tickFormatter={(v) => v.length > 7 ? `${v.slice(0, 7)}…` : v}
+                      tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} 
+                      axisLine={false} 
+                      tickLine={false} 
+                    />
                     <RechartsTooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px' }} />
-                    {/* 💡 アニメーション設定はここ（Barタグ側）に持たせるのが正解です */}
-                    <Bar dataKey="value" fill={rankingMode === 'sales' ? "#1d70b8" : "#c2410c"} radius={[0, 2, 2, 0]} barSize={12} animationDuration={1000}>
+                    <Bar dataKey="value" fill={rankingMode === 'sales' ? "#1d70b8" : "#c2410c"} radius={[0, 2, 2, 0]} barSize={12}>
                       <LabelList dataKey="label" position="right" fill="#475569" fontSize={10} fontWeight="bold" offset={10} />
                     </Bar>
                   </BarChart>
@@ -381,7 +391,7 @@ export default function CompareDashboardPage() {
                     </div>
                   ) 
                   : isAnalyzing ? (
-                    <div className="h-full flex flex-col gap-3">
+                    <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                       {[1, 2, 3].map(i => (
                         <div key={i} className="flex-1 bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
                           <div className="h-3 bg-slate-200 rounded-md w-1/4"></div>
@@ -391,17 +401,17 @@ export default function CompareDashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="h-full flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
-                      <div className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm">
-                        <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-emerald-700 mb-2"><BarChart3 size={16}/> 1. 主要・コスト指標 評価</h4>
+                    <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-start">
+                        <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-emerald-700 mb-2 shrink-0"><BarChart3 size={16}/> 1. 主要・コスト指標 評価</h4>
                         <p className="text-slate-700 text-[11px] md:text-[12px] leading-relaxed font-medium whitespace-pre-wrap">{chappyAnalysis.summaryMetrics}</p>
                       </div>
-                      <div className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm">
-                        <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-amber-700 mb-2"><PieChartIcon size={16}/> 2. 工数内訳 評価</h4>
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-start">
+                        <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-amber-700 mb-2 shrink-0"><PieChartIcon size={16}/> 2. 工数内訳 評価</h4>
                         <p className="text-slate-700 text-[11px] md:text-[12px] leading-relaxed font-medium whitespace-pre-wrap">{chappyAnalysis.summaryManhours}</p>
                       </div>
-                      <div className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm">
-                        <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-purple-700 mb-2"><ActivitySquare size={16}/> 3. パフォーマンス 評価</h4>
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-start">
+                        <h4 className="flex items-center gap-2 text-xs md:text-sm font-black text-purple-700 mb-2 shrink-0"><ActivitySquare size={16}/> 3. パフォーマンス 評価</h4>
                         <p className="text-slate-700 text-[11px] md:text-[12px] leading-relaxed font-medium whitespace-pre-wrap">{chappyAnalysis.summaryPerformance}</p>
                       </div>
                     </div>

@@ -40,9 +40,9 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function AfsBisaiDashboardPage() {
-  // 🚀 AFS尾西専用の locationId に設定
-  const locationId = 'afs-bisai';
+export default function TokyuStoreDashboardPage() {
+  // 🚀 東急ストア専用の locationId に設定
+  const locationId = 'tokyu-store';
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('logistics');
@@ -129,8 +129,8 @@ export default function AfsBisaiDashboardPage() {
 
   const fetchDashboardData = async (isReload = false) => {
     fetchSupabaseData();
-    // 🚀 【AFS尾西専用URLに設定完了】
-    const gasUrl = "https://script.google.com/macros/s/AKfycbzAKRllP2bRTxDsBZqVpbGYsK3t11MpoW-eyqoQFmh_eGQHadnqUrSkknrz9sn2CbFb/exec";
+    // 🚀 【東急ストア専用URLに設定完了】
+    const gasUrl = "https://script.google.com/macros/s/AKfycbxLAfqf6i2jUAA2d0OJz6BKT5jwPhHgBVS2Dtxkqggb4Hfvt9hHTcYONvPdbaFxiZYXsA/exec";
     try {
       const res = await fetch(gasUrl);
       const json = await res.json();
@@ -185,7 +185,7 @@ export default function AfsBisaiDashboardPage() {
       setNewItem({ startDate: item.date ? item.date.replace(/\//g, '-') : '', client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●' });
     } else {
       const targetList = activeTab === 'dx' ? dxItems : envItems; const item = targetList[index];
-      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customerRelated: item.customer_related === 'あり', ratio: item.ratio || 0 });
+      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', end_date: item.end_date ? item.end_date.replace(/\//g, '-') : '', customer_related: item.customer_related === 'あり', ratio: item.ratio || 0 });
     }
     setIsModalOpen(true);
   };
@@ -503,7 +503,7 @@ export default function AfsBisaiDashboardPage() {
         comment = `【経営予測：致命的失速アラート】『${title}』に急ブレーキがかかっています。当月最終実績が予算比で【${formatVal(deviationAmount, title)}】下振れ失速するリスクが試算されます。`; 
       } else {
         color = 'text-slate-700 bg-slate-50 border-slate-200'; icon = <Bot size={18} className="text-slate-500" />;
-        comment = `【経営予測：計画達成維持】『${title}』は経営計画通りの手堅く堅実な推移を見せています。`; 
+        comment = `【経営予測：計画達成維持】『${title}』は経営計画通りの手かったく堅実な推移を見せています。`; 
       }
     }
     return { color, icon, comment, shortComment, ratio: ratio.toFixed(1) };
@@ -682,9 +682,9 @@ export default function AfsBisaiDashboardPage() {
           </Link>
         </div>
         
-        {/* 🚀 AFS尾西_流通 に変更 */}
+        {/* 🚀 東急ストアに変更 */}
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
-          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS尾西_流通</h1>
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 東急ストア 流通センター</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">
             {['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
           </p>
@@ -735,7 +735,7 @@ export default function AfsBisaiDashboardPage() {
       </header>
 
       <div className="hidden print:block text-center pt-8 pb-6 border-b-2 border-slate-900 mb-8">
-        <h1 className="text-3xl font-black italic tracking-tighter uppercase text-slate-900">経営ダッシュボード : AFS尾西_流通</h1>
+        <h1 className="text-3xl font-black italic tracking-tighter uppercase text-slate-900">経営ダッシュボード : 東急ストア 流通センター</h1>
         <p className="text-base font-bold text-blue-600 tracking-[0.2em] uppercase mt-1">
           {['dx', 'env', 'history', 'accidents', 'analysis', 'contract'].includes(activeTab) ? 'STRATEGIC MANAGEMENT LAYER' : `${displayMode.toUpperCase()} ANALYTICS MODE (${globalSelectedMonth}月)`}
         </p>
