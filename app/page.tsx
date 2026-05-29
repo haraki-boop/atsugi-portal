@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { MapPin, Navigation, Building2, ChevronRight } from 'lucide-react';
+import { MapPin, Navigation, Building2, ChevronRight, DoorOpen } from 'lucide-react';
 
 export default function MapPortalPage() {
   const [map, setMap] = useState<any>(null);
@@ -130,12 +130,23 @@ export default function MapPortalPage() {
                 alt="株式会社PAL Logo" 
                 className="h-5 md:h-7 w-auto object-contain inline-block mr-1.5 align-middle"
               />
-              <span className="align-middle">拠点統括ロジスティクスマップ</span>
+              <span className="align-middle">拠点統スタロジスティクスマップ</span>
             </p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase px-1">拠点一覧 ({locations.length})</p>
+            {/* 💡 視認性アップ：サイズを14→18に拡大、初期色を少し濃いめの slate-400 に変更！ */}
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">拠点一覧 ({locations.length})</p>
+              <Link 
+                href="https://palproductivity-dashboard.vercel.app/dashboard/compare" 
+                title="15現場 業績比較ダッシュボードを開く" 
+                className="text-slate-400 hover:text-blue-600 transition-all p-1 rounded-lg hover:bg-slate-50 duration-200 flex items-center justify-center"
+              >
+                <DoorOpen size={18} />
+              </Link>
+            </div>
+            
             <div className="space-y-2 max-h-full overflow-y-auto pr-1">
               {locations.map((loc) => (
                 <button
