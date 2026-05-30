@@ -418,7 +418,7 @@ export default function CompareDashboardPage() {
           <div className="flex flex-col xl:flex-row gap-4 min-h-[320px] xl:h-[320px] shrink-0 w-full">
             <div className="w-full xl:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] xl:h-full">
               <div className="flex items-center justify-between mb-2 shrink-0">
-                <h3 className="text-sm font-bold text-slate-900">選択エリア別 {rankingMode === 'sales' ? '売上' : '売上生産性'}ランキング</h3>
+                <h3 className="text-sm font-bold text-slate-900">現場別 {rankingMode === 'sales' ? '売上' : '売上生産性'}ランキング</h3>
                 <div className="flex bg-slate-100 p-0.5 rounded-md text-xs">
                   <button onClick={() => setRankingMode('sales')} className={`px-2.5 py-1 rounded font-bold ${rankingMode === 'sales' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>売上</button>
                   <button onClick={() => setRankingMode('productivity')} className={`px-2.5 py-1 rounded font-bold ${rankingMode === 'productivity' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>生産性</button>
@@ -499,7 +499,7 @@ export default function CompareDashboardPage() {
           <div className="flex flex-col lg:flex-row gap-4 w-full shrink-0">
             {/* 💡 スクロール廃止(h-auto) ＆ パディング(py-0.5)でギュッと圧縮 */}
             <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-auto">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">選択エリアの現場別 KPIヒートマップ</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">現場別 KPIヒートマップ</h3>
               <div className="flex-1 w-full overflow-x-auto">
                  <table className="w-full text-[11px] text-center border-collapse whitespace-nowrap">
                    <thead>
