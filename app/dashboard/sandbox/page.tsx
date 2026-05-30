@@ -6,7 +6,8 @@ import {
   ScatterChart, Scatter, ZAxis, Cell, LabelList, Line, Legend, Area, ComposedChart
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrainCircuit, Bot, Zap, BarChart3, PieChart as PieChartIcon, ActivitySquare, Loader2, Globe, MapPin, Sparkles, TrendingUp, Target, Rocket, Leaf, MessageSquare, Search, Filter } from 'lucide-react';
+// 💡 Calendarアイコンを追加
+import { BrainCircuit, Bot, Zap, BarChart3, PieChart as PieChartIcon, ActivitySquare, Loader2, Globe, MapPin, Sparkles, TrendingUp, Target, Rocket, Leaf, MessageSquare, Search, Filter, Calendar } from 'lucide-react';
 
 const GAS_API_URL = "/api/compare";
 
@@ -17,7 +18,6 @@ const SITE_AREA_MAP: { [key: string]: 'kanto' | 'kansai' | 'chubu' | 'cleanness'
   "尾西清盛": "cleanness", "尾西清掃": "cleanness", "兵庫清掃": "cleanness", "姫路清掃": "cleanness", "万代彩都": "cleanness", "万代綾都": "cleanness"
 };
 
-// 💡 拠点IDと表示名のマッピング
 const LOCATION_NAME_MAP: { [key: string]: string } = {
   "afs-bisai": "afs尾西",
   "afs-minamikanto": "afs南関東",
@@ -125,22 +125,21 @@ export default function CompareDashboardPage() {
   
   const [loading, setLoading] = useState<boolean>(true);
   const [rankingMode, setRankingMode] = useState<'sales' | 'productivity'>('sales');
-  // 💡 selectedArea に 'action' を追加対応
   const [selectedArea, setSelectedArea] = useState<'all' | 'kanto' | 'kansai' | 'chubu' | 'cleanness' | 'action'>('all');
 
   const [chappyAnalysis, setChappyAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentMonthStr, setCurrentMonthStr] = useState<string>('');
 
-  // 💡 アクションタブ用のステート
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [actionSubTab, setActionSubTab] = useState<'dx' | 'env' | 'history'>('dx');
   const [actionLocationFilter, setActionLocationFilter] = useState<string>('all');
+  // 💡 月フィルター用のステートを追加
+  const [actionMonthFilter, setActionMonthFilter] = useState<string>('all');
   const [actionSearchQuery, setActionSearchQuery] = useState<string>('');
 
-  // 💡 Supabaseから全拠点のデータを一括取得する関数
   const fetchSupabaseAllData = async () => {
     try {
       const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVraGNhbGF5YWF6d211ZmV3c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMDc5MTUsImV4cCI6MjA5NDY4MzkxNX0.I5A3_xeDUcBJvRogo_pYVa45_vJ_qL8Fur1qbuu3j4c`;
@@ -166,7 +165,6 @@ export default function CompareDashboardPage() {
     setIsMounted(true);
     const fetchData = async () => {
       try {
-        // GASデータの取得
         const res = await fetch(GAS_API_URL);
         const data = await res.json();
         if (!Array.isArray(data)) {
@@ -185,7 +183,6 @@ export default function CompareDashboardPage() {
         if (uniqueMonths.includes(thisMonthStr)) setSelectedMonth(thisMonthStr);
         else if (uniqueMonths.length > 0) setSelectedMonth(uniqueMonths[0]);
 
-        // Supabaseデータの一括取得を追加
         await fetchSupabaseAllData();
 
       } catch (error) {
@@ -373,22 +370,54 @@ export default function CompareDashboardPage() {
       </div>
     );
   }
-  // 💡 アクションタブ用のデータ集計ロジック
+  // 💡 アクション項目の全データから存在する「月 (YYYY/MM)」を抽出
+  const actionAvailableMonths = Array.from(new Set(
+    [...dxItems, ...envItems, ...historyItems].map(item => {
+      const d = item.date || item.start_date;
+      if (!d) return null;
+      const parts = d.replace(/-/g, '/').split('/');
+      if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+      return null;
+    }).filter(Boolean)
+  )).sort().reverse() as string[];
+
+  // 💡 アクションタブ用のデータ集計ロジック（月フィルター＆降順ソートを追加）
   const currentActionList = actionSubTab === 'dx' ? dxItems : (actionSubTab === 'env' ? envItems : historyItems);
   
   const filteredActionList = currentActionList.filter(item => {
+    // 拠点フィルター
     const matchLoc = actionLocationFilter === 'all' || item.location_id === actionLocationFilter;
+    
+    // キーワードフィルター
     const searchStr = actionSearchQuery.toLowerCase();
     const matchSearch = actionSubTab === 'history'
       ? (item.client?.toLowerCase().includes(searchStr) || item.proposal?.toLowerCase().includes(searchStr) || item.detail?.toLowerCase().includes(searchStr))
       : (item.name?.toLowerCase().includes(searchStr) || item.effect?.toLowerCase().includes(searchStr));
-    return matchLoc && matchSearch;
+
+    // 月フィルター
+    let matchMonth = true;
+    if (actionMonthFilter !== 'all') {
+      const d = item.date || item.start_date;
+      if (!d) {
+        matchMonth = false;
+      } else {
+        const normalized = d.replace(/-/g, '/'); // "2026/05/15" のような形に統一
+        matchMonth = normalized.startsWith(actionMonthFilter);
+      }
+    }
+
+    return matchLoc && matchSearch && matchMonth;
+  }).sort((a, b) => {
+    // 💡 降順ソート（最新の日付が上に来るように並び替え）
+    const dateA = new Date((a.date || a.start_date || '').replace(/-/g, '/')).getTime() || 0;
+    const dateB = new Date((b.date || b.start_date || '').replace(/-/g, '/')).getTime() || 0;
+    return dateB - dateA;
   });
 
   // グラフ用データ（拠点ごとの登録件数）
   const actionChartDataMap: { [key: string]: number } = {};
   Object.keys(LOCATION_NAME_MAP).forEach(k => actionChartDataMap[k] = 0);
-  currentActionList.forEach(item => {
+  filteredActionList.forEach(item => { // 絞り込み後の件数を反映
     if (actionChartDataMap[item.location_id] !== undefined) {
       actionChartDataMap[item.location_id]++;
     }
@@ -408,7 +437,6 @@ export default function CompareDashboardPage() {
           </linearGradient>
           <linearGradient id="areaActual" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
           <radialGradient id="bubbleGrad" cx="30%" cy="30%" r="70%"><stop offset="0%" stopColor="#38bdf8" stopOpacity={0.8}/><stop offset="100%" stopColor="#0284c7" stopOpacity={0.4}/></radialGradient>
-          {/* アクションタブのグラフ用グラデーション */}
           <linearGradient id="actionBarGrad" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/><stop offset="100%" stopColor="#8b5cf6" stopOpacity={1}/>
           </linearGradient>
@@ -420,7 +448,6 @@ export default function CompareDashboardPage() {
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 0 001 1m-6 0h6"/></svg>
         </a>
         <div className="w-full border-t border-slate-100 my-1"></div>
-        {/* 💡 サイドバーに 'action' を追加 */}
         {['all', 'kanto', 'chubu', 'kansai', 'cleanness', 'action'].map((area) => (
           <button 
             key={area} onClick={() => { setSelectedArea(area as any); setChappyAnalysis(null); }} 
@@ -449,14 +476,10 @@ export default function CompareDashboardPage() {
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 w-full">
           
-          {/* =======================================================
-              💡 新設：アクション（DX・改善・営業）ダッシュボード
-          ======================================================= */}
           {selectedArea === 'action' ? (
             <div className="flex flex-col h-full gap-4">
-              {/* コントロールパネル */}
               <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex bg-slate-100 p-1 rounded-lg">
+                <div className="flex bg-slate-100 p-1 rounded-lg w-full lg:w-auto overflow-x-auto">
                   {[
                     { id: 'dx', label: 'DX推進', icon: <Rocket size={14}/>, color: 'text-purple-600' },
                     { id: 'env', label: '現場改善', icon: <Leaf size={14}/>, color: 'text-emerald-600' },
@@ -465,13 +488,31 @@ export default function CompareDashboardPage() {
                     <button
                       key={tab.id}
                       onClick={() => setActionSubTab(tab.id as any)}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-black transition-all ${actionSubTab === tab.id ? 'bg-white shadow-sm ' + tab.color : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-black transition-all whitespace-nowrap ${actionSubTab === tab.id ? 'bg-white shadow-sm ' + tab.color : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       {tab.icon} {tab.label}
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-3 w-full lg:w-auto">
+                
+                {/* 💡 コントロールパネルのフィルターエリア（月選択を追加） */}
+                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                  {/* 月選択フィルター */}
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg shrink-0">
+                    <Calendar size={14} className="text-slate-400" />
+                    <select
+                      value={actionMonthFilter}
+                      onChange={(e) => setActionMonthFilter(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">すべての月</option>
+                      {actionAvailableMonths.map(m => (
+                        <option key={m} value={m}>{m}度</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 拠点選択フィルター */}
                   <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg shrink-0">
                     <Filter size={14} className="text-slate-400" />
                     <select
@@ -485,6 +526,8 @@ export default function CompareDashboardPage() {
                       ))}
                     </select>
                   </div>
+                  
+                  {/* キーワード検索 */}
                   <div className="relative w-full lg:w-64 shrink-0">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input type="text" placeholder="キーワード検索..." value={actionSearchQuery} onChange={(e) => setActionSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 pl-8 pr-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -492,10 +535,8 @@ export default function CompareDashboardPage() {
                 </div>
               </div>
 
-              {/* 2カラムレイアウト（左：リスト、右：グラフ） */}
               <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-[500px]">
                 
-                {/* 👈 左側：スクロール可能なリスト */}
                 <div className="w-full lg:w-[60%] flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2 h-[600px] lg:h-full">
                   {filteredActionList.length === 0 ? (
                     <div className="h-full flex items-center justify-center bg-white rounded-xl border border-slate-200 border-dashed text-slate-400 font-bold text-sm">
@@ -505,7 +546,6 @@ export default function CompareDashboardPage() {
                     filteredActionList.map((item, i) => (
                       <div key={i} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center hover:shadow-md transition-all">
                         {actionSubTab !== 'history' ? (
-                          // DX・改善のカード
                           <>
                             <div className="w-16 h-16 shrink-0 relative flex items-center justify-center bg-slate-50 rounded-full border border-slate-100">
                               <span className="text-lg font-black" style={{ color: actionSubTab === 'dx' ? '#9333ea' : '#10b981' }}>{item.ratio || 0}%</span>
@@ -523,7 +563,6 @@ export default function CompareDashboardPage() {
                             </div>
                           </>
                         ) : (
-                          // 営業履歴のカード
                           <div className="flex-1 space-y-2 w-full">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-800 text-white shadow-sm">
@@ -542,14 +581,15 @@ export default function CompareDashboardPage() {
                   )}
                 </div>
 
-                {/* 👉 右側：拠点別の登録件数グラフ（固定） */}
                 <div className="w-full lg:w-[40%] bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col h-[400px] lg:h-[600px] sticky top-0">
                   <div className="mb-4 shrink-0 border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                       <BarChart3 size={16} className="text-blue-600" />
                       拠点別 アクション登録件数
                     </h3>
-                    <p className="text-[10px] text-slate-400 font-bold mt-1">選択中のサブタブ ({actionSubTab === 'dx' ? 'DX推進' : actionSubTab === 'env' ? '現場改善' : '営業履歴'}) の全件数</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1">
+                      選択中のサブタブ ({actionSubTab === 'dx' ? 'DX推進' : actionSubTab === 'env' ? '現場改善' : '営業履歴'}) の件数比較
+                    </p>
                   </div>
                   <div className="flex-1 w-full min-h-0 relative">
                     <ResponsiveContainer width="100%" height="100%">
@@ -560,7 +600,7 @@ export default function CompareDashboardPage() {
                         <RechartsTooltip 
                           cursor={{ fill: 'rgba(241, 245, 249, 0.5)' }} 
                           contentStyle={modernTooltipStyle}
-                          formatter={(val: any) => [`${val} 件`, '登録数']}
+                          formatter={(val: any) => [`${val} 件`, '該当件数']}
                         />
                         <Bar dataKey="count" fill="url(#actionBarGrad)" radius={[0, 6, 6, 0]} barSize={20} animationDuration={1000}>
                           <LabelList dataKey="count" position="right" fill="#64748b" fontSize={11} fontWeight="bold" formatter={(val: any) => `${val}件`} />
@@ -573,9 +613,6 @@ export default function CompareDashboardPage() {
               </div>
             </div>
           ) : (
-          /* =======================================================
-              通常ダッシュボード（KPI・グラフ等）
-          ======================================================= */
             <div className="flex flex-col gap-4 w-full">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0 w-full">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden h-24 md:h-28">
