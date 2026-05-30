@@ -256,10 +256,17 @@ export default function CompareDashboardPage() {
       const areaName = selectedArea === 'all' ? '全社' : selectedArea === 'kanto' ? '関東' : selectedArea === 'kansai' ? '関西' : selectedArea === 'chubu' ? '中部' : 'クリンネス';
       const growthText = growthRate !== null ? `前月比成長率は ${growthRate.toFixed(1)}% となっています。` : '';
 
-      let metricsText = `【${areaName}主要指標・コスト詳細評価】当月のエリア総売上実績は予算比${achievementRate}%の着地となりました。${growthText}全体の目標達成に最も大きく貢献したのは「${goodSite}」であり、物量変動に左右されない緻密な人員配置運用と、固定費の徹底的な管理が高水準な達成率の最大の要因です。固定費のコントロールスキームをエリア全体で共有すべきです。`;
-      let manhoursText = `【現場別工数内訳・ボトルネック分析】エリア全体の投入総工数を詳細に分析した結果、高収益現場と課題現場の間で生産性に大きな二極化が発生しています。黒字運用が定着している現場ではChappyを活用した事前の必要工数予測に基づきシフトが最適化されていますが、生産性が低迷している「${badSite}」などの現場では「当日の稼働状況に合わせた場当たり的な配置調整」が常態化しています。`;
-      let performanceText = `【収益性向上・次月への具体的是正策】現在のエリア平均粗利益率${avgProfitMargin.toFixed(1)}%をベースラインとし、次クォーターに向けてさらなる収益改善を達成するためには、粗利下位現場の工数投入スピードの是正が最優先課題となります。具体的には、ラインごとの時間当たり生産性チェックを日次で徹底し、物量の進捗スピードに応じた柔軟な調整を全社ルーチン化してください。`;
+      let metricsText = ""; let manhoursText = ""; let performanceText = "";
 
+      if (isPastMonth) {
+        metricsText = `【${areaName}確定期総評】最終的なエリア総売上実績は予算比${achievementRate}%を達成しました。${growthText}また、27期通期予算に対する累計進捗率は${annualProgressRate}%に到達。目標達成に最も貢献したのは「${goodSite}」であり、エリア全体の収益の柱として機能しています。この高効率なオペレーションを分析し、他現場への標準モデルとしてマニュアル化を進めるべきです。`;
+        manhoursText = `【工数内訳】当月は「${badSite}」において、物量変動に対する人員配置のミスマッチが解消しきれず、最終日まで数値を圧迫しました。投入総工数に対し売上生産性が追いついていない要因を特定するため、時間帯別の稼働効率を至急洗い出してください。具体的な是正策を講じ、次月への課題として振り返りを徹底する必要があります。`;
+        performanceText = `【パフォーマンス】エリア平均粗利益率は${avgProfitMargin.toFixed(1)}%で確定しました。一定の健全性は保っていますが、下位現場の工数コントロールの甘さが全体の利益率を相殺しています。高利益率を維持している上位現場の要員配置スキームや作業導線を体系化し、全現場へ横展開する仕組みを構築してください。ボトムアップだけで全社利益はさらに数％改善します。`;
+      } else {
+        metricsText = `【${areaName}当月着地予測】現在のペースを維持した場合、月末の売上実績は予算比約${achievementRate}%に到達する見込みです。${growthText}27期の通期予算に対する累計進捗率は${annualProgressRate}%で推移中。現時点では「${goodSite}」の生産性が非常に高く、目標達成に向けて全体を牽引する原動力となっています。この好調を維持しつつ、突発的な物量変動リスクへの体制構築を図ってください。`;
+        manhoursText = `【超過アラート】現在「${badSite}」の生産性が大幅に落ち込んでおり、放置すると当月の全体の着地利益を大きく圧迫するリスクがあります。残業の常態化やシフトのアンマッチがないか、至急現場マネージャーと連携して現状の工数コントロールを再点検してください。特に月末に向け、過剰な労務費が発生しないよう先行管理が必要です。`;
+        performanceText = `【パフォーマンス】現時点のエリア平均粗利益率は${avgProfitMargin.toFixed(1)}%で推移しています。生産性が予算を下回っている課題現場の要員投入ペースを早急に是正することが最優先事項です。労務費比率が急増しているラインに対してChappyを用いた詳細な工数分析を実行し、ボトルネックを排除することで、今月末までに全体の利益率を数％引き上げることが十分に期待できます。`;
+      }
       setChappyAnalysis({ summaryMetrics: metricsText, summaryManhours: manhoursText, summaryPerformance: performanceText });
     } catch (err) {
       setChappyAnalysis({ summaryMetrics: `【通信エラー】AIとの接続に失敗しました。`, summaryManhours: "APIの通信状況を確認してください。", summaryPerformance: "-" });
@@ -303,6 +310,33 @@ export default function CompareDashboardPage() {
   };
 
   const areaDisplayName = selectedArea === 'all' ? '全社' : selectedArea === 'kanto' ? '関東エリア' : selectedArea === 'kansai' ? '関西エリア' : selectedArea === 'chubu' ? '中部エリア' : 'クリンネス部門';
+
+  // 🚀 ライトモード版：ローディング画面（いただいたコードをそのまま適用）
+  if (loading || !isMounted) {
+    return (
+      <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-white px-6 py-3.5 rounded-2xl mb-8 shadow-sm border border-slate-200">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 text-center px-4">
+            PAL Productivity Dashboard
+          </h1>
+          <div className="w-64 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-6 shadow-inner relative">
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
+          </div>
+          <div className="flex items-center gap-3 text-slate-500">
+            <Loader2 className="animate-spin text-blue-500" size={18} />
+            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }
+        `}} />
+      </div>
+    );
+  }
   return (
     <div className="flex h-screen w-full bg-[#f4f6f8] text-slate-800 font-sans overflow-hidden notranslate" translate="no">
       
@@ -364,13 +398,10 @@ export default function CompareDashboardPage() {
 
           {selectedArea !== 'all' && (
             <AnimatePresence>
-              {/* 💡 【神修正：レイアウト比率 65:35】 */}
               <div className="flex flex-col lg:flex-row gap-4 w-full shrink-0 min-h-[340px]">
                 
-                {/* 現場別 通期予算達成率グリッド：幅を 65% に拡大 */}
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="w-full lg:w-[65%] bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col overflow-hidden h-[340px] lg:h-auto">
                   <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2 mb-3 shrink-0"><Target size={14} className="text-emerald-600" />現場別 通期目標達成状況</h3>
-                  {/* 💡 【神修正：横スクロール対応】flex-nowrapを明示し、はみ出た場合のみ横スクロールを許可。pb-2でスクロールバー被り防止 */}
                   <div className="flex-1 flex flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-2 items-center">
                     {siteProgressData.map((site, index) => (
                       <motion.div key={site.name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.04 }}>
@@ -380,7 +411,6 @@ export default function CompareDashboardPage() {
                   </div>
                 </motion.div>
 
-                {/* 27期 通期累計売上 進捗トレンドグラフ：幅を 35% に縮小し左寄せ */}
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="w-full lg:w-[35%] bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[300px] lg:h-auto">
                   <div className="flex justify-between items-center mb-2 shrink-0">
                     <div>
@@ -396,13 +426,9 @@ export default function CompareDashboardPage() {
                       <ComposedChart data={cumulativeTrendData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                        {/* 💡 型エラー対策：v を any 化 */}
                         <YAxis tickFormatter={(v: any) => `${Math.round(Number(v)/10000).toLocaleString()}万`} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                        {/* 💡 型エラー対策：val を any 化 */}
                         <RechartsTooltip contentStyle={modernTooltipStyle} formatter={(val: any) => `¥${Number(val).toLocaleString()}`} />
                         <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }} />
-                        
-                        {/* 💡 進捗を示す青い棒グラフ（Bar） */}
                         <Bar dataKey="累計実績売上" name="累計実績売上" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
                         <Line type="step" dataKey="27期 通期予算" name="通期予算ゴール" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 5" dot={false} activeDot={false} />
                         <Line type="monotone" dataKey="予算ペース (毎月累計)" stroke="#94a3b8" strokeWidth={1.2} strokeDasharray="4 4" dot={false} activeDot={false} />
@@ -418,7 +444,7 @@ export default function CompareDashboardPage() {
           <div className="flex flex-col xl:flex-row gap-4 min-h-[320px] xl:h-[320px] shrink-0 w-full">
             <div className="w-full xl:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] xl:h-full">
               <div className="flex items-center justify-between mb-2 shrink-0">
-                <h3 className="text-sm font-bold text-slate-900">選択エリア別 {rankingMode === 'sales' ? '売上' : '売上生産性'}ランキング</h3>
+                <h3 className="text-sm font-bold text-slate-900">現場別 {rankingMode === 'sales' ? '売上' : '売上生産性'}ランキング</h3>
                 <div className="flex bg-slate-100 p-0.5 rounded-md text-xs">
                   <button onClick={() => setRankingMode('sales')} className={`px-2.5 py-1 rounded font-bold ${rankingMode === 'sales' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>売上</button>
                   <button onClick={() => setRankingMode('productivity')} className={`px-2.5 py-1 rounded font-bold ${rankingMode === 'productivity' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>生産性</button>
@@ -431,8 +457,6 @@ export default function CompareDashboardPage() {
                     <XAxis type="number" hide domain={[0, maxBarValue]} xAxisId={0} />
                     <XAxis type="number" hide domain={[0, maxBarValue]} xAxisId={1} />
                     <YAxis dataKey="name" type="category" width={110} interval={0} tickFormatter={(v: any) => String(v).length > 8 ? `${String(v).slice(0, 8)}…` : v} tick={{ fontSize: 11, fill: '#374151', textAnchor: 'end', dy: 4 }} axisLine={false} tickLine={false} />
-                    
-                    {/* 💡 ツールチップの完全日本語化＆型エラー対策 */}
                     <RechartsTooltip 
                       cursor={{ fill: 'rgba(241, 245, 249, 0.5)' }} 
                       content={({ active, payload }) => {
@@ -470,7 +494,6 @@ export default function CompareDashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <ScatterChart margin={{ top: 20, right: 20, bottom: 25, left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" opacity={0.6} />
-                    {/* 💡 型エラー対策：v を any 化 */}
                     <XAxis type="number" dataKey="x" tickFormatter={(v: any) => `${(Number(v)/10000).toFixed(0)}万`} stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} label={{ value: '売上実績', position: 'bottom', fontSize: 11, offset: 5 }} />
                     <YAxis type="number" dataKey="y" tickFormatter={(v: any) => `${Number(v)}%`} stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} label={{ value: '利益率', angle: -90, position: 'insideLeft', fontSize: 11 }} />
                     <ZAxis type="number" dataKey="z" range={[200, 3500]} />
@@ -497,9 +520,8 @@ export default function CompareDashboardPage() {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-4 w-full shrink-0">
-            {/* 💡 スクロール廃止(h-auto) ＆ パディング(py-0.5)でギュッと圧縮 */}
             <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-auto">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">選択エリアの現場別 KPIヒートマップ</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">現場別 KPIヒートマップ</h3>
               <div className="flex-1 w-full overflow-x-auto">
                  <table className="w-full text-[11px] text-center border-collapse whitespace-nowrap">
                    <thead>
@@ -522,7 +544,6 @@ export default function CompareDashboardPage() {
                        
                        return (
                          <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                           {/* 💡 py-0.5 で縦を極限まで詰める */}
                            <td className="py-0.5 text-left font-bold text-slate-700 pl-2">{item["現場名"]}</td>
                            <td className="py-0.5 font-extrabold border-l border-white shadow-inner" style={sRatioStyle}>
                              {(sRatio * 100).toFixed(1)}%
@@ -541,7 +562,7 @@ export default function CompareDashboardPage() {
               </div>
             </div>
 
-            <div className="w-full lg:w-1/2 flex flex-col h-auto">
+            <div className="w-full lg:w-1/2 flex flex-col h-[350px] lg:h-auto">
               <div className="flex-1 bg-white border border-slate-200 p-5 md:p-6 rounded-xl relative overflow-hidden flex flex-col shadow-sm">
                 <div className="flex items-center gap-2 md:gap-3 mb-4 shrink-0">
                   <BrainCircuit size={20} className="text-blue-600" />
@@ -564,17 +585,16 @@ export default function CompareDashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    /* 💡 AI横3列固定（lg:grid-cols-3）配置＆ボリューム増量テキスト */
-                    <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-xl shadow-sm flex flex-col justify-start">
+                    <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-start">
                         <h4 className="flex items-center gap-1.5 text-xs md:text-sm font-black text-emerald-700 mb-2 shrink-0"><BarChart3 size={14}/> 1. 主要指標評価</h4>
                         <p className="text-slate-700 text-[10px] md:text-[11px] leading-relaxed font-medium whitespace-pre-wrap">{chappyAnalysis.summaryMetrics}</p>
                       </div>
-                      <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-xl shadow-sm flex flex-col justify-start">
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-start">
                         <h4 className="flex items-center gap-1.5 text-xs md:text-sm font-black text-amber-700 mb-2 shrink-0"><PieChartIcon size={14}/> 2. 工数内訳分析</h4>
                         <p className="text-slate-700 text-[10px] md:text-[11px] leading-relaxed font-medium whitespace-pre-wrap">{chappyAnalysis.summaryManhours}</p>
                       </div>
-                      <div className="bg-purple-50/50 border border-purple-100 p-4 rounded-xl shadow-sm flex flex-col justify-start">
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-start">
                         <h4 className="flex items-center gap-1.5 text-xs md:text-sm font-black text-purple-700 mb-2 shrink-0"><ActivitySquare size={14}/> 3. 次月是正策</h4>
                         <p className="text-slate-700 text-[10px] md:text-[11px] leading-relaxed font-medium whitespace-pre-wrap">{chappyAnalysis.summaryPerformance}</p>
                       </div>
