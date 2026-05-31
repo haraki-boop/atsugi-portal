@@ -179,7 +179,7 @@ export default function MapPortalPage() {
           </div>
         </div>
         <div className="p-3 bg-slate-50 border-t border-slate-100 text-[9px] md:text-[10px] text-slate-400 font-bold text-center">
-          REIZO COLDCHAIN SYSTEM
+          PRODUCTIVITY SYSTEM
         </div>
       </div>
 
