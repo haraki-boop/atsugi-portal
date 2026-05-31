@@ -633,21 +633,30 @@ export default function OieHannanDashboardPage() {
   };
 // ========== 前半ロジック部分ここまで ==========
 // ========== ここから後半（JSX描画部分） ==========
+  // 🚀 ライトモード版：ローディング画面
   if (!data || !isMounted) {
     return (
-      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+      <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        {/* 背景のぼんやり光るエフェクト（薄いブルーに変更） */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse" />
+        
         <div className="relative z-10 flex flex-col items-center">
-          <div className="bg-white/95 px-6 py-3.5 rounded-2xl mb-8 shadow-[0_0_40px_rgba(59,130,246,0.3)] backdrop-blur-sm border border-white/20">
+          {/* ロゴの箱（白い立体的な枠に変更） */}
+          <div className="bg-white px-6 py-3.5 rounded-2xl mb-8 shadow-sm border border-slate-200">
             <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 text-center px-4">
+          
+          {/* タイトル文字（白背景用に少し濃いめのグラデーションに変更） */}
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.3em] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 text-center px-4">
             PAL Productivity Dashboard
           </h1>
-          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative">
+          
+          {/* ローディングバー（土台をライトグレーに変更） */}
+          <div className="w-64 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-6 shadow-inner relative">
             <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2 animate-[ping_2s_ease-in-out_infinite]" style={{ animationName: 'loading-slide', animationDuration: '2s', animationIterationCount: 'infinite' }} />
           </div>
-          <div className="flex items-center gap-3 text-slate-400">
+          
+          <div className="flex items-center gap-3 text-slate-500">
             <Loader2 className="animate-spin text-blue-500" size={18} />
             <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
           </div>
