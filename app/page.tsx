@@ -21,7 +21,7 @@ export default function MapPortalPage() {
     { id: 'yamanaka-shionagi', name: 'ヤマナカ しおなぎ生鮮センター', address: '愛知県名古屋市港区潮凪町1-3', lat: 35.0797, lng: 136.8618, type: 'center', desc: '' },
     { id: 'mitsui-chubu', name: '三井食品 中部物流センター（高根山）', address: '愛知県名古屋市緑区高根山2丁目108', lat: 35.0461, lng: 136.9485, type: 'center', desc: '' },
     
-    // 💡 新規追加：三井とカインズの間に挿入（青ピン）
+    // 💡 三井とカインズの間に挿入（青ピン）
     { id: 'oie-hannan', name: '尾家産業 阪南支店', address: '大阪府貝塚市二色中町5-1', lat: 34.454641, lng: 135.344908, type: 'center', desc: '' },
     { id: 'medi-entrance', name: 'メディエントランス', address: '大阪府箕面市森町西2丁目4-1', lat: 34.885, lng: 135.443, type: 'center', desc: '' },
 
@@ -31,7 +31,10 @@ export default function MapPortalPage() {
     // 🌸 ピンク指定の3現場
     { id: 'afs-bisai-seiso', name: 'AFS尾西_清掃', address: '愛知県一宮市明地南茱之木25-1', lat: 35.286934, lng: 136.739061, type: 'center', desc: '', isPink: true },
     { id: 'himeji-afs-seiso', name: '兵庫姫路_AFS_清掃', address: '兵庫県姫路市白浜町甲841-51', lat: 34.778469, lng: 134.703810, type: 'center', desc: '', isPink: true },
-    { id: 'mandai-saito', name: '万代彩都', address: '大阪府茨木市彩都あかね3-1', lat: 34.861370, lng: 135.534495, type: 'center', desc: '万代 彩都物流センター', isPink: true }
+    { id: 'mandai-saito', name: '万代彩都', address: '大阪府茨木市彩都あかね3-1', lat: 34.861370, lng: 135.534495, type: 'center', desc: '万代 彩都物流センター', isPink: true },
+
+    // 🍏 ライトグリーン指定（AFS南関東と同じ座標に重ねる）
+    { id: 'dts-division', name: 'DTS事業部', address: '千葉県船橋市高瀬町24番12号', lat: 35.6717, lng: 139.9924, type: 'center', desc: '', isLightGreen: true }
   ];
 
   useEffect(() => {
@@ -72,18 +75,33 @@ export default function MapPortalPage() {
           className: 'pink-map-pin' 
         });
 
+        // 🍏 ライトグリーン用アイコン
+        const lightGreenIcon = new L.Icon({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+          className: 'light-green-map-pin' 
+        });
+
         locations.forEach(loc => {
-          const markerOptions = loc.isPink ? { icon: pinkIcon } : {};
+          let markerOptions = {};
+          if (loc.isPink) {
+            markerOptions = { icon: pinkIcon };
+          } else if (loc.isLightGreen) {
+            markerOptions = { icon: lightGreenIcon };
+          }
+
           const marker = L.marker([loc.lat, loc.lng], markerOptions).addTo(leafMap);
           
-          // 作成したピンをRefに保存
           markersRef.current[loc.id] = marker;
           
           marker.on('click', () => {
             setSelectedLocation(loc);
             leafMap.panTo([loc.lat, loc.lng]);
             
-            // 🚀 クリックされたピンを最前面（一番上）に持ってくる
             Object.values(markersRef.current).forEach((m: any) => m.setZIndexOffset(0));
             marker.setZIndexOffset(1000);
           });
@@ -100,7 +118,6 @@ export default function MapPortalPage() {
     if (map && window.L) {
       map.setView([loc.lat, loc.lng], 11, { animate: true, duration: 1 });
       
-      // 🚀 サイドバーから選んだ時も、該当のピンを最前面に持ってくる
       if (markersRef.current) {
         Object.values(markersRef.current).forEach((m: any) => m.setZIndexOffset(0));
         if (markersRef.current[loc.id]) {
@@ -117,6 +134,9 @@ export default function MapPortalPage() {
         .pink-map-pin {
           filter: hue-rotate(140deg) saturate(200%) brightness(110%);
         }
+        .light-green-map-pin {
+          filter: hue-rotate(-120deg) saturate(200%) brightness(120%);
+        }
       `}} />
 
       {/* サイドバーエリア */}
@@ -130,12 +150,11 @@ export default function MapPortalPage() {
                 alt="株式会社PAL Logo" 
                 className="h-5 md:h-7 w-auto object-contain inline-block mr-1.5 align-middle"
               />
-              <span className="align-middle">拠点統スタロジスティクスマップ</span>
+              <span className="align-middle">拠点統括ロジスティクスマップ</span>
             </p>
           </div>
 
           <div className="space-y-2">
-            {/* 💡 視認性アップ：サイズを14→18に拡大、初期色を少し濃いめの slate-400 に変更！ */}
             <div className="flex items-center justify-between px-1">
               <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">拠点一覧 ({locations.length})</p>
               <Link 
@@ -165,9 +184,15 @@ export default function MapPortalPage() {
                       </h3>
                     </div>
                     <p className={`text-[10px] md:text-[11px] font-medium flex items-center gap-1.5 ${selectedLocation?.id === loc.id ? 'text-slate-300' : 'text-slate-500'}`}>
+                      {/* 💡 直接カラーコードを指定して確実に色を変える */}
                       <MapPin 
                         size={13} 
-                        className={selectedLocation?.id === loc.id ? "text-white" : (loc.isPink ? "text-pink-500" : "text-blue-500")} 
+                        className="shrink-0 transition-colors"
+                        style={{ 
+                          color: selectedLocation?.id === loc.id 
+                            ? '#ffffff' 
+                            : (loc.isPink ? '#ec4899' : (loc.isLightGreen ? '#84cc16' : '#3b82f6')) 
+                        }} 
                       /> 
                       {loc.address}
                     </p>
@@ -211,7 +236,14 @@ export default function MapPortalPage() {
                 </div>
               )}
               <div className="text-[10px] md:text-[11px] text-slate-500 font-medium flex items-start gap-1">
-                <MapPin size={12} className={`mt-0.5 shrink-0 ${selectedLocation.isPink ? 'text-pink-500' : 'text-blue-500'}`} /> 
+                {/* 💡 ここも直接カラーコードを指定 */}
+                <MapPin 
+                  size={12} 
+                  className="mt-0.5 shrink-0" 
+                  style={{ 
+                    color: selectedLocation.isPink ? '#ec4899' : (selectedLocation.isLightGreen ? '#84cc16' : '#3b82f6') 
+                  }} 
+                /> 
                 <span>{selectedLocation.address}</span>
               </div>
             </div>
