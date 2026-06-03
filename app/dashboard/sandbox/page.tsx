@@ -74,7 +74,6 @@ export default function ShowaReizoDashboardPage() {
 
   const [toastInfo, setToastInfo] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({show: false, msg: '', type: 'success'});
 
-  // 🌟 修正：「原価」もコストとして赤緑判定させるために追加
   const lowIsBetterMetrics = ["労務費", "タイミー", "外注費", "社会保険", "雇用保険", "有給", "交通費", "工数", "事故", "償却", "残業", "深夜", "超過", "違反者", "総工数", "減価償却費", "原価"];
   const totalMetricsKeywords = ["売上", "原価", "費", "工数", "物量", "タイミー", "有給", "交通費", "事故", "数", "ケース", "パレット", "卸量", "トン", "総工数", "人員", "金額"];
 
@@ -458,7 +457,6 @@ export default function ShowaReizoDashboardPage() {
   };
 
   const getAiCorporateEvaluation = (title: string, actual: number, forecast: number, mode: string, isTotal: boolean, currentRatio: number, rawForecastArray: any[]) => {
-    // 🌟 修正：「工数タブ」なら無条件でコスト判定（赤・緑）に含める
     const isLowBetter = lowIsBetterMetrics.some(keyword => title.includes(keyword)) || activeTab === 'manhours';
     const ratio = currentRatio;
     const totalMonthForecast = currentMonthIndices.reduce((sum, idx) => sum + n(rawForecastArray[idx]), 0);
@@ -509,7 +507,6 @@ export default function ShowaReizoDashboardPage() {
     });
 
     const evaluated = Array.from(combinedMap.values()).map(m => {
-      // 🌟 AI分析内のコスト判定にも、すべての「工数データ」が赤緑判定に含まれるよう安全策として組み込み
       const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || (data.logisticsData && data.logisticsData.some((ld: any) => ld.title.replace('＿', '_').includes(m.title)));
       const isAvgMetric = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || m.title.includes("単価") || m.title.includes("時給");
       let finalAct = 0; let finalFct = 0;
@@ -626,7 +623,7 @@ export default function ShowaReizoDashboardPage() {
       setNewItem({ startDate: item.date ? item.date.replace(/\//g, '-') : '', client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●' });
     } else {
       const targetList = activeTab === 'dx' ? dxItems : envItems; const item = targetList[index];
-      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customerRelated: item.customer_related === 'あり', ratio: item.ratio || 0 });
+      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customer_related: item.customer_related === 'あり', ratio: item.ratio || 0 });
     }
     setIsModalOpen(true);
   };
@@ -783,16 +780,16 @@ export default function ShowaReizoDashboardPage() {
             className={`grid gap-4 md:gap-6 print:grid-cols-2 print:gap-8 ${displayMode !== 'daily' ? 'grid-cols-1 lg:grid-cols-2' : ''}`}
             style={displayMode === 'daily' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))' } : {}}
           >
+            {finalSortedMetrics.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">データがありません。GAS側でデータを転写してください。</div>}
             
             {finalSortedMetrics.map((m, i) => {
               const isAvgMetric = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || m.title.includes("単価") || m.title.includes("時給");
-              // 🌟 修正：「工数詳細」タブ全体と、「原価」という文字が含まれる項目を無条件でコスト（良し悪し反転）判定に設定
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || activeTab === 'manhours' || m.title.includes('原価');
               const isStacked = m.isStacked;
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               
               let chartData = []; 
-              let dispAct = m._sortVal; // 🌟 前半で計算したソート用の実績値をそのまま利用
+              let dispAct = m._sortVal; 
               let dispFct = 0; let dispLastAct = 0; let dispPrevYearAct = 0;
               let currentRatio = 0; let diffLastMonth = 0; let diffLastYear = 0;
               let lastMonthRatio = 0; let lastYearRatio = 0; let hasForecastData = false;
@@ -804,7 +801,7 @@ export default function ShowaReizoDashboardPage() {
                     const dayStr = baseLabelsFiltered[idx].includes('/') ? baseLabelsFiltered[idx].split('/').pop() : baseLabelsFiltered[idx].replace(/[^0-9]/g, '') || '1';
                     const dayNum = parseInt(dayStr, 10);
                     const todayMonth = new Date().getMonth() + 1; const selMonth = parseInt(dataMonth, 10);
-                    if (selMonth !== todayMonth) return true; // 過去月なら無条件で全日取得
+                    if (selMonth !== todayMonth) return true; 
                     return dayNum <= new Date().getDate();
                  }) : currentMonthIndices);
 
@@ -827,7 +824,6 @@ export default function ShowaReizoDashboardPage() {
                 lastYearRatio = dispPrevYearAct > 0 ? (dispAct / dispPrevYearAct) * 100 : (dispAct > 0 ? 100 : 0);
               } 
               else {
-                // 🌟 修正：ツールチップ用のキー名を短縮し改行防止
                 chartData = (displayMode === 'daily' || displayMode === 'monthly' ? currentMonthIndices : weekIdx).map(idx => ({ 
                    name: m.labels[idx], 
                    "今月実績": n(m.actual_thisMonth[idx]), 
@@ -840,7 +836,6 @@ export default function ShowaReizoDashboardPage() {
                 const lastActs = targetIndices.map(idx => n(m.actual_lastMonth[idx]));
                 const prevYearActs = targetIndices.map(idx => n(m.actual_lastYear[idx]));
 
-                // 🌟 修正：平均か合計かを完全自動判定。生産性・％以外はすべて合計（足し算）
                 if (isAvgMetric) { 
                   dispFct = calcAvg(fcts) || 1; dispLastAct = calcAvg(lastActs); dispPrevYearAct = calcAvg(prevYearActs);
                 } else { 
@@ -854,14 +849,12 @@ export default function ShowaReizoDashboardPage() {
                 lastYearRatio = dispPrevYearAct > 0 ? (dispAct / dispPrevYearAct) * 100 : (dispAct > 0 ? 100 : 0);
               }
 
-              // デイリーモード上部のバッジ色判定ロジック
               const getDiffBgBorderColor = (diff: number, isCost: boolean) => {
                 if (diff === 0) return 'text-slate-500 bg-slate-50 border-slate-200';
                 if (isCost) return diff > 0 ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-emerald-600 bg-emerald-50 border-emerald-200';
                 return diff > 0 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
               };
 
-              // 🌟 修正：ダークカード用のバッジ色判定ロジック（直感的な赤・緑判定）
               const getDarkBadgeStyle = (diff: number, isCost: boolean) => {
                 if (diff === 0) return 'bg-slate-800 text-slate-400 border-slate-700';
                 if (isCost) return diff > 0 ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -878,7 +871,6 @@ export default function ShowaReizoDashboardPage() {
                 <div key={i} className="print-avoid-break bg-white border border-slate-200 p-5 md:p-6 rounded-3xl shadow-sm flex flex-col gap-4 md:gap-5 min-w-0 overflow-hidden print:shadow-none print:border-slate-300">
                   <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 border-b border-slate-100 pb-4 print:border-slate-200">
                     <div className="flex-1 flex flex-col items-start min-w-0 w-full">
-                      {/* 🌟 修正：バッジと項目名を横並びにし、美しい余白（gap-3）を設ける */}
                       <div className="flex items-center gap-3 mb-1.5 w-full">
                         <span className="text-[10px] md:text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shadow-sm whitespace-nowrap shrink-0">
                           {dataMonth}月
@@ -887,7 +879,8 @@ export default function ShowaReizoDashboardPage() {
                           {m.title}
                         </h4>
                       </div>
-                      {displayMode === 'daily' && <p className="text-3xl lg:text-4xl xl:text-5xl font-black text-slate-800 tracking-tighter leading-none mt-1.5">{formatVal(dispAct, m.title)}</p>}
+                      {/* 🌟 修正：本番の3列環境でもバッジ集団と衝突しないよう、絶妙なサイズ（text-2xl sm:text-3xl）にサイズダウン！ */}
+                      {displayMode === 'daily' && <p className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-none mt-1.5">{formatVal(dispAct, m.title)}</p>}
                     </div>
                     
                     {displayMode === 'daily' && (
@@ -906,7 +899,6 @@ export default function ShowaReizoDashboardPage() {
                           )}
                         </div>
                         <div className="flex gap-2">
-                          {/* 🌟 修正：すべてのバッジに whitespace-nowrap と justify-between を付与し、絶対に縦に折り返させない */}
                           <span className={`flex-1 xl:flex-none text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center justify-between gap-3 border ${getDiffBgBorderColor(diffLastMonth, isCost)}`}>
                             <span className="whitespace-nowrap">先月比</span> <span className="whitespace-nowrap font-black">{diffLastMonth > 0 ? '+' : diffLastMonth < 0 ? '-' : '±'}{hasForecastData && !isStacked ? formatVal(Math.abs(diffLastMonth), m.title) : `${lastMonthRatio.toFixed(1)}%`}</span>
                           </span>
@@ -974,7 +966,6 @@ export default function ShowaReizoDashboardPage() {
                                 </span>
                                 <span className="text-sm md:text-base font-bold text-slate-300">{formatVal(dispFct, m.title)}</span>
                               </div>
-                              {/* 🌟 復活させた「達成率（％）」 */}
                               <div className="flex justify-between items-baseline mt-2.5 border-t border-slate-700/50 pt-2.5">
                                 <span className="text-[10px] md:text-xs font-black text-blue-400 whitespace-nowrap">達成率</span>
                                 <span className={`text-xl md:text-2xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
@@ -983,7 +974,6 @@ export default function ShowaReizoDashboardPage() {
                           )}
                         </div>
                         
-                        {/* 🌟 視認性抜群のカラーバッジに進化した「先月比」「前年比」 */}
                         <div className="border-t border-slate-800 pt-3 mt-3 flex flex-col gap-2">
                           <div className="flex justify-between items-center">
                             <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">先月比</span>
@@ -1485,7 +1475,7 @@ export default function ShowaReizoDashboardPage() {
               <div className="space-y-3 md:space-y-4 text-[11px] md:text-xs font-bold text-slate-700">
                 <div className="space-y-1"><label className="text-slate-400">1. 日付 *必須</label><input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">2. 誰に *必須</label><input type="text" value={newItem.client} onChange={(e) => setNewItem({...newItem, client: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
-                <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+                <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-16 resize-none font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">4. 内容詳細</label><textarea value={newItem.detail} onChange={(e) => setNewItem({...newItem, detail: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-20 md:h-24 resize-none font-semibold text-slate-900" /></div>
                 <div className="space-y-1">
                   <label className="text-slate-400">5. 商談結果</label>
@@ -1504,8 +1494,8 @@ export default function ShowaReizoDashboardPage() {
                   <input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" />
                   <input type="date" value={newItem.endDate} onChange={(e) => setNewItem({...newItem, endDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" />
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 p-2.5 md:p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customerRelated: !newItem.customerRelated})}>
-                  <input type="checkbox" checked={newItem.customerRelated} onChange={() => {}} className="accent-slate-900 w-4 h-4" />
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 md:p-3 rounded-xl border border-slate-100 cursor-pointer" onClick={() => setNewItem({...newItem, customer_related: !newItem.customer_related})}>
+                  <input type="checkbox" checked={newItem.customer_related} onChange={() => {}} className="accent-slate-900 w-4 h-4" />
                   <span className="text-[11px] md:text-xs text-slate-900 font-black">この施策は「顧客関連」に影響あり</span>
                 </div>
                 <div className="space-y-1 bg-slate-50 p-2.5 md:p-3 rounded-xl border">
