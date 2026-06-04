@@ -46,7 +46,7 @@ export default function ShowaReizoDashboardPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
 
-  // 🌟 タブ構成の管理
+  // タブ構成の管理（全9タブ）
   const [activeTab, setActiveTab] = useState('sales');
   const [activeActionTab, setActiveActionTab] = useState<'dx' | 'env' | 'history'>('dx');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
@@ -60,7 +60,7 @@ export default function ShowaReizoDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showHiddenItems, setShowHiddenItems] = useState(false);
 
-  // 🌟 AI診断用ステート
+  // AI診断用ステート
   const [tabAiAnalysis, setTabAiAnalysis] = useState<{ [key: string]: string }>({});
   const [isTabAnalyzing, setIsTabAnalyzing] = useState<{ [key: string]: boolean }>({});
 
@@ -169,7 +169,7 @@ export default function ShowaReizoDashboardPage() {
     setSearchQuery('');
   };
 
-  // 🌟 ナビゲーションタブの定義（総合AI分析タブを消去、全9タブへ）
+  // ナビゲーションタブの定義（全9タブ体制）
   const tabs = [
     { id: 'sales', label: '1. 売上進捗', icon: Calculator, color: '#2563eb', dataKey: 'salesData' },
     { id: 'manhours', label: '2. 工数詳細', icon: Clock, color: '#059669', dataKey: 'logisticsData' },
@@ -423,11 +423,35 @@ export default function ShowaReizoDashboardPage() {
     return result;
   })();
 
+  // 🌟 新設：事故管理の「先月比VS」の統合集計ロジック
+  const accidentSummary = useMemo(() => {
+    if (!data || !data.accidentData) return { thisTotal: 0, lastTotal: 0, diff: 0, ratio: 0 };
+    const rawRecords = data.accidentData || [];
+    let thisTotal = 0; let lastTotal = 0;
+    
+    const curMonth = parseInt(globalSelectedMonth, 10);
+    const lastMonth = curMonth === 1 ? 12 : curMonth - 1;
+    
+    rawRecords.forEach((row: any) => {
+      if (row.date) {
+        const parts = row.date.split('/');
+        if (parts.length >= 2) {
+          const m = parseInt(parts[1], 10);
+          if (m === curMonth) thisTotal += n(row.total);
+          if (m === lastMonth) lastTotal += n(row.total);
+        }
+      }
+    });
+    const diff = thisTotal - lastTotal;
+    const ratio = lastTotal > 0 ? (thisTotal / lastTotal) * 100 : (thisTotal === 0 ? 0 : 100);
+    return { thisTotal, lastTotal, diff, ratio };
+  }, [data, globalSelectedMonth]);
+
   const filteredDxItems = dxItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.effect.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredEnvItems = envItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.effect.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredHistoryItems = historyItems.filter(item => item.client?.toLowerCase().includes(searchQuery.toLowerCase()) || item.proposal?.toLowerCase().includes(searchQuery.toLowerCase()) || item.detail?.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // 🌟 AI診断ロジック（タブ7と9のみ。タブ7は「要約」フラグを送信）
+  // AI診断ロジック（タブ7と9のみに限定。タブ7は「要約」フラグを送信）
   const handleStartTabAnalysis = async (tabId: string) => {
     setIsTabAnalyzing(prev => ({ ...prev, [tabId]: true }));
     try {
@@ -435,7 +459,7 @@ export default function ShowaReizoDashboardPage() {
       let analysisType = 'evaluation';
       
       if (tabId === 'actions') {
-        analysisType = 'summary'; // 💡 ここで「評価」ではなく「要約」を要求
+        analysisType = 'summary';
         payloadItems = [
           { category: 'DX推進', items: filteredDxItems },
           { category: '現場改善', items: filteredEnvItems },
@@ -511,7 +535,7 @@ export default function ShowaReizoDashboardPage() {
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
 
-  // 🌟 極上のサイバーローディング画面（テキスト透明化バグ修正版）
+  // 🌟 安全かつ極上のサイバーローディング画面（文字消えバグ対策版）
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -520,12 +544,9 @@ export default function ShowaReizoDashboardPage() {
           <div className="bg-white px-6 py-3.5 rounded-2xl mb-8 shadow-sm border border-slate-200">
             <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
           </div>
-          
-          {/* 🌟 ここを安全なスタイルに修正！ PALを青、それ以外を濃いグレーに */}
           <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.2em] mb-8 text-slate-800 text-center px-4 drop-shadow-sm">
             <span className="text-blue-600">PAL</span> Productivity Dashboard
           </h1>
-
           <div className="w-64 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-6 shadow-inner relative">
             <div 
               className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2" 
@@ -591,12 +612,8 @@ export default function ShowaReizoDashboardPage() {
           <div className="flex flex-wrap gap-2">
             {tabs.map((t) => <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-3 md:px-4 py-2.5 rounded-xl transition-all font-black text-[10px] md:text-xs flex-grow md:flex-grow-0 text-center ${activeTab === t.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>)}
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
-            {activeTab === 'actions' && (
-              <button onClick={() => setShowHiddenItems(!showHiddenItems)} className={`w-full sm:w-auto whitespace-nowrap shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black border transition-all ${showHiddenItems ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-inner' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                {showHiddenItems ? <EyeOff size={14} /> : <Eye size={14} />} <span>{showHiddenItems ? '非表示項目を隠す' : '非表示項目を表示'}</span>
-              </button>
-            )}
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto justify-end">
+            {/* 🌟 変更点：ここにあったアクション用の非表示ボタンを撤去し、検索窓のみにしてスッキリ化 */}
             <div className="relative w-full sm:w-72 shrink-0">
               <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="項目を絞り込み検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
@@ -773,7 +790,7 @@ export default function ShowaReizoDashboardPage() {
                     )}
                   </div>
 
-                  {/* 🌟 修正ポイント：w-full と min-w-0 を追加し、潰れを防止 */}
+                  {/* 🌟 修正ガード：w-full と min-w-0、min-h-[220px] でノートPC等でのグラフ潰れを永久遮断 */}
                   <div className={displayMode !== 'daily' ? 'flex flex-col xl:flex-row gap-4 items-stretch w-full min-w-0' : 'w-full min-w-0'}>
                     <div className="flex-1 w-full h-[220px] min-h-[220px] bg-slate-50/50 p-2 rounded-2xl border min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
@@ -807,7 +824,6 @@ export default function ShowaReizoDashboardPage() {
                         )}
                       </ResponsiveContainer>
                     </div>
-                    {/* 🌟 修正ポイント：w-full と min-w-0 を追加 */}
                     {displayMode !== 'daily' && (
                       <div className="w-full xl:w-[240px] bg-slate-900 text-white p-5 rounded-2xl flex flex-col justify-between shrink-0 shadow-inner min-w-0">
                         <div>
@@ -922,6 +938,25 @@ export default function ShowaReizoDashboardPage() {
         ========================================= */}
         {activeTab === 'actions' && (
           <div className="space-y-6">
+            {/* 🌟 変更点：請負予実とお作法を統一した大見出しタイトルラインを新設 */}
+            <div className="border-b border-slate-200 pb-3 md:pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3">
+                  <Rocket className="text-purple-500" size={24} /> 7. アクション施策管理
+                </h2>
+                <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Operation & DX Action Roadmap</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* 🌟 変更点：最上部からここに引っ越し！請負予実と完全同等のスタイリッシュなトグルボタン */}
+                <button
+                  onClick={() => setShowHiddenItems(!showHiddenItems)}
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${showHiddenItems ? 'bg-purple-600 text-white border-purple-700 shadow-inner' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}
+                >
+                  {showHiddenItems ? '非表示項目を隠す(ON)' : '非表示項目を表示'}
+                </button>
+              </div>
+            </div>
+
             <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shadow-sm max-w-md print:hidden">
               <button onClick={() => { setActiveActionTab('dx'); setSearchQuery(''); }} className={`flex-1 px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${activeActionTab === 'dx' ? 'bg-white text-purple-600 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}><Rocket size={14} /> DX推進</button>
               <button onClick={() => { setActiveActionTab('env'); setSearchQuery(''); }} className={`flex-1 px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${activeActionTab === 'env' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}><Leaf size={14} /> 現場改善</button>
@@ -1033,6 +1068,29 @@ export default function ShowaReizoDashboardPage() {
                 <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3"><AccidentIcon className="text-amber-500" size={24} /> 8. カテゴリ別 事故件数 ({globalSelectedMonth}月度)</h2>
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
               </div>
+
+              {/* 🌟 変更点：赤枠空きスペースへ「先月比VSサマリー」を動的新設！100%超でレッド警告＆パルス明滅 */}
+              <div className="flex flex-wrap items-center gap-3.5 flex-1 justify-start lg:justify-center px-2 md:px-6 print:hidden">
+                <div className={`flex items-center gap-5 px-5 py-2.5 rounded-2xl border shadow-sm transition-all ${accidentSummary.ratio >= 100 ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse font-black' : 'bg-emerald-50/60 border-emerald-100 text-emerald-800'}`}>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">センター全体の当月総事故</span>
+                    <div className="flex items-baseline gap-2 mt-0.5">
+                      <span className="text-base md:text-lg font-extrabold">{accidentSummary.thisTotal} 件</span>
+                      <span className="text-[10px] text-slate-500">
+                        (先月: {accidentSummary.lastTotal}件 / 前月差: {accidentSummary.diff >= 0 ? `+${accidentSummary.diff}` : accidentSummary.diff}件)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-8 w-[1px] bg-slate-200" />
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">事故発生率 (先月比)</span>
+                    <span className="text-xs md:text-base font-extrabold tracking-tight mt-0.5 flex items-center gap-1">
+                      {accidentSummary.ratio.toFixed(1)}% {accidentSummary.ratio >= 100 ? '🚨 [目標超過]' : '✅ [安全圏]'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl print:hidden shadow-sm">
                 <Calendar size={12} className="text-blue-500" />
                 <select value={globalSelectedMonth} onChange={(e) => setGlobalSelectedMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
