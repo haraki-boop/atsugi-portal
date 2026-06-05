@@ -365,8 +365,17 @@ export default function UniversalDashboardPage() {
     if (searchQuery) result = result.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (activeTab === 'labor') {
+      // 🌟 追加：合体グラフ用の設定もSupabaseから読み込む
+      const staffSetting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === 'スタッフ工数 (通常・残業・深夜)');
+
       const stackedGroups: any = {
-        'スタッフ工数': { title: 'スタッフ工数 (通常・残業・深夜)', isStacked: true, data: {} },
+        'スタッフ工数': { 
+          title: 'スタッフ工数 (通常・残業・深夜)', 
+          isStacked: true, 
+          data: {},
+          is_pinned: staffSetting ? staffSetting.is_pinned : false,
+          is_hidden: staffSetting ? staffSetting.is_hidden : false
+        },
       };
 
       const finalResult: any[] = [];
