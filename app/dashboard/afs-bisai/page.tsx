@@ -656,7 +656,7 @@ export default function UniversalDashboardPage() {
         </div>
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
           {/* 🌟 ヘッダータイトルも自動で「今開いている拠点名」に追従する仕様に連動させました */}
-          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS尾西流通</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">STRATEGIC MANAGEMENT LAYER</p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 md:gap-3 items-center w-full md:w-auto">
