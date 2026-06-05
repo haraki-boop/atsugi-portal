@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 
@@ -41,12 +41,12 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function ShowaReizoDashboardPage() {
-  const locationId = 'showa-reizo';
+export default function AfsMinamikantoDashboardPage() {
+  const locationId = 'afs-minamikanto';
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
 
-  // タブ構成の管理（全9タブ）
+  // タブ管理・表示モード管理
   const [activeTab, setActiveTab] = useState('sales');
   const [activeActionTab, setActiveActionTab] = useState<'dx' | 'env' | 'history'>('dx');
   const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
@@ -58,15 +58,21 @@ export default function ShowaReizoDashboardPage() {
 
   const [hideZeroContracts, setHideZeroContracts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showHiddenItems, setShowHiddenItems] = useState(false);
+  
+  // 非表示項目のトグリスイッチ
+  const [showHiddenItems, setShowHiddenItems] = useState(false);        
+  const [showHiddenMetrics, setShowHiddenMetrics] = useState(false);    
 
   // AI診断用ステート
   const [tabAiAnalysis, setTabAiAnalysis] = useState<{ [key: string]: string }>({});
   const [isTabAnalyzing, setIsTabAnalyzing] = useState<{ [key: string]: boolean }>({});
 
+  // Supabaseデータ格納用ステート
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [metricSettings, setMetricSettings] = useState<any[]>([]); 
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
@@ -97,39 +103,77 @@ export default function ShowaReizoDashboardPage() {
     await fetchDashboardData(true);
   };
 
+  // 🌟 修正・強化：400エラーの「本当の理由」をコンソールに吐き出す最強デバッグ仕様
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
       const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
       const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVraGNhbGF5YWF6d211ZmV3c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMDc5MTUsImV4cCI6MjA5NDY4MzkxNX0.I5A3_xeDUcBJvRogo_pYVa45_vJ_qL8Fur1qbuu3j4c`;
       const headers: any = { 'apikey': token, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+      
       if (method === 'GET') {
         const res = await fetch(`${url}?location_id=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
-        if (!res.ok) throw new Error(`GET ${res.status}`); return await res.json();
-      } else if (method === 'POST') {
+        if (!res.ok) {
+          const errDetail = await res.json().catch(() => ({}));
+          console.error(`❌ Supabase [GET ${table}] エラー詳細:`, errDetail);
+          throw new Error(`GET ${res.status}: ${errDetail.message || 'Unknown Error'}`);
+        }
+        return await res.json();
+      } 
+      else if (method === 'POST') {
         const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-        if (!res.ok) throw new Error(`POST ${res.status}`); return await res.json();
-      } else if (method === 'PATCH') {
+        if (!res.ok) {
+          const errDetail = await res.json().catch(() => ({}));
+          console.error(`❌ Supabase [POST ${table}] エラー詳細:`, errDetail);
+          throw new Error(`POST ${res.status}: ${errDetail.message || 'Unknown Error'}`);
+        }
+        return await res.json();
+      } 
+      else if (method === 'PATCH') {
         const targetId = String(body.id); const { id, ...cleanBody } = body;
         const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'PATCH', headers, body: JSON.stringify(cleanBody) });
-        if (!res.ok) throw new Error(`PATCH ${res.status}`); return await res.json();
-      } else if (method === 'DELETE') {
+        if (!res.ok) {
+          const errDetail = await res.json().catch(() => ({}));
+          console.error(`❌ Supabase [PATCH ${table}] エラー詳細:`, errDetail);
+          throw new Error(`PATCH ${res.status}: ${errDetail.message || 'Unknown Error'}`);
+        }
+        return await res.json();
+      } 
+      else if (method === 'DELETE') {
         const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
         if (!res.ok) throw new Error(`DELETE ${res.status}`); return true;
       }
-    } catch (e) { console.error("Supabase Operation Error:", e); }
+    } catch (e) { 
+      console.error("Supabase Operation Error:", e); 
+      throw e; 
+    }
     return null;
   };
 
+  // 🌟 修正・強化：新テーブルのGETで400エラーが起きても画面全体の起動を「絶対に巻き添えにしない」超防衛処理
   const fetchSupabaseData = async () => {
-    const [dxData, envData, historyData] = await Promise.all([
-      supabaseRequest('dx_actions', 'GET'), supabaseRequest('env_actions', 'GET'), supabaseRequest('sales_history', 'GET')
+    const safeFetch = async (table: string) => {
+      return supabaseRequest(table, 'GET').catch(err => {
+        console.warn(`⚠️ テーブル [${table}] のデータ取得に失敗したため空配列で防衛しました。`);
+        return [];
+      });
+    };
+
+    const [dxData, envData, historyData, settingsData] = await Promise.all([
+      safeFetch('dx_actions'), 
+      safeFetch('env_actions'), 
+      safeFetch('sales_history'),
+      safeFetch('dashboard_metric_settings') 
     ]);
-    if (dxData) setDxItems(dxData); if (envData) setEnvItems(envData); if (historyData) setHistoryItems(historyData);
+    
+    if (dxData) setDxItems(dxData); 
+    if (envData) setEnvItems(envData); 
+    if (historyData) setHistoryItems(historyData);
+    if (settingsData) setMetricSettings(settingsData);
   };
 
   const fetchDashboardData = async (isReload = false) => {
     fetchSupabaseData();
-    const gasUrl = "https://script.google.com/macros/s/AKfycbz2UbjitGKuhYU88BleEBOpt-jSRNJ9gltPT4TY2OXEf3ktlzqmEhZrPOh1cP11n7T2/exec";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbwF8PhNWrNS4bbRbAsvg-rZThmhq99ngwQdoI4Gbm1MH286vM2uiI3Kps6Mykc31_3a/exec";
 
     try {
       const res = await fetch(gasUrl);
@@ -169,7 +213,34 @@ export default function ShowaReizoDashboardPage() {
     setSearchQuery('');
   };
 
-  // ナビゲーションタブの定義（全9タブ体制）
+  // 🌟 修正・強化：Supabase側でデフォルト値(false)の登録に漏れがあってもNext側で100%カバーしてインサートする安全確実ロジック
+  const handleToggleMetricSetting = async (metricTitle: string, field: 'is_pinned' | 'is_hidden', currentVal: boolean) => {
+    try {
+      const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
+      
+      const payload: any = {
+        location_id: locationId,
+        tab_id: activeTab,
+        metric_title: metricTitle,
+        is_pinned: field === 'is_pinned' ? !currentVal : (existing ? existing.is_pinned : false),
+        is_hidden: field === 'is_hidden' ? !currentVal : (existing ? existing.is_hidden : false)
+      };
+
+      if (existing) {
+        payload.id = existing.id;
+        await supabaseRequest('dashboard_metric_settings', 'PATCH', payload);
+      } else {
+        await supabaseRequest('dashboard_metric_settings', 'POST', payload);
+      }
+
+      const updatedSettings = await supabaseRequest('dashboard_metric_settings', 'GET').catch(() => []);
+      if (updatedSettings) setMetricSettings(updatedSettings);
+      showToast('グラフの設定を保存しました', 'success');
+    } catch (e) {
+      showToast('設定の保存に失敗しました。F12コンソールを確認してください。', 'error');
+    }
+  };
+
   const tabs = [
     { id: 'sales', label: '1. 売上進捗', icon: Calculator, color: '#2563eb', dataKey: 'salesData' },
     { id: 'manhours', label: '2. 工数詳細', icon: Clock, color: '#059669', dataKey: 'logisticsData' },
@@ -251,6 +322,8 @@ export default function ShowaReizoDashboardPage() {
       if (cleanTitle.includes('社会保険')) cleanTitle = '社会保険';
 
       if (!combinedMap.has(cleanTitle)) {
+        const setting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === cleanTitle);
+
         combinedMap.set(cleanTitle, {
           title: cleanTitle,
           labels: item.labels || baseLabelsFiltered,
@@ -259,6 +332,8 @@ export default function ShowaReizoDashboardPage() {
           actual_lastYear: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           forecast: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           forecastType: '予測',
+          is_pinned: setting ? setting.is_pinned : false,   
+          is_hidden: setting ? setting.is_hidden : false    
         });
       }
       const entry = combinedMap.get(cleanTitle);
@@ -299,7 +374,6 @@ export default function ShowaReizoDashboardPage() {
           finalResult.push(m);
         }
         else if (m.title === '社員工数_通常工数' || m.title === '社員工数_深夜工数') {
-          // 除外
         }
         else if (m.title === 'スタッフ工数_通常工数') stackedGroups['スタッフ工数'].data['通常'] = m;
         else if (m.title === 'スタッフ工数_残業工数') stackedGroups['スタッフ工数'].data['残業'] = m;
@@ -327,8 +401,7 @@ export default function ShowaReizoDashboardPage() {
           if (!baseLabelsFiltered[idx]) return false;
           const dayStr = baseLabelsFiltered[idx].includes('/') ? baseLabelsFiltered[idx].split('/').pop() : baseLabelsFiltered[idx].replace(/[^0-9]/g, '') || '1';
           const dayNum = parseInt(dayStr, 10);
-          const todayMonth = new Date().getMonth() + 1;
-          const selMonth = parseInt(dataMonth, 10);
+          const todayMonth = new Date().getMonth() + 1; const selMonth = parseInt(dataMonth, 10);
           if (selMonth !== todayMonth) return true;
           return dayNum <= new Date().getDate();
         });
@@ -349,18 +422,25 @@ export default function ShowaReizoDashboardPage() {
       return { ...m, _sortVal: actVal };
     });
 
-    return metricsWithValues.sort((a, b) => {
+    let filteredMetrics = metricsWithValues;
+    if (!showHiddenMetrics) {
+      filteredMetrics = filteredMetrics.filter(m => !m.is_hidden);
+    }
+
+    return filteredMetrics.sort((a, b) => {
+      if (a.is_pinned !== b.is_pinned) {
+        return a.is_pinned ? -1 : 1; 
+      }
+      
       if (activeTab === 'volume') {
-        const priority = ['ユニー', 'リコス', 'BB', '汎用'];
-        const aIndex = priority.findIndex(p => a.title.includes(p));
-        const bIndex = priority.findIndex(p => b.title.includes(p));
+        const priority = ['畜産', '水産'];
+        const aIndex = priority.findIndex(p => a.title.includes(p)); const bIndex = priority.findIndex(p => b.title.includes(p));
         if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-        if (aIndex !== -1) return -1;
-        if (bIndex !== -1) return 1;
+        if (aIndex !== -1) return -1; if (bIndex !== -1) return 1;
       }
       return b._sortVal - a._sortVal;
     });
-  }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups]);
+  }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
   const contractList = (() => {
     if (!data || !data.contractYojitsuData) return [];
@@ -423,15 +503,12 @@ export default function ShowaReizoDashboardPage() {
     return result;
   })();
 
-  // 🌟 新設：事故管理の「先月比VS」の統合集計ロジック
   const accidentSummary = useMemo(() => {
     if (!data || !data.accidentData) return { thisTotal: 0, lastTotal: 0, diff: 0, ratio: 0 };
     const rawRecords = data.accidentData || [];
     let thisTotal = 0; let lastTotal = 0;
-    
     const curMonth = parseInt(globalSelectedMonth, 10);
     const lastMonth = curMonth === 1 ? 12 : curMonth - 1;
-    
     rawRecords.forEach((row: any) => {
       if (row.date) {
         const parts = row.date.split('/');
@@ -451,13 +528,11 @@ export default function ShowaReizoDashboardPage() {
   const filteredEnvItems = envItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.effect.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredHistoryItems = historyItems.filter(item => item.client?.toLowerCase().includes(searchQuery.toLowerCase()) || item.proposal?.toLowerCase().includes(searchQuery.toLowerCase()) || item.detail?.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // AI診断ロジック（タブ7と9のみに限定。タブ7は「要約」フラグを送信）
   const handleStartTabAnalysis = async (tabId: string) => {
     setIsTabAnalyzing(prev => ({ ...prev, [tabId]: true }));
     try {
       let payloadItems: any[] = [];
       let analysisType = 'evaluation';
-      
       if (tabId === 'actions') {
         analysisType = 'summary';
         payloadItems = [
@@ -471,7 +546,6 @@ export default function ShowaReizoDashboardPage() {
           return { 項目: m.title, 月度: `${contractSelectedMonth}月`, 実績: targetIdx !== -1 ? m.actual[targetIdx] : 0, 予算: targetIdx !== -1 ? m.forecast[targetIdx] : 0, 差異: targetIdx !== -1 ? (n(m.actual[targetIdx]) - n(m.forecast[targetIdx])) : 0 };
         });
       }
-
       const res = await fetch('/api/analyze-tab', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
@@ -497,7 +571,7 @@ export default function ShowaReizoDashboardPage() {
       setNewItem({ startDate: item.date ? item.date.replace(/\//g, '-') : '', client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●' });
     } else {
       const targetList = activeActionTab === 'dx' ? dxItems : envItems; const item = targetList[index];
-      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customerRelated: item.customer_related === 'あり', ratio: item.ratio || 0 });
+      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customer_related: item.customer_related === 'あり', ratio: item.ratio || 0 });
     }
     setIsModalOpen(true);
   };
@@ -535,7 +609,6 @@ export default function ShowaReizoDashboardPage() {
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
 
-  // 🌟 安全かつ極上のサイバーローディング画面（文字消えバグ対策版）
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -548,36 +621,21 @@ export default function ShowaReizoDashboardPage() {
             <span className="text-blue-600">PAL</span> Productivity Dashboard
           </h1>
           <div className="w-64 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-6 shadow-inner relative">
-            <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2" 
-              style={{ animation: 'loading-slide 2s ease-in-out infinite' }} 
-            />
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full w-1/2" style={{ animation: 'loading-slide 2s ease-in-out infinite' }} />
           </div>
           <div className="flex items-center gap-3 text-slate-500">
             <Loader2 className="animate-spin text-blue-500" size={18} />
             <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to Database...</span>
           </div>
         </div>
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes loading-slide { 
-            0% { transform: translateX(-100%); width: 50%; } 
-            100% { transform: translateX(250%); width: 50%; } 
-          }
-        `}} />
+        <style dangerouslySetInnerHTML={{__html: `@keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }`}} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate print:bg-white print:pb-0 print:block" translate="no">
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-        @page { size: A4 portrait; margin: 10mm; }
-        body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        main { zoom: 0.65; }
-        .print-avoid-break { page-break-inside: avoid; }
-        }
-      `}} />
+      <style dangerouslySetInnerHTML={{__html: `@media print { @page { size: A4 portrait; margin: 10mm; } body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } main { zoom: 0.65; } .print-avoid-break { page-break-inside: avoid; } }`}} />
 
       <header className="bg-white border-b border-slate-200 px-4 md:px-10 py-3 md:py-0 md:h-20 flex flex-col md:flex-row justify-between items-center sticky top-0 z-40 backdrop-blur-md bg-white/80 gap-3 md:gap-0 print:hidden">
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
@@ -590,7 +648,7 @@ export default function ShowaReizoDashboardPage() {
           </Link>
         </div>
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
-          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">STRATEGIC MANAGEMENT LAYER</p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 md:gap-3 items-center w-full md:w-auto">
@@ -613,7 +671,15 @@ export default function ShowaReizoDashboardPage() {
             {tabs.map((t) => <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-3 md:px-4 py-2.5 rounded-xl transition-all font-black text-[10px] md:text-xs flex-grow md:flex-grow-0 text-center ${activeTab === t.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>)}
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto justify-end">
-            {/* 🌟 変更点：ここにあったアクション用の非表示ボタンを撤去し、検索窓のみにしてスッキリ化 */}
+            {/* 📌 1〜5タブの時だけ「非表示グラフを表示する」トグルスイッチを配備 */}
+            {['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab) && (
+              <button
+                onClick={() => setShowHiddenMetrics(!showHiddenMetrics)}
+                className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm ${showHiddenMetrics ? 'bg-slate-800 text-white border-slate-700 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              >
+                {showHiddenMetrics ? '非表示グラフを隠す(ON)' : '非表示グラフを表示'}
+              </button>
+            )}
             <div className="relative w-full sm:w-72 shrink-0">
               <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="項目を絞り込み検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
@@ -628,7 +694,6 @@ export default function ShowaReizoDashboardPage() {
           </div>
         )}
 
-        {/* 🌟 AI Insightエリア：タブ7(アクション) と タブ9(請負予実) のみに限定表示 */}
         {['actions', 'contract'].includes(activeTab) && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm flex flex-col md:flex-row items-start gap-4 mb-2 relative overflow-hidden print:bg-white">
             <div className="bg-white p-3 rounded-2xl shadow-sm shrink-0 hidden md:block border"><Bot size={24} className="text-blue-600" /></div>
@@ -745,13 +810,33 @@ export default function ShowaReizoDashboardPage() {
               const prevYearColor = '#fbbf24';
 
               return (
-                <div key={i} className="print-avoid-break bg-white border border-slate-200 p-5 md:p-6 rounded-3xl shadow-sm flex flex-col gap-4 md:gap-5 min-w-0 overflow-hidden print:shadow-none print:border-slate-300">
+                <div key={i} className={`print-avoid-break p-5 md:p-6 rounded-3xl shadow-sm flex flex-col gap-4 md:gap-5 min-w-0 overflow-hidden print:shadow-none print:border-slate-300 transition-all border relative ${m.is_hidden ? 'opacity-40 bg-slate-100 border-dashed border-amber-300' : 'bg-white border-slate-200'}`}>
+                  
+                  {/* 📌 グラフ操作用コントロールスイッチを右上に配置（印刷時は非表示） */}
+                  <div className="absolute top-4 right-4 flex gap-1.5 print:hidden z-20">
+                    <button 
+                      onClick={() => handleToggleMetricSetting(m.title, 'is_pinned', m.is_pinned)} 
+                      className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_pinned ? 'bg-blue-100 border-blue-300 text-blue-600 font-black' : 'bg-white text-slate-400 hover:text-blue-500'}`} 
+                      title={m.is_pinned ? "最上位ピン留めを解除" : "最上位にピン留めする"}
+                    >
+                      <Pin size={13} className={m.is_pinned ? "fill-blue-600 rotate-45" : ""} />
+                    </button>
+                    <button 
+                      onClick={() => handleToggleMetricSetting(m.title, 'is_hidden', m.is_hidden)} 
+                      className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_hidden ? 'bg-amber-100 border-amber-300 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} 
+                      title={m.is_hidden ? "グラフを表示する" : "グラフを非表示にする"}
+                    >
+                      {m.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                    </button>
+                  </div>
+
                   <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 border-b border-slate-100 pb-4 print:border-slate-200">
-                    <div className="flex-1 flex flex-col items-start min-w-0 w-full">
+                    <div className="flex-1 flex flex-col items-start min-w-0 w-full pr-16">
                       <div className="flex items-center gap-3 mb-1.5 w-full">
                         <span className="text-[10px] md:text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shadow-sm whitespace-nowrap shrink-0">
                           {dataMonth}月
                         </span>
+                        {m.is_pinned && <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm shrink-0">📌 固定中</span>}
                         <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tighter uppercase leading-tight truncate">
                           {m.title}
                         </h4>
@@ -790,7 +875,6 @@ export default function ShowaReizoDashboardPage() {
                     )}
                   </div>
 
-                  {/* 🌟 修正ガード：w-full と min-w-0、min-h-[220px] でノートPC等でのグラフ潰れを永久遮断 */}
                   <div className={displayMode !== 'daily' ? 'flex flex-col xl:flex-row gap-4 items-stretch w-full min-w-0' : 'w-full min-w-0'}>
                     <div className="flex-1 w-full h-[220px] min-h-[220px] bg-slate-50/50 p-2 rounded-2xl border min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
@@ -894,41 +978,36 @@ export default function ShowaReizoDashboardPage() {
                 <ChevronDown size={11} className="text-blue-400" />
               </div>
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-              {(!data?.salesConfirmedData || data.salesConfirmedData.length === 0) && (
-                <div className="col-span-full py-10 text-center text-slate-400 font-bold">データがありません。GAS側でデータを転写してください。</div>
-              )}
-              {data?.salesConfirmedData?.map((item: any, i: number) => {
-                const diffLastMonth = item.今月 - item.先月;
-                const diffLastYear = item.今月 - item.前年;
-                return (
-                  <div key={i} className="bg-white border border-slate-200 p-4 md:p-5 rounded-2xl shadow-sm flex flex-col justify-between gap-3 transition-all hover:shadow-md border-t-4 print:break-inside-avoid print:shadow-none print:border-slate-300" style={{ borderTopColor: '#0ea5e9' }}>
-                    <h4 className="text-sm md:text-base font-black text-slate-800 tracking-tight line-clamp-2">{item.title}</h4>
-                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2 print:bg-white print:border-slate-200">
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-[10px] md:text-xs font-bold text-sky-600 whitespace-nowrap">今月確定</span>
-                        <span className="text-lg md:text-xl font-black text-slate-900 whitespace-nowrap">{formatVal(item.今月, '売上')}</span>
-                      </div>
-                      <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] md:text-[10px] font-bold text-slate-400 whitespace-nowrap">先月</span>
-                          <div className="text-right flex items-center">
-                            <span className="text-xs font-bold text-slate-600 mr-2 whitespace-nowrap">{formatVal(item.先月, '売上')}</span>
-                            <span className={`text-[9px] font-black w-16 text-right whitespace-nowrap ${diffLastMonth > 0 ? 'text-emerald-500' : diffLastMonth < 0 ? 'text-rose-500' : 'text-slate-400'}`}>{diffLastMonth > 0 ? '▲' : diffLastMonth < 0 ? '▼' : '±'} {formatVal(Math.abs(diffLastMonth), '売上')}</span>
-                          </div>
+              {(!data?.salesConfirmedData || !data.salesConfirmedData[globalSelectedMonth] || data.salesConfirmedData[globalSelectedMonth].length === 0) ? (
+                <div className="col-span-full py-10 text-center text-slate-400 font-bold">選択された月度（{globalSelectedMonth}月）の月次確定データがありません。シートの転写マクロを実行してください。</div>
+              ) : (
+                data.salesConfirmedData[globalSelectedMonth].map((item: any, i: number) => {
+                  const diffLastMonth = item.今月 - item.先月;
+                  const diffLastYear = item.今月 - item.前年;
+                  return (
+                    <div key={i} className="bg-white border border-slate-200 p-4 md:p-5 rounded-2xl shadow-sm flex flex-col justify-between gap-3 transition-all hover:shadow-md border-t-4 print:break-inside-avoid print:shadow-none print:border-slate-300" style={{ borderTopColor: '#0ea5e9' }}>
+                      <h4 className="text-sm md:text-base font-black text-slate-800 tracking-tight line-clamp-2">{item.title}</h4>
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2 print:bg-white print:border-slate-200">
+                        <div className="flex justify-between items-end mb-2">
+                          <span className="text-[10px] md:text-xs font-bold text-sky-600 whitespace-nowrap">当月確定</span>
+                          <span className="text-lg md:text-xl font-black text-slate-900 whitespace-nowrap">{formatVal(item.今月, item.title)}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] md:text-[10px] font-bold text-slate-400 whitespace-nowrap">前年</span>
-                          <div className="text-right flex items-center">
-                            <span className="text-xs font-bold text-slate-600 mr-2 whitespace-nowrap">{formatVal(item.前年, '売上')}</span>
-                            <span className={`text-[9px] font-black w-16 text-right whitespace-nowrap ${diffLastYear > 0 ? 'text-emerald-500' : diffLastYear < 0 ? 'text-rose-500' : 'text-slate-400'}`}>{diffLastYear > 0 ? '▲' : diffLastYear < 0 ? '▼' : '±'} {formatVal(Math.abs(diffLastYear), '売上')}</span>
+                        <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 whitespace-nowrap">前月確定</span>
+                            <div className="text-right flex items-center">
+                              <span className="text-xs font-bold text-slate-600 mr-2 whitespace-nowrap">{formatVal(item.先月, item.title)}</span>
+                              <span className={`text-[9px] font-black w-16 text-right whitespace-nowrap ${diffLastMonth > 0 ? 'text-emerald-500' : diffLastMonth < 0 ? 'text-rose-500' : 'text-slate-400'}`}>{diffLastMonth > 0 ? '▲' : diffLastMonth < 0 ? '▼' : '±'} {formatVal(Math.abs(diffLastMonth), item.title)}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -938,7 +1017,6 @@ export default function ShowaReizoDashboardPage() {
         ========================================= */}
         {activeTab === 'actions' && (
           <div className="space-y-6">
-            {/* 🌟 変更点：請負予実とお作法を統一した大見出しタイトルラインを新設 */}
             <div className="border-b border-slate-200 pb-3 md:pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
               <div>
                 <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3">
@@ -947,7 +1025,6 @@ export default function ShowaReizoDashboardPage() {
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Operation & DX Action Roadmap</p>
               </div>
               <div className="flex items-center gap-2">
-                {/* 🌟 変更点：最上部からここに引っ越し！請負予実と完全同等のスタイリッシュなトグルボタン */}
                 <button
                   onClick={() => setShowHiddenItems(!showHiddenItems)}
                   className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${showHiddenItems ? 'bg-purple-600 text-white border-purple-700 shadow-inner' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}
@@ -1069,7 +1146,6 @@ export default function ShowaReizoDashboardPage() {
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
               </div>
 
-              {/* 🌟 変更点：赤枠空きスペースへ「先月比VSサマリー」を動的新設！100%超でレッド警告＆パルス明滅 */}
               <div className="flex flex-wrap items-center gap-3.5 flex-1 justify-start lg:justify-center px-2 md:px-6 print:hidden">
                 <div className={`flex items-center gap-5 px-5 py-2.5 rounded-2xl border shadow-sm transition-all ${accidentSummary.ratio >= 100 ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse font-black' : 'bg-emerald-50/60 border-emerald-100 text-emerald-800'}`}>
                   <div className="flex flex-col">
@@ -1100,7 +1176,7 @@ export default function ShowaReizoDashboardPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 print:grid-cols-2 print:gap-6">
-              {accidentCategories.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致するデータがありません。</div>}
+              {accidentCategories.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">検索条件に一致する data がありません。</div>}
               {accidentCategories.map((cat, i) => {
                 const styles = getLevelStyles(cat.total); const daysSince = calculateDaysSince(cat.lastDate);
                 return (
@@ -1119,6 +1195,7 @@ export default function ShowaReizoDashboardPage() {
                       <div className={`w-32 h-32 md:w-48 md:h-48 rounded-full border-8 md:border-[16px] flex flex-col items-center justify-center bg-white shadow-inner z-10 relative ${styles.meterBorder} ${styles.text}`}>
                         <span className="text-[9px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-[-2px] md:mb-[-5px]">当月事故</span>
                         <span className="text-5xl md:text-7xl font-black tracking-tighter"><AnimatedNumber value={cat.total} /></span>
+                        <span className="text-[8px] md:text-[10px] font-bold">件</span>
                       </div>
                     </div>
                     <div className="flex justify-center gap-2 md:gap-4 text-[10px] md:text-sm font-bold">
