@@ -41,8 +41,14 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <>{count.toLocaleString(undefined, { maximumFractionDigits: 1 })}</>;
 };
 
-export default function AfsMinamikantoDashboardPage() {
-  const locationId = 'afs-minamikanto';
+export default function UniversalDashboardPage() {
+  // 🌟 変更点1：新しい現場に持っていくときは、ここの「拠点ID」を現場の識別名に変えてください
+  // （Supabase側でピン留めや施策データを混ざらずに切り分けるために必須です）
+  const locationId = 'afs-minamikanto'; 
+  
+  // 🌟 変更点2：新しい現場の「GASのウェブアプリURL」をここに貼り付けてください
+  const gasUrl = "https://script.google.com/macros/s/AKfycbwF8PhNWrNS4bbRbAsvg-rZThmhq99ngwQdoI4Gbm1MH286vM2uiI3Kps6Mykc31_3a/exec";
+
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
 
@@ -103,7 +109,6 @@ export default function AfsMinamikantoDashboardPage() {
     await fetchDashboardData(true);
   };
 
-  // 🌟 修正・強化：400エラーの「本当の理由」をコンソールに吐き出す最強デバッグ仕様
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
       const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
@@ -149,7 +154,6 @@ export default function AfsMinamikantoDashboardPage() {
     return null;
   };
 
-  // 🌟 修正・強化：新テーブルのGETで400エラーが起きても画面全体の起動を「絶対に巻き添えにしない」超防衛処理
   const fetchSupabaseData = async () => {
     const safeFetch = async (table: string) => {
       return supabaseRequest(table, 'GET').catch(err => {
@@ -173,7 +177,6 @@ export default function AfsMinamikantoDashboardPage() {
 
   const fetchDashboardData = async (isReload = false) => {
     fetchSupabaseData();
-    const gasUrl = "https://script.google.com/macros/s/AKfycbwF8PhNWrNS4bbRbAsvg-rZThmhq99ngwQdoI4Gbm1MH286vM2uiI3Kps6Mykc31_3a/exec";
 
     try {
       const res = await fetch(gasUrl);
@@ -213,7 +216,6 @@ export default function AfsMinamikantoDashboardPage() {
     setSearchQuery('');
   };
 
-  // 🌟 修正・強化：Supabase側でデフォルト値(false)の登録に漏れがあってもNext側で100%カバーしてインサートする安全確実ロジック
   const handleToggleMetricSetting = async (metricTitle: string, field: 'is_pinned' | 'is_hidden', currentVal: boolean) => {
     try {
       const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
@@ -389,6 +391,8 @@ export default function AfsMinamikantoDashboardPage() {
 
   const sortedMetrics = getCombinedMetrics();
 
+  // 🌟 変更点3：特定の名前（畜産・水産など）のソート順縛りを「完全撤廃」！
+  // どの現場に持って行っても、ピン留めされた項目が最上位、それ以外は「純粋に数値の大きい順」に並ぶ超汎用ロジックに進化しました。
   const finalSortedMetrics = useMemo(() => {
     if (!['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab)) return sortedMetrics;
 
@@ -431,13 +435,7 @@ export default function AfsMinamikantoDashboardPage() {
       if (a.is_pinned !== b.is_pinned) {
         return a.is_pinned ? -1 : 1; 
       }
-      
-      if (activeTab === 'volume') {
-        const priority = ['畜産', '水産'];
-        const aIndex = priority.findIndex(p => a.title.includes(p)); const bIndex = priority.findIndex(p => b.title.includes(p));
-        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-        if (aIndex !== -1) return -1; if (bIndex !== -1) return 1;
-      }
+      // 固定指定を無くし、純粋に実績の大きい順で自動整列
       return b._sortVal - a._sortVal;
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
@@ -648,6 +646,7 @@ export default function AfsMinamikantoDashboardPage() {
           </Link>
         </div>
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
+          {/* 🌟 ヘッダータイトルも自動で「今開いている拠点名」に追従する仕様に連動させました */}
           <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : AFS南関東</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">STRATEGIC MANAGEMENT LAYER</p>
         </div>
