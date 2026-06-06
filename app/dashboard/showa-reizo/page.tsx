@@ -43,7 +43,6 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 
 export default function UniversalDashboardPage() {
   // 🌟 変更点1：新しい現場に持っていくときは、ここの「拠点ID」を現場の識別名に変えてください
-  // （Supabase側でピン留めや施策データを混ざらずに切り分けるために必須です）
   const locationId = 'showa-reizo'; 
   
   // 🌟 変更点2：新しい現場の「GASのウェブアプリURL」をここに貼り付けてください
@@ -61,6 +60,9 @@ export default function UniversalDashboardPage() {
   // 月選択ステート
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [contractSelectedMonth, setContractSelectedMonth] = useState<string>('');
+  
+  // 🌟 追加：月次確定タブ専用の年月ステート（例：2026/05）
+  const [salesMonth, setSalesMonth] = useState<string>('');
 
   const [hideZeroContracts, setHideZeroContracts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -193,6 +195,12 @@ export default function UniversalDashboardPage() {
           const cleanCLabels = cLabels.map((l: any) => String(l).replace('月', ''));
           if (cleanCLabels.includes(extractedMonth)) setContractSelectedMonth(extractedMonth);
           else setContractSelectedMonth(cleanCLabels[0] || '4');
+        }
+        
+        // 🌟 追加：月次確定データがあれば、一番新しい年月を初期セットする
+        if (json.salesConfirmedData) {
+          const sKeys = Object.keys(json.salesConfirmedData).sort();
+          if (sKeys.length > 0) setSalesMonth(sKeys[sKeys.length - 1]);
         }
       }
       if (isReload) showToast('最新データを取得しました', 'success');
@@ -365,7 +373,6 @@ export default function UniversalDashboardPage() {
     if (searchQuery) result = result.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (activeTab === 'labor') {
-      // 🌟 追加：合体グラフ用の設定もSupabaseから読み込む
       const staffSetting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === 'スタッフ工数 (通常・残業・深夜)');
 
       const stackedGroups: any = {
@@ -400,8 +407,6 @@ export default function UniversalDashboardPage() {
 
   const sortedMetrics = getCombinedMetrics();
 
-  // 🌟 変更点3：特定の名前（畜産・水産など）のソート順縛りを「完全撤廃」！
-  // どの現場に持って行っても、ピン留めされた項目が最上位、それ以外は「純粋に数値の大きい順」に並ぶ超汎用ロジックに進化しました。
   const finalSortedMetrics = useMemo(() => {
     if (!['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab)) return sortedMetrics;
 
@@ -444,7 +449,6 @@ export default function UniversalDashboardPage() {
       if (a.is_pinned !== b.is_pinned) {
         return a.is_pinned ? -1 : 1; 
       }
-      // 固定指定を無くし、純粋に実績の大きい順で自動整列
       return b._sortVal - a._sortVal;
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
@@ -639,7 +643,6 @@ export default function UniversalDashboardPage() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate print:bg-white print:pb-0 print:block" translate="no">
       <style dangerouslySetInnerHTML={{__html: `@media print { @page { size: A4 portrait; margin: 10mm; } body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } main { zoom: 0.65; } .print-avoid-break { page-break-inside: avoid; } }`}} />
@@ -655,7 +658,6 @@ export default function UniversalDashboardPage() {
           </Link>
         </div>
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
-          {/* 🌟 ヘッダータイトルも自動で「今開いている拠点名」に追従する仕様に連動させました */}
           <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">STRATEGIC MANAGEMENT LAYER</p>
         </div>
@@ -679,7 +681,6 @@ export default function UniversalDashboardPage() {
             {tabs.map((t) => <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-3 md:px-4 py-2.5 rounded-xl transition-all font-black text-[10px] md:text-xs flex-grow md:flex-grow-0 text-center ${activeTab === t.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>{t.label}</button>)}
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto justify-end">
-            {/* 📌 1〜5タブの時だけ「非表示グラフを表示する」トグルスイッチを配備 */}
             {['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab) && (
               <button
                 onClick={() => setShowHiddenMetrics(!showHiddenMetrics)}
@@ -980,18 +981,22 @@ export default function UniversalDashboardPage() {
               </div>
               <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl print:hidden shadow-sm">
                 <Calendar size={12} className="text-blue-500" />
-                <select value={globalSelectedMonth} onChange={(e) => setGlobalSelectedMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
-                  {availableMonths.map((m, idx) => <option key={idx} value={m}>{m}月度 確定データ</option>)}
+                {/* 🌟 変更：salesMonth と動的なキーリストを使う */}
+                <select value={salesMonth} onChange={(e) => setSalesMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
+                  {Object.keys(data?.salesConfirmedData || {}).sort().reverse().map((m, idx) => (
+                    <option key={idx} value={m}>{m} 確定データ</option>
+                  ))}
                 </select>
                 <ChevronDown size={11} className="text-blue-400" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-              {(!data?.salesConfirmedData || !data.salesConfirmedData[globalSelectedMonth] || data.salesConfirmedData[globalSelectedMonth].length === 0) ? (
-                <div className="col-span-full py-10 text-center text-slate-400 font-bold">選択された月度（{globalSelectedMonth}月）の月次確定データがありません。シートの転写マクロを実行してください。</div>
+              {/* 🌟 変更：globalSelectedMonth ではなく salesMonth を使う */}
+              {(!data?.salesConfirmedData || !data.salesConfirmedData[salesMonth] || data.salesConfirmedData[salesMonth].length === 0) ? (
+                <div className="col-span-full py-10 text-center text-slate-400 font-bold">選択された月度（{salesMonth}）の月次確定データがありません。シートの転写マクロを実行してください。</div>
               ) : (
-                data.salesConfirmedData[globalSelectedMonth].map((item: any, i: number) => {
+                data.salesConfirmedData[salesMonth].map((item: any, i: number) => {
                   const diffLastMonth = item.今月 - item.先月;
                   const diffLastYear = item.今月 - item.前年;
                   return (
