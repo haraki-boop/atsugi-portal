@@ -199,13 +199,21 @@ export default function UniversalDashboardPage() {
           else setContractSelectedMonth(cleanCLabels[0] || '4');
         }
         
-        // 🌟 修正：月次確定データの初期選択を「前月（最新から1つ手前）」にする
+        // 🌟 修正：現実のカレンダーから確実に「先月」を計算して初期選択する
         if (json.salesConfirmedData) {
-          const sKeys = Object.keys(json.salesConfirmedData).sort();
-          if (sKeys.length > 1) {
-            setSalesMonth(sKeys[sKeys.length - 2]); // 最新の1つ手前（前月）をセット
-          } else if (sKeys.length > 0) {
-            setSalesMonth(sKeys[0]); // 1ヶ月分しかない場合はそれをセット
+          const sKeys = Object.keys(json.salesConfirmedData);
+          
+          // 今の現実の日付から1ヶ月戻して「yyyy/MM」の形を作る
+          const d = new Date();
+          d.setMonth(d.getMonth() - 1);
+          const targetMonth = `${d.getFullYear()}/${("0" + (d.getMonth() + 1)).slice(-2)}`;
+          
+          // もし先月のデータ枠があればそれをセット、無ければ一番新しいものをセット
+          if (sKeys.includes(targetMonth)) {
+            setSalesMonth(targetMonth);
+          } else {
+            sKeys.sort();
+            if (sKeys.length > 0) setSalesMonth(sKeys[sKeys.length - 1]);
           }
         }
       }
