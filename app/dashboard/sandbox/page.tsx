@@ -45,11 +45,11 @@ export default function UniversalDashboardPage() {
   // =========================================================
   // 🏢 【拠点マスター設定】他拠点へ展開時は、この2つだけを変更してください！
   // =========================================================
-  const LOCATION_ID = 'afs-bisai'; // ① Supabase用の拠点ID（※ここは各拠点のIDのまま！）
+  const LOCATION_ID = 'showa-reizo'; // ① Supabase用の拠点ID（※ここは各拠点のIDのまま！）
   const LOCATION_NAME = 'afs尾西流通'; // ② ヘッダーに表示される現場名
   
   // 🛡️ 新仕様：直接のURLを削除し、安全な中継所を呼び出す
-  const GAS_URL = `/api/gas?location=${showa-reizo}`;
+  const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
 
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
