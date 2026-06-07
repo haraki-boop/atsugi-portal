@@ -43,9 +43,9 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 
 export default function UniversalDashboardPage() {
   // =========================================================
-  // 🏢 【拠点マスター設定】他拠点へ展開時は、この2つだけを変更してください！
+  // 🏢 【拠点マスター設定】
   // =========================================================
-  const LOCATION_ID = 'showa-reizo'; // ① Supabase用の拠点ID（※ここは各拠点のIDのまま！）
+  const LOCATION_ID = 'showa-reizo'; // ① Supabase用の拠点ID
   const LOCATION_NAME = '昭和冷蔵'; // ② ヘッダーに表示される現場名
   
   // 🛡️ 新仕様：直接のURLを削除し、安全な中継所を呼び出す
@@ -63,7 +63,7 @@ export default function UniversalDashboardPage() {
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [contractSelectedMonth, setContractSelectedMonth] = useState<string>('');
   
-  // 🌟 追加：月次確定タブ専用の年月ステート（例：2026/05）
+  // 追加：月次確定タブ専用の年月ステート（例：2026/05）
   const [salesMonth, setSalesMonth] = useState<string>('');
 
   const [hideZeroContracts, setHideZeroContracts] = useState(false);
@@ -172,7 +172,8 @@ export default function UniversalDashboardPage() {
     fetchSupabaseData();
 
     try {
-      const res = await fetch(gasUrl);
+      // 🟢 修正：gasUrl(小文字) から GAS_URL(大文字) に統一してエラーを撃破！
+      const res = await fetch(GAS_URL);
       const json = await res.json();
       setData(json);
       if (!isReload && json && json.labels && json.labels.length > 0) {
@@ -188,16 +189,12 @@ export default function UniversalDashboardPage() {
           else setContractSelectedMonth(cleanCLabels[0] || '4');
         }
         
-        // 🌟 修正：現実のカレンダーから確実に「先月」を計算して初期選択する
         if (json.salesConfirmedData) {
           const sKeys = Object.keys(json.salesConfirmedData);
-          
-          // 今の現実の日付から1ヶ月戻して「yyyy/MM」の形を作る
           const d = new Date();
           d.setMonth(d.getMonth() - 1);
           const targetMonth = `${d.getFullYear()}/${("0" + (d.getMonth() + 1)).slice(-2)}`;
           
-          // もし先月のデータ枠があればそれをセット、無ければ一番新しいものをセット
           if (sKeys.includes(targetMonth)) {
             setSalesMonth(targetMonth);
           } else {
@@ -232,7 +229,8 @@ export default function UniversalDashboardPage() {
       const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
       
       const payload: any = {
-        location_id: locationId,
+        // 🟢 修正：locationId(小文字) から LOCATION_ID(大文字) に一元化！
+        location_id: LOCATION_ID,
         tab_id: activeTab,
         metric_title: metricTitle,
         is_pinned: field === 'is_pinned' ? !currentVal : (existing ? existing.is_pinned : false),
@@ -593,12 +591,14 @@ export default function UniversalDashboardPage() {
   const handleSaveItem = async () => {
     if (activeActionTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
-      const payload = { location_id: locationId, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
+      // 🟢 修正：locationId(小文字) から LOCATION_ID(大文字) に統一！
+      const payload = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
       if (editingIndex !== null) { payload.id = historyItems[editingIndex].id; await supabaseRequest('sales_history', 'PATCH', payload); }
       else { await supabaseRequest('sales_history', 'POST', payload); }
     } else {
       if (!newItem.name) return;
-      const payload = { location_id: locationId, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
+      // 🟢 修正：locationId(小文字) から LOCATION_ID(大文字) に統一！
+      const payload = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.start_date.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
       const targetTable = activeActionTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingIndex !== null) {
         const targetList = activeActionTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
@@ -661,7 +661,7 @@ export default function UniversalDashboardPage() {
           </Link>
         </div>
         <div className="text-center w-full md:w-auto order-first md:order-none mb-1 md:mb-0">
-          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : 昭和冷蔵</h1>
+          <h1 className="text-base md:text-lg font-black italic tracking-tighter uppercase text-slate-800">経営ダッシュボード : {LOCATION_NAME}</h1>
           <p className="text-[8px] md:text-[9px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-0.5">STRATEGIC MANAGEMENT LAYER</p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 md:gap-3 items-center w-full md:w-auto">
@@ -678,6 +678,7 @@ export default function UniversalDashboardPage() {
           {activeTab === 'actions' && <button onClick={handleOpenAddModal} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md"><Plus size={14} /> 新規追加</button>}
         </div>
       </header>
+
       <main className="p-4 md:p-8 max-w-[1800px] mx-auto space-y-4 md:space-y-6 print:p-0 print:space-y-8">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 print:hidden">
           <div className="flex flex-wrap gap-2">
@@ -984,7 +985,6 @@ export default function UniversalDashboardPage() {
               </div>
               <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl print:hidden shadow-sm">
                 <Calendar size={12} className="text-blue-500" />
-                {/* 🌟 変更：salesMonth と動的なキーリストを使う */}
                 <select value={salesMonth} onChange={(e) => setSalesMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
                   {Object.keys(data?.salesConfirmedData || {}).sort().reverse().map((m, idx) => (
                     <option key={idx} value={m}>{m} 確定データ</option>
@@ -995,13 +995,11 @@ export default function UniversalDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-              {/* 🌟 変更：globalSelectedMonth ではなく salesMonth を使う */}
               {(!data?.salesConfirmedData || !data.salesConfirmedData[salesMonth] || data.salesConfirmedData[salesMonth].length === 0) ? (
                 <div className="col-span-full py-10 text-center text-slate-400 font-bold">選択された月度（{salesMonth}）の月次確定データがありません。シートの転写マクロを実行してください。</div>
               ) : (
                 data.salesConfirmedData[salesMonth].map((item: any, i: number) => {
                   const diffLastMonth = item.今月 - item.先月;
-                  const diffLastYear = item.今月 - item.前年;
                   return (
                     <div key={i} className="bg-white border border-slate-200 p-4 md:p-5 rounded-2xl shadow-sm flex flex-col justify-between gap-3 transition-all hover:shadow-md border-t-4 print:break-inside-avoid print:shadow-none print:border-slate-300" style={{ borderTopColor: '#0ea5e9' }}>
                       <h4 className="text-sm md:text-base font-black text-slate-800 tracking-tight line-clamp-2">{item.title}</h4>
