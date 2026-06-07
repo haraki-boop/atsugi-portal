@@ -42,12 +42,14 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 export default function UniversalDashboardPage() {
-  // 🌟 変更点1：新しい現場に持っていくときは、ここの「拠点ID」を現場の識別名に変えてください
-  const locationId = 'showa-reizo'; 
+  // =========================================================
+  // 🏢 【拠点マスター設定】他拠点へ展開時は、この2つだけを変更してください！
+  // =========================================================
+  const LOCATION_ID = 'showa-reizo'; // ① Supabase用の拠点ID（※ここは各拠点のIDのまま！）
+  const LOCATION_NAME = '昭和冷蔵'; // ② ヘッダーに表示される現場名
   
-  // 🌟 変更点2：新しい現場の「GASのウェブアプリURL」をここに貼り付けてください
-  const gasUrl = "https://script.google.com/macros/s/AKfycbz2UbjitGKuhYU88BleEBOpt-jSRNJ9gltPT4TY2OXEf3ktlzqmEhZrPOh1cP11n7T2/exec";
-
+  // 🛡️ 新仕様：直接のURLを削除し、安全な中継所を呼び出す
+  const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
 
@@ -113,47 +115,36 @@ export default function UniversalDashboardPage() {
 
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
-      const url = `https://ukhcalayaazwmufewsks.supabase.co/rest/v1/${table}`;
-      const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVraGNhbGF5YWF6d211ZmV3c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMDc5MTUsImV4cCI6MjA5NDY4MzkxNX0.I5A3_xeDUcBJvRogo_pYVa45_vJ_qL8Fur1qbuu3j4c`;
-      const headers: any = { 'apikey': token, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+      // クエリ（条件）の組み立て
+      let query = '';
+      if (method === 'GET') query = `?location_id=eq.${LOCATION_ID}&order=id.asc`;
+      if (method === 'PATCH' || method === 'DELETE') query = `?id=eq.${body.id}`;
       
-      if (method === 'GET') {
-        const res = await fetch(`${url}?location_id=eq.${locationId}&order=id.asc`, { method: 'GET', headers, cache: 'no-store' });
-        if (!res.ok) {
-          const errDetail = await res.json().catch(() => ({}));
-          console.error(`❌ Supabase [GET ${table}] エラー詳細:`, errDetail);
-          throw new Error(`GET ${res.status}: ${errDetail.message || 'Unknown Error'}`);
-        }
-        return await res.json();
-      } 
-      else if (method === 'POST') {
-        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-        if (!res.ok) {
-          const errDetail = await res.json().catch(() => ({}));
-          console.error(`❌ Supabase [POST ${table}] エラー詳細:`, errDetail);
-          throw new Error(`POST ${res.status}: ${errDetail.message || 'Unknown Error'}`);
-        }
-        return await res.json();
-      } 
-      else if (method === 'PATCH') {
-        const targetId = String(body.id); const { id, ...cleanBody } = body;
-        const res = await fetch(`${url}?id=eq.${targetId}`, { method: 'PATCH', headers, body: JSON.stringify(cleanBody) });
-        if (!res.ok) {
-          const errDetail = await res.json().catch(() => ({}));
-          console.error(`❌ Supabase [PATCH ${table}] エラー詳細:`, errDetail);
-          throw new Error(`PATCH ${res.status}: ${errDetail.message || 'Unknown Error'}`);
-        }
-        return await res.json();
-      } 
-      else if (method === 'DELETE') {
-        const res = await fetch(`${url}?id=eq.${body.id}`, { method: 'DELETE', headers });
-        if (!res.ok) throw new Error(`DELETE ${res.status}`); return true;
+      const cleanBody = method === 'PATCH' ? { ...body } : body;
+      if (method === 'PATCH') delete cleanBody.id;
+
+      // 🛡️ 直接Supabaseに繋がず、Next.jsの自社サーバー（中継所）に「お願い」を送る
+      const res = await fetch('/api/supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: table,
+          actionMethod: method,
+          payload: (method === 'POST' || method === 'PATCH') ? cleanBody : undefined,
+          query: query
+        })
+      });
+
+      if (!res.ok) {
+        const errDetail = await res.json().catch(() => ({}));
+        throw new Error(`[API Error] ${res.status}: ${errDetail.error || 'Unknown'}`);
       }
+
+      return method === 'DELETE' ? true : await res.json();
     } catch (e) { 
-      console.error("Supabase Operation Error:", e); 
+      console.error("Secure Supabase Operation Error:", e); 
       throw e; 
     }
-    return null;
   };
 
   const fetchSupabaseData = async () => {

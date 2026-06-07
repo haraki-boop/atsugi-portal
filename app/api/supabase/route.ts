@@ -22,13 +22,12 @@ export async function POST(request: Request) {
       method: actionMethod,
       headers: {
         'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       },
-      // データを送る必要がある(POSTやPATCH)場合だけ、payloadをくっつける
+      // 🚨 復活：データを送る必要がある(POSTやPATCH)場合だけ、payloadをくっつける
       body: payload ? JSON.stringify(payload) : undefined
-    });
+    }); // 🚨 復活：ここできっちりfetchを閉じる！
 
     // 5. Supabaseからの返答をチェック
     if (!res.ok) {
