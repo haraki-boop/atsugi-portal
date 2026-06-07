@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+// 🟢 関数名も「proxy」にアップデート！
+export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   
-  // ログイン画面やロゴ画像など、パスワードなしでも見せていい場所
+  // ログイン画面など、パスワードなしでも見せていい場所
   const isPublicPath = path === '/login';
 
   // ユーザーが持っている通行証（Cookie）を確認
