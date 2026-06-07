@@ -155,7 +155,6 @@ export default function CompareDashboardPage() {
   const [actionMonthFilter, setActionMonthFilter] = useState<string>('all');
   const [actionSearchQuery, setActionSearchQuery] = useState<string>('');
 
-  // 🛡️ 改造後：むき出しのtoken・URLを完全除去し、既存の受付窓口（/api/supabase）に同列で丸投げする
   const fetchSupabaseAllData = async () => {
     try {
       const [dxRes, envRes, histRes] = await Promise.all([
@@ -299,8 +298,6 @@ export default function CompareDashboardPage() {
   const avgProfitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
   const growthRate = getGrowthRate();
 
-  // ----- ここからグラフデータ群 -----
-
   const sortedRankingData = [...filteredData]
     .sort((a, b) => rankingMode === 'sales' ? (b["確定売上"] || 0) - (a["確定売上"] || 0) : (b["実績_利益"] || 0) - (a["実績_利益"] || 0))
     .slice(0, 15);
@@ -329,7 +326,6 @@ export default function CompareDashboardPage() {
     return { name: item["現場名"], x: item["確定売上"] || 0, y: margin, z: Math.max(Math.abs(margin), 10), profit: item["実績_利益"] || 0 };
   });
 
-  // 💡 現場別 リスク・コンプライアンス データ
   const riskChartData = filteredData.map(item => ({
     name: item["現場名"],
     "流通事故": item["事故件数（流通）"] || 0,
@@ -340,7 +336,6 @@ export default function CompareDashboardPage() {
     totalRisk: (item["事故件数（流通）"] || 0) + (item["事故件数（設備破壊）"] || 0) + (item["労災件数"] || 0) + (item["労務トラブル件数"] || 0) + (item["36協定違反者数"] || 0)
   })).sort((a, b) => b.totalRisk - a.totalRisk).slice(0, 15);
 
-  // 💡 タイミーコスト vs 採用時給・最低賃金 データ
   const hrChartData = filteredData.map(item => ({
     name: item["現場名"],
     "タイミー使用金額": item["タイミー使用金額"] || 0,
@@ -448,16 +443,30 @@ export default function CompareDashboardPage() {
     count: actionChartDataMap[k]
   })).sort((a, b) => b.count - a.count);
 
-  // 🛡️ 追加：データが届く前に画面描写が走るのを防ぐ安全ブロック（早期リターン）
+  // 🛡️ 変更箇所：ローディング画面を「全社統括ボード」らしいダークテーマに進化させました！
   if (loading || !isMounted) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-blue-600 mb-2" size={32} />
-        <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">Loading Matrix Layer...</p>
+      <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-white px-6 py-3.5 rounded-2xl mb-8 shadow-lg border border-slate-700/50">
+            <img src="/pal-logo.png" alt="PAL Logo" className="h-8 md:h-10 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-[0.2em] mb-8 text-white text-center px-4 drop-shadow-md">
+            <span className="text-blue-400">PAL</span> HQ Strategic Board
+          </h1>
+          <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 shadow-inner relative border border-slate-700">
+            <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-400 rounded-full w-1/2" style={{ animation: 'loading-slide 2s ease-in-out infinite' }} />
+          </div>
+          <div className="flex items-center gap-3 text-slate-400">
+            <Loader2 className="animate-spin text-blue-400" size={18} />
+            <span className="text-[11px] font-bold tracking-widest uppercase">Connecting to HQ Database...</span>
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{__html: `@keyframes loading-slide { 0% { transform: translateX(-100%); width: 50%; } 100% { transform: translateX(250%); width: 50%; } }`}} />
       </div>
     );
   }
-
   return (
     <div className="flex h-screen w-full bg-[#f4f6f8] text-slate-800 font-sans overflow-hidden notranslate" translate="no">
       
@@ -658,14 +667,11 @@ export default function CompareDashboardPage() {
               {selectedArea !== 'all' && (
                 <AnimatePresence>
                   <div className="flex flex-col lg:flex-row gap-4 w-full shrink-0 min-h-[340px]">
-                    {/* 💡 左右幅がバグらないように min-w-0 を追加 */}
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="w-full lg:w-[65%] bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col overflow-hidden h-[340px] lg:h-auto min-w-0">
                       <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2 mb-3 shrink-0"><Target size={14} className="text-emerald-600" />現場別 通期27期予算進捗状況</h3>
                       
-                      {/* 💡 制限幅（w-full min-w-0）を設け、タッチ・スクロールを100%有効化 */}
                       <div className="flex-1 flex flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-2 items-center w-full min-w-0 scroll-smooth">
                         {siteProgressData.map((site, index) => (
-                          /* 💡 各カードに shrink-0 を絶対指定して、潰れを完全防止 */
                           <motion.div key={site.name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.04 }} className="shrink-0">
                             <DualRingChart siteName={site.name} annualBudget={site.annualBudget} plannedSales={site.plannedSales} achievedSales={site.achievedSales} />
                           </motion.div>
@@ -702,10 +708,8 @@ export default function CompareDashboardPage() {
                 </AnimatePresence>
               )}
 
-              {/* 📊 1段目グラフ（売上・利益）: 50%ずつに完全横並び固定 */}
               <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[320px] shrink-0 w-full">
                 
-                {/* 確定売上・実績利益ランキング（50%） */}
                 <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] lg:h-full min-w-0">
                   <div className="flex items-center justify-between mb-2 shrink-0">
                     <h3 className="text-sm font-bold text-slate-900">現場別 {rankingMode === 'sales' ? '確定売上' : '実績利益'}ランキング</h3>
@@ -749,7 +753,6 @@ export default function CompareDashboardPage() {
                   </div>
                 </div>
 
-                {/* 確定売上 vs 利益率バブル（50%） */}
                 <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] lg:h-full min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 mb-2">確定売上 vs. 利益率</h3>
                   <div className="flex-1 w-full min-h-0 relative">
@@ -782,10 +785,8 @@ export default function CompareDashboardPage() {
 
               </div>
 
-              {/* 📊 2段目グラフ（リスク管理・タイミー時給）: 50%ずつに完全横並び固定 */}
               <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[320px] shrink-0 w-full">
                 
-                {/* コンプライアンスリスク（50%） */}
                 <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] lg:h-full min-w-0">
                   <div className="flex items-center justify-between mb-2 shrink-0">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><ActivitySquare size={16} className="text-rose-600"/> 現場別 コンプライアンス・リスク発生状況</h3>
@@ -809,7 +810,6 @@ export default function CompareDashboardPage() {
                   </div>
                 </div>
 
-                {/* タイミー代 vs 採用時給（50%） */}
                 <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] lg:h-full min-w-0">
                   <div className="flex items-center justify-between mb-2 shrink-0">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><TrendingUp size={16} className="text-purple-600"/> タイミー使用金額 vs 採用時給</h3>
@@ -836,7 +836,6 @@ export default function CompareDashboardPage() {
 
               </div>
 
-              {/* 3段目：ヒートマップテーブル ＆ AI組織分析 */}
               <div className="flex flex-col lg:flex-row gap-4 w-full shrink-0">
                 <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-auto">
                   <h3 className="text-sm font-bold text-slate-900 mb-2">現場別 KPIヒートマップ</h3>
