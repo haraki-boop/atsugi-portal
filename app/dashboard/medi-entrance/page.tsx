@@ -43,15 +43,13 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 
 export default function UniversalDashboardPage() {
   // =========================================================
-  // 🏢 【拠点マスター設定】
+  // 🏢 【拠点マスター設定】（※他拠点にコピペする時はここだけ変える！）
   // =========================================================
-  const LOCATION_ID = 'medi-entrance'; // ① Supabase用の拠点ID
-  const LOCATION_NAME = 'メディエントランス'; // ② ヘッダーに表示される現場名
+  const LOCATION_ID = 'medi-entrance'; 
+  const LOCATION_NAME = 'メディエントランス'; 
   
   // 🛡️ 新仕様：直接のURLを削除し、安全な中継所を呼び出す
   const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
-  
-  // ✅ 修正：setIsMounted が定義されていなかったエラーを解消！
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
 
@@ -65,6 +63,7 @@ export default function UniversalDashboardPage() {
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [contractSelectedMonth, setContractSelectedMonth] = useState<string>('');
   
+  // 追加：月次確定タブ専用の年月ステート（例：2026/05）
   const [salesMonth, setSalesMonth] = useState<string>('');
 
   const [hideZeroContracts, setHideZeroContracts] = useState(false);
@@ -585,7 +584,10 @@ export default function UniversalDashboardPage() {
     setIsModalOpen(true);
   };
 
+  // ⚡ 爆速化適用：モーダルを一瞬で閉じて、Supabaseだけを再取得する！
   const handleSaveItem = async () => {
+    setIsModalOpen(false);
+
     if (activeActionTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
       const payload = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
@@ -599,7 +601,8 @@ export default function UniversalDashboardPage() {
         const targetList = activeActionTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
       } else { await supabaseRequest(targetTable, 'POST', payload); }
     }
-    await fetchDashboardData(); setIsModalOpen(false);
+    
+    await fetchSupabaseData();
     showToast('データを保存しました', 'success');
   };
 
@@ -607,14 +610,16 @@ export default function UniversalDashboardPage() {
     if (activeActionTab === 'history') await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
     else if (activeActionTab === 'dx') await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
     else await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
-    await fetchDashboardData();
+    
+    await fetchSupabaseData();
     showToast('データを削除しました', 'success');
   };
 
   const handleToggleHideItem = async (item: any, table: string) => {
     const payload = { id: item.id, is_hidden: !item.is_hidden };
     await supabaseRequest(table, 'PATCH', payload);
-    await fetchDashboardData();
+    
+    await fetchSupabaseData();
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
   if (!data || !isMounted) {
@@ -640,7 +645,6 @@ export default function UniversalDashboardPage() {
       </div>
     );
   }
-  
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate print:bg-white print:pb-0 print:block" translate="no">
       <style dangerouslySetInnerHTML={{__html: `@media print { @page { size: A4 portrait; margin: 10mm; } body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } main { zoom: 0.65; } .print-avoid-break { page-break-inside: avoid; } }`}} />
@@ -673,6 +677,7 @@ export default function UniversalDashboardPage() {
           {activeTab === 'actions' && <button onClick={handleOpenAddModal} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md"><Plus size={14} /> 新規追加</button>}
         </div>
       </header>
+
       <main className="p-4 md:p-8 max-w-[1800px] mx-auto space-y-4 md:space-y-6 print:p-0 print:space-y-8">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 print:hidden">
           <div className="flex flex-wrap gap-2">

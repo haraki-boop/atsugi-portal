@@ -43,10 +43,10 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 
 export default function UniversalDashboardPage() {
   // =========================================================
-  // 🏢 【拠点マスター設定】
+  // 🏢 【拠点マスター設定】（※他拠点にコピペする時はここだけ変える！）
   // =========================================================
-  const LOCATION_ID = 'showa-reizo'; // ① Supabase用の拠点ID
-  const LOCATION_NAME = '昭和冷蔵'; // ② ヘッダーに表示される現場名
+  const LOCATION_ID = 'showa-reizo'; 
+  const LOCATION_NAME = '昭和冷蔵'; 
   
   // 🛡️ 新仕様：直接のURLを削除し、安全な中継所を呼び出す
   const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
@@ -115,7 +115,6 @@ export default function UniversalDashboardPage() {
 
   const supabaseRequest = async (table: string, method: string, body?: any) => {
     try {
-      // クエリ（条件）の組み立て
       let query = '';
       if (method === 'GET') query = `?location_id=eq.${LOCATION_ID}&order=id.asc`;
       if (method === 'PATCH' || method === 'DELETE') query = `?id=eq.${body.id}`;
@@ -123,7 +122,6 @@ export default function UniversalDashboardPage() {
       const cleanBody = method === 'PATCH' ? { ...body } : body;
       if (method === 'PATCH') delete cleanBody.id;
 
-      // 🛡️ 直接Supabaseに繋がず、Next.jsの自社サーバー（中継所）に「お願い」を送る
       const res = await fetch('/api/supabase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,7 +170,6 @@ export default function UniversalDashboardPage() {
     fetchSupabaseData();
 
     try {
-      // 🟢 修正：gasUrl(小文字) から GAS_URL(大文字) に統一してエラーを撃破！
       const res = await fetch(GAS_URL);
       const json = await res.json();
       setData(json);
@@ -229,7 +226,6 @@ export default function UniversalDashboardPage() {
       const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
       
       const payload: any = {
-        // 🟢 修正：locationId(小文字) から LOCATION_ID(大文字) に一元化！
         location_id: LOCATION_ID,
         tab_id: activeTab,
         metric_title: metricTitle,
@@ -588,23 +584,25 @@ export default function UniversalDashboardPage() {
     setIsModalOpen(true);
   };
 
+  // ⚡ 爆速化適用：モーダルを一瞬で閉じて、Supabaseだけを再取得する！
   const handleSaveItem = async () => {
+    setIsModalOpen(false);
+
     if (activeActionTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
-      // 🟢 修正：locationId(小文字) から LOCATION_ID(大文字) に統一！
       const payload = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
       if (editingIndex !== null) { payload.id = historyItems[editingIndex].id; await supabaseRequest('sales_history', 'PATCH', payload); }
       else { await supabaseRequest('sales_history', 'POST', payload); }
     } else {
       if (!newItem.name) return;
-      // 🟢 修正：locationId(小文字) から LOCATION_ID(大文字) に統一！
-      const payload = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.start_date.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
+      const payload = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
       const targetTable = activeActionTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingIndex !== null) {
         const targetList = activeActionTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
       } else { await supabaseRequest(targetTable, 'POST', payload); }
     }
-    await fetchDashboardData(); setIsModalOpen(false);
+    
+    await fetchSupabaseData();
     showToast('データを保存しました', 'success');
   };
 
@@ -612,17 +610,18 @@ export default function UniversalDashboardPage() {
     if (activeActionTab === 'history') await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
     else if (activeActionTab === 'dx') await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
     else await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
-    await fetchDashboardData();
+    
+    await fetchSupabaseData();
     showToast('データを削除しました', 'success');
   };
 
   const handleToggleHideItem = async (item: any, table: string) => {
     const payload = { id: item.id, is_hidden: !item.is_hidden };
     await supabaseRequest(table, 'PATCH', payload);
-    await fetchDashboardData();
+    
+    await fetchSupabaseData();
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
-
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
