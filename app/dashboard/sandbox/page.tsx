@@ -331,17 +331,14 @@ export default function UniversalDashboardPage() {
 
       if (!combinedMap.has(cleanTitle)) {
         const setting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === cleanTitle);
-
         combinedMap.set(cleanTitle, {
-          title: cleanTitle,
-          labels: item.labels || baseLabelsFiltered,
+          title: cleanTitle, labels: item.labels || baseLabelsFiltered,
           actual_thisMonth: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           actual_lastMonth: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           actual_lastYear: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           forecast: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           forecastType: '予測',
-          is_pinned: setting ? setting.is_pinned : false,   
-          is_hidden: setting ? setting.is_hidden : false    
+          is_pinned: setting ? setting.is_pinned : false, is_hidden: setting ? setting.is_hidden : false    
         });
       }
       const entry = combinedMap.get(cleanTitle);
@@ -373,31 +370,18 @@ export default function UniversalDashboardPage() {
 
     if (activeTab === 'labor') {
       const staffSetting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === 'スタッフ工数 (通常・残業・深夜)');
-
       const stackedGroups: any = {
-        'スタッフ工数': { 
-          title: 'スタッフ工数 (通常・残業・深夜)', 
-          isStacked: true, 
-          data: {},
-          is_pinned: staffSetting ? staffSetting.is_pinned : false,
-          is_hidden: staffSetting ? staffSetting.is_hidden : false
-        },
+        'スタッフ工数': { title: 'スタッフ工数 (通常・残業・深夜)', isStacked: true, data: {}, is_pinned: staffSetting ? staffSetting.is_pinned : false, is_hidden: staffSetting ? staffSetting.is_hidden : false },
       };
-
       const finalResult: any[] = [];
       result.forEach(m => {
-        if (m.title === '社員工数_残業工数') {
-          m.title = '社員工数_残業';
-          finalResult.push(m);
-        }
-        else if (m.title === '社員工数_通常工数' || m.title === '社員工数_深夜工数') {
-        }
+        if (m.title === '社員工数_残業工数') { m.title = '社員工数_残業'; finalResult.push(m); }
+        else if (m.title === '社員工数_通常工数' || m.title === '社員工数_深夜工数') { }
         else if (m.title === 'スタッフ工数_通常工数') stackedGroups['スタッフ工数'].data['通常'] = m;
         else if (m.title === 'スタッフ工数_残業工数') stackedGroups['スタッフ工数'].data['残業'] = m;
         else if (m.title === 'スタッフ工数_深夜工数') stackedGroups['スタッフ工数'].data['深夜'] = m;
         else finalResult.push(m);
       });
-
       if (Object.keys(stackedGroups['スタッフ工数'].data).length > 0) finalResult.push(stackedGroups['スタッフ工数']);
       return finalResult;
     }
@@ -406,7 +390,6 @@ export default function UniversalDashboardPage() {
 
   const sortedMetrics = getCombinedMetrics();
 
-  // 🌟【エラー修正済】月次着地の集計時のスタックグラフ対策
   const finalSortedMetrics = useMemo(() => {
     if (!['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab)) return sortedMetrics;
 
@@ -488,11 +471,9 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【新設】7. 月次生産性用の専用データマッピング（時系列グラフ＋サマリーパネル用）
   const monthlyProductivityData = useMemo(() => {
     if (!data || !data.productivityData || !data.productivityAccumulatedData) return [];
     
-    // 1. まず生産性データの中から「目標」を持っている工程（プロセス名）を抽出する
     const processes = new Set<string>();
     data.productivityData.forEach((d: any) => {
       if (d.title.startsWith('目標_作業生産性_')) {
@@ -501,26 +482,22 @@ export default function UniversalDashboardPage() {
     });
 
     return Array.from(processes).map(process => {
-      // 目標データは今月分のデータが daily で入っている
       const targetObj = data.productivityData.find((d: any) => d.title === `目標_作業生産性_${process}`);
       const targets = targetObj ? targetObj.values : [];
       const labels = targetObj ? targetObj.labels : [];
 
-      // 永久蓄積データから指定した月の実績データをマッピングする
       const accObj = data.productivityAccumulatedData.find((d: any) => d.title === `蓄積実績_作業生産性_${process}`);
       
       let actSum = 0; let actCount = 0;
       let tgtSum = 0; let tgtCount = 0;
 
       const chartData = labels.map((lbl: any, idx: number) => {
-        // ラベル（例: "06/01"）から日を取得
         const dayMatch = String(lbl).match(/\d+/g);
         const dayStr = dayMatch ? dayMatch[dayMatch.length - 1] : String(idx + 1);
         const dayNum = parseInt(dayStr, 10);
         
         let actualVal = 0;
         if (accObj) {
-          // 指定された月（prodSelectedMonth）と日を組み合わせてYYYY/MM/DDの形式を探す
           const targetDateStr = `${prodSelectedMonth.padStart(2, '0')}/${String(dayNum).padStart(2, '0')}`;
           const accIdx = accObj.labels.findIndex((l: any) => String(l).includes(targetDateStr));
           if (accIdx !== -1) actualVal = n(accObj.values[accIdx]);
@@ -683,7 +660,6 @@ export default function UniversalDashboardPage() {
 
   const handleSaveItem = async () => {
     setIsModalOpen(false);
-
     if (activeActionTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
       const payload: any = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
@@ -697,7 +673,6 @@ export default function UniversalDashboardPage() {
         const targetList = activeActionTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
       } else { await supabaseRequest(targetTable, 'POST', payload); }
     }
-    
     await fetchSupabaseData();
     showToast('データを保存しました', 'success');
   };
@@ -706,7 +681,6 @@ export default function UniversalDashboardPage() {
     if (activeActionTab === 'history') await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
     else if (activeActionTab === 'dx') await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
     else await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
-    
     await fetchSupabaseData();
     showToast('データを削除しました', 'success');
   };
@@ -714,7 +688,6 @@ export default function UniversalDashboardPage() {
   const handleToggleHideItem = async (item: any, table: string) => {
     const payload = { id: item.id, is_hidden: !item.is_hidden };
     await supabaseRequest(table, 'PATCH', payload);
-    
     await fetchSupabaseData();
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
@@ -847,7 +820,6 @@ export default function UniversalDashboardPage() {
               lastMonthRatio = dispLastAct > 0 ? (dispAct / dispLastAct) * 100 : (dispAct > 0 ? 100 : 0);
               lastYearRatio = dispPrevYearAct > 0 ? (dispAct / dispPrevYearAct) * 100 : (dispAct > 0 ? 100 : 0);
 
-              // 🌟 グラフ描画データ生成（月次の場合も、日次のフルサイズAreaChartとして描画し、統一感を出す）
               const chartIndicesForRender = isMonthly ? currentMonthIndices : (displayMode === 'daily' ? currentMonthIndices : weekIdx);
               chartData = chartIndicesForRender.map(idx => {
                 if (isStacked) return { name: baseLabelsFiltered[idx], 通常: n(m.data['通常']?.actual_thisMonth[idx]), 残業: n(m.data['残業']?.actual_thisMonth[idx]), 深夜: n(m.data['深夜']?.actual_thisMonth[idx]) };
@@ -951,22 +923,26 @@ export default function UniversalDashboardPage() {
                     {displayMode !== 'daily' && (
                       <div className="w-full xl:w-[240px] bg-slate-900 text-white p-5 rounded-2xl flex flex-col justify-between shrink-0 shadow-inner min-w-0">
                         <div>
-                          <p className="text-[9px] font-black tracking-widest text-blue-400 uppercase">{isMonthly ? '月次フォアキャスト確定' : (!isAvgMetric ? '当週合計確認':'当週平均確認')}</p>
-                          <div className="flex justify-between items-baseline mt-3">
-                            <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">{isMonthly ? '月末着地予測' : (!isAvgMetric ? '当週合計実績' : '当週平均実績')}</span>
-                            <span className="text-xl md:text-2xl font-black text-white">{formatVal(dispAct, m.title)}</span>
+                          {/* 🌟【修正】文字詰まり対策：mb-3で下の余白を広げた */}
+                          <p className="text-[9px] font-black tracking-widest text-blue-400 uppercase mb-3">{isMonthly ? '月次フォアキャスト確定' : (!isAvgMetric ? '当週合計確認':'当週平均確認')}</p>
+                          
+                          {/* 🌟【修正】文字詰まり対策：flex justify-between をやめて、ラベルと数値を縦並びに（ドカンと配置） */}
+                          <div className="mb-3">
+                            <span className="text-[10px] md:text-[11px] font-bold text-slate-400 block mb-0.5">{isMonthly ? '月末着地予測' : (!isAvgMetric ? '当週合計実績' : '当週平均実績')}</span>
+                            <span className="text-2xl md:text-3xl font-black text-white block tracking-tighter">{formatVal(dispAct, m.title)}</span>
                           </div>
+
                           {(hasForecastData || isMonthly) && !isStacked && (
-                            <>
-                              <div className="flex justify-between items-baseline mt-2">
+                            <div className="space-y-2 mt-3 pt-3 border-t border-slate-700/50">
+                              <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">{isMonthly ? '今月目標設定' : (!isAvgMetric ? `当週${m.forecastType}` : `当週平均${m.forecastType}`)}</span>
                                 <span className="text-sm md:text-base font-bold text-slate-300">{formatVal(dispFct, m.title)}</span>
                               </div>
-                              <div className="flex justify-between items-baseline mt-2.5 border-t border-slate-700/50 pt-2.5">
+                              <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] md:text-xs font-black text-blue-400 whitespace-nowrap">達成率</span>
-                                <span className={`text-xl md:text-2xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
+                                <span className={`text-lg md:text-xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                               </div>
-                            </>
+                            </div>
                           )}
                         </div>
                         <div className="border-t border-slate-800 pt-3 mt-3 flex flex-col gap-2">
@@ -1102,14 +1078,19 @@ export default function UniversalDashboardPage() {
                       {/* 右側サマリーエリア */}
                       <div className="w-full xl:w-[240px] bg-slate-900 text-white p-5 rounded-2xl flex flex-col justify-between shrink-0 shadow-inner min-w-0">
                         <div>
-                          <p className="text-[9px] font-black tracking-widest text-amber-400 uppercase">月間生産性 サマリー</p>
-                          <div className="flex justify-between items-baseline mt-3">
-                            <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">月間 実績平均</span>
-                            <span className="text-xl md:text-2xl font-black text-white">{item.actAvg.toFixed(1)}</span>
+                          {/* 🌟【修正】文字詰まり対策：タイトルと数値を縦並び（flex-col相当）にして余白調整 */}
+                          <p className="text-[9px] font-black tracking-widest text-amber-400 uppercase mb-3">月間生産性 サマリー</p>
+                          
+                          <div className="mb-3">
+                            <span className="text-[10px] md:text-[11px] font-bold text-slate-400 block mb-0.5">月間 実績平均</span>
+                            <span className="text-2xl md:text-3xl font-black text-white block tracking-tighter">{item.actAvg.toFixed(1)}</span>
                           </div>
-                          <div className="flex justify-between items-baseline mt-2">
-                            <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">月間 目標平均</span>
-                            <span className="text-sm md:text-base font-bold text-slate-300">{item.tgtAvg.toFixed(1)}</span>
+
+                          <div className="space-y-2 mt-3 pt-3 border-t border-slate-700/50">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">月間 目標平均</span>
+                              <span className="text-sm md:text-base font-bold text-slate-300">{item.tgtAvg.toFixed(1)}</span>
+                            </div>
                           </div>
                         </div>
 
@@ -1358,7 +1339,7 @@ export default function UniversalDashboardPage() {
                       </div>
                       <div className="flex justify-between items-end">
                         <span className="text-[8px] text-slate-400 font-bold whitespace-nowrap">予算</span>
-                        <span className="text-[9px] md:text-[10px] font-bold text-slate-500 whitespace-nowrap">{formatVal(fctVal, m.title)}</span>
+                        <span className="text-[9px] md:text-[10px] font-bold text-slate-50 whitespace-nowrap">{formatVal(fctVal, m.title)}</span>
                       </div>
                       <div className="flex justify-between items-end border-t border-dashed border-slate-200 pt-1">
                         <span className="text-[8px] text-slate-400 font-bold whitespace-nowrap">差異</span>
