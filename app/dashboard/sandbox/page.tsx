@@ -384,7 +384,7 @@ export default function UniversalDashboardPage() {
 
     if (searchQuery) result = result.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    // 🌟【修正】スタッフ工数の合算ロジック時に、全体の「予測・予算」データもキャッチしてスタックに結合する
+    // 🌟スタッフ工数の合算ロジック
     if (activeTab === 'labor') {
       const staffSetting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === 'スタッフ工数 (通常・残業・深夜)');
       const stackedGroups: any = {
@@ -456,7 +456,6 @@ export default function UniversalDashboardPage() {
           if (prevYearAct > 0) { totalLastYear += prevYearAct; validLastYearDays++; }
         });
 
-        // 🌟【大改修】予算データが無い場合、実績の平均値から月末着地をランレート予測で自動補完する
         if (!hasFct && validChakuchiDays > 0 && validChakuchiDays < currentMonthIndices.length && !isAvgMetric) {
           const dailyAvg = totalChakuchi / validChakuchiDays;
           totalChakuchi = dailyAvg * currentMonthIndices.length;
@@ -514,7 +513,6 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【大改修】月次生産性のカテゴリ別取得ロジック（工数を消し、GASから生産性を直接取得）
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
     
@@ -766,6 +764,18 @@ export default function UniversalDashboardPage() {
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
   };
 
+  const handleToggleHideMetric = async (metricTitle: string) => {
+    const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
+    const isCurrentlyHidden = existing ? existing.is_hidden : false;
+    await handleToggleMetricSetting(metricTitle, 'is_hidden', isCurrentlyHidden);
+  };
+
+  const handleTogglePinMetric = async (metricTitle: string) => {
+    const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
+    const isCurrentlyPinned = existing ? existing.is_pinned : false;
+    await handleToggleMetricSetting(metricTitle, 'is_pinned', isCurrentlyPinned);
+  };
+
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -839,7 +849,7 @@ export default function UniversalDashboardPage() {
               <input type="text" placeholder="項目を絞り込み検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
             </div>
             
-            {/* 🌟 1〜5のタブでは月切り替えフィルターを非表示にし、事故管理に限定 */}
+            {/* 🌟 1〜5のタブでは月切り替えフィルターを非表示にし、事故管理などに限定 */}
             {['accidents'].includes(activeTab) && (
               <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-2.5 rounded-xl shadow-sm shrink-0">
                 <Calendar size={14} className="text-blue-500" />
@@ -887,6 +897,10 @@ export default function UniversalDashboardPage() {
               let lastYearRatio = 0; 
               let hasForecastData = m.forecast?.some((v: number) => n(v) > 0) || false;
 
+              let totalChakuchi = 0; 
+              let validChakuchiDays = 0;
+              let dailyAvg = 0;
+
               const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
               const targetIndices = isMonthly ? currentMonthIndices : (displayMode === 'weekly' ? weekIdx : currentMonthIndices.filter(idx => {
                 if (!baseLabelsFiltered[idx]) return false;
@@ -905,6 +919,13 @@ export default function UniversalDashboardPage() {
                 dispFct = m._monthlyBudget;
                 dispLastAct = m._monthlyLastAct;
                 dispPrevYearAct = m._monthlyPrevYearAct;
+                
+                currentMonthIndices.forEach(idx => {
+                  let actVal = isStacked ? (n(m.data['通常']?.actual_thisMonth[idx]) + n(m.data['残業']?.actual_thisMonth[idx]) + n(m.data['深夜']?.actual_thisMonth[idx])) : n(m.actual_thisMonth?.[idx]);
+                  if (actVal > 0) { totalChakuchi += actVal; validChakuchiDays++; }
+                });
+                dailyAvg = validChakuchiDays > 0 ? totalChakuchi / validChakuchiDays : 0;
+
               } else if (displayMode === 'weekly') {
                 if (!isStacked) {
                   const fcts = targetIndices.map(idx => n(m.forecast[idx]));
@@ -943,16 +964,27 @@ export default function UniversalDashboardPage() {
               const chartIndicesForRender = isMonthly ? currentMonthIndices : (displayMode === 'daily' ? currentMonthIndices : weekIdx);
               chartData = chartIndicesForRender.map(idx => {
                 if (isStacked) {
+                  let fctVal = m.forecast ? n(m.forecast[idx]) : 0;
+                  if (fctVal === 0 && !hasForecastData && !isAvgMetric && dailyAvg > 0) {
+                    fctVal = dailyAvg;
+                  }
                   return { 
                     name: baseLabelsFiltered[idx], 
                     通常: n(m.data['通常']?.actual_thisMonth[idx]), 
                     残業: n(m.data['残業']?.actual_thisMonth[idx]), 
                     深夜: n(m.data['深夜']?.actual_thisMonth[idx]),
-                    [m.forecastType]: m.forecast ? n(m.forecast[idx]) : 0
+                    [m.forecastType]: fctVal
                   };
                 }
-                return { name: m.labels[idx], 今月実績: n(m.actual_thisMonth[idx]), 先月: n(m.actual_lastMonth[idx]), 前年: n(m.actual_lastYear[idx]), [m.forecastType]: n(m.forecast[idx]) };
+                
+                let fctVal = n(m.forecast[idx]);
+                if (fctVal === 0 && !hasForecastData && !isAvgMetric && dailyAvg > 0) {
+                  fctVal = dailyAvg;
+                }
+                return { name: m.labels[idx], 今月実績: n(m.actual_thisMonth[idx]), 先月: n(m.actual_lastMonth[idx]), 前年: n(m.actual_lastYear[idx]), [m.forecastType]: fctVal };
               });
+
+              if (!hasForecastData && !isAvgMetric && dailyAvg > 0) hasForecastData = true;
 
               const getDiffBgBorderColor = (diff: number | null, isCost: boolean) => {
                 if (diff === null || diff === 0) return 'text-slate-500 bg-slate-50 border-slate-200';
@@ -967,71 +999,69 @@ export default function UniversalDashboardPage() {
               const secondaryColor = '#8b5cf6';
 
               return (
-                <div key={i} className={`print-avoid-break p-5 md:p-6 rounded-3xl shadow-sm flex flex-col gap-4 md:gap-5 min-w-0 overflow-hidden transition-all border relative ${m.is_hidden ? 'opacity-40 bg-slate-100 border-dashed border-amber-300' : 'bg-white border-slate-200'}`}>
-                  <div className="absolute top-6 right-6 flex gap-1.5 print:hidden z-20">
-                    <button onClick={() => handleToggleMetricSetting(m.title, 'is_pinned', m.is_pinned)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_pinned ? 'bg-blue-100 border-blue-300 text-blue-600 font-black' : 'bg-white text-slate-400 hover:text-blue-500'}`} title={m.is_pinned ? "最上位ピン留めを解除" : "最上位にピン留めする"}><Pin size={13} className={m.is_pinned ? "fill-blue-600 rotate-45" : ""} /></button>
-                    <button onClick={() => handleToggleMetricSetting(m.title, 'is_hidden', m.is_hidden)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_hidden ? 'bg-amber-100 border-amber-300 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={m.is_hidden ? "グラフを表示する" : "グラフを非表示にする"}>{m.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}</button>
+                <div key={i} className={`print-avoid-break p-4 rounded-2xl shadow-sm flex flex-col gap-3 min-w-0 overflow-hidden transition-all border ${m.is_hidden ? 'opacity-40 bg-slate-100 border-dashed border-amber-300' : 'bg-white border-slate-200'}`}>
+                  
+                  {/* ヘッダー領域: バッジ類とタイトル */}
+                  <div className="flex flex-col gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex justify-between items-center w-full">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] md:text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shadow-sm whitespace-nowrap">{dataMonth}月</span>
+                        {m.is_pinned && <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm">📌 固定中</span>}
+                      </div>
+                      <div className="flex gap-1.5 print:hidden z-20">
+                        <button onClick={() => handleTogglePinMetric(m.title)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_pinned ? 'bg-blue-100 border-blue-300 text-blue-600 font-black' : 'bg-white text-slate-400 hover:text-blue-500'}`} title={m.is_pinned ? "最上位ピン留めを解除" : "最上位にピン留めする"}><Pin size={13} className={m.is_pinned ? "fill-blue-600 rotate-45" : ""} /></button>
+                        <button onClick={() => handleToggleHideMetric(m.title)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_hidden ? 'bg-amber-100 border-amber-300 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={m.is_hidden ? "グラフを表示する" : "グラフを非表示にする"}><Eye size={13} /></button>
+                      </div>
+                    </div>
+                    <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tighter leading-snug truncate" title={m.title}>{m.title}</h4>
                   </div>
 
-                  <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 border-b border-slate-100 pb-4">
-                    <div className="flex-1 flex flex-col items-start min-w-0 w-full pr-16">
-                      <div className="flex items-center gap-3 mb-1.5 w-full">
-                        <span className="text-[10px] md:text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shadow-sm whitespace-nowrap shrink-0">{dataMonth}月</span>
-                        {m.is_pinned && <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm shrink-0">📌 固定中</span>}
-                        <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tighter uppercase leading-tight truncate">{m.title}</h4>
+                  {/* 🌟真・案A: 実績額と進捗率、その下に比較バッジ（左右に配置） */}
+                  <div className="flex flex-col gap-2.5 pt-0.5 pb-1">
+                    <div className="flex justify-between items-start w-full gap-4">
+                      <div className="flex-1">
+                        {(displayMode === 'daily' || displayMode === 'monthly') && (
+                          <div className="mt-0">
+                            {isMonthly && <span className="text-[10px] font-bold text-slate-400 block mb-0.5">月末着地予測</span>}
+                            <p className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-none">{formatVal(dispAct, m.title)}</p>
+                          </div>
+                        )}
                       </div>
-                      {(displayMode === 'daily' || displayMode === 'monthly') && (
-                        <div className="mt-1.5">
-                          {isMonthly && <span className="text-[10px] font-bold text-slate-400 block mb-0.5">月末着地予測</span>}
-                          <p className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-none">{formatVal(dispAct, m.title)}</p>
+                      
+                      {/* 進捗率を右端へ */}
+                      {(displayMode === 'daily' || displayMode === 'monthly') && (hasForecastData || isMonthly) && !isStacked && (
+                        <div className="flex items-center gap-2 bg-slate-900 text-white px-3 py-1.5 rounded-xl shadow-sm text-right shrink-0">
+                          <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">{isMonthly ? '予算達成率' : '進捗率'}</span>
+                          <span className={`text-sm sm:text-base font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                         </div>
                       )}
                     </div>
 
+                    {/* 🌟【完璧修正】先月差・前年差のバッジも右詰め（justify-end）に統一！ */}
                     {(displayMode === 'daily' || displayMode === 'monthly') && (
-                      <div className="flex flex-col gap-2 shrink-0 w-full xl:w-auto">
-                        <div className="flex gap-2">
-                          {(hasForecastData || isMonthly) && !isStacked ? (
-                            <div className="flex items-center gap-3 bg-white border px-4 py-1.5 rounded-xl shadow-sm flex-1 xl:flex-none justify-center">
-                              <span className="text-xs font-bold text-slate-400 whitespace-nowrap">{isMonthly ? '予算達成率' : '進捗率'}</span>
-                              <span className={`text-xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</span>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex flex-col bg-white border px-3 py-1 rounded-xl flex-1 items-center justify-center">
-                                <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{lastLbl}比</span>
-                                <span className={`text-sm font-black whitespace-nowrap ${dispLastAct === null ? 'text-slate-400' : diffLastMonth >= 0 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>
-                                  {dispLastAct === null ? '-' : `${lastMonthRatio.toFixed(1)}%`}
-                                </span>
-                              </div>
-                              <div className="flex flex-col bg-white border px-3 py-1 rounded-xl flex-1 items-center justify-center">
-                                <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">前年比</span>
-                                <span className={`text-sm font-black whitespace-nowrap ${diffLastYear >= 0 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>
-                                  {lastYearRatio.toFixed(1)}%
-                                </span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <span className={`flex-1 xl:flex-none text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center justify-between gap-3 border ${getDiffBgBorderColor(dispLastAct === null ? null : diffLastMonth, isCost)}`}>
-                            <span className="whitespace-nowrap">{lastLbl}{isMonthly ? '差' : '比'}</span>
-                            <span className="whitespace-nowrap font-black">{dispLastAct === null ? '-' : (diffLastMonth > 0 ? '+' : diffLastMonth < 0 ? '-' : '±') + ((hasForecastData||isMonthly) && !isStacked ? formatVal(Math.abs(diffLastMonth), m.title) : `${lastMonthRatio.toFixed(1)}%`)}</span>
+                      <div className="flex flex-col gap-1.5 w-full mt-0.5">
+                        <div className="flex flex-wrap gap-1.5 justify-end">
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border shadow-sm ${getDiffBgBorderColor(dispLastAct === null ? null : diffLastMonth, isCost)}`}>
+                            <span className="text-slate-400 font-medium">{lastLbl}{isMonthly ? '差' : '比'}:</span>
+                            <span className="font-black">{dispLastAct === null ? '-' : (diffLastMonth > 0 ? '+' : '') + formatVal(diffLastMonth, m.title)}</span>
+                            {dispLastAct !== null && <span className="text-[9px] opacity-75">({lastMonthRatio.toFixed(1)}%)</span>}
                           </span>
-                          <span className={`flex-1 xl:flex-none text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center justify-between gap-3 border ${getDiffBgBorderColor(diffLastYear, isCost)}`}>
-                            <span className="whitespace-nowrap">前年{isMonthly ? '差' : '比'}</span>
-                            <span className="whitespace-nowrap font-black">{diffLastYear > 0 ? '+' : diffLastYear < 0 ? '-' : '±'}{(hasForecastData||isMonthly) && !isStacked ? formatVal(Math.abs(diffLastYear), m.title) : `${lastYearRatio.toFixed(1)}%`}</span>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border shadow-sm ${getDiffBgBorderColor(diffLastYear, isCost)}`}>
+                            <span className="text-slate-400 font-medium">前年{isMonthly ? '差' : '比'}:</span>
+                            <span className="font-black">{diffLastYear > 0 ? '+' : ''} {formatVal(diffLastYear, m.title)}</span>
+                            <span className="text-[9px] opacity-75">({lastYearRatio.toFixed(1)}%)</span>
                           </span>
                         </div>
-                        <div className="flex gap-2">
-                          <div className="bg-slate-50 px-3 py-1 rounded-lg border flex-1 xl:flex-none flex justify-between items-center gap-3">
-                            <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{lastLbl}{isMonthly?'着地':''}</span>
-                            <span className="text-[10px] font-black text-slate-600 whitespace-nowrap">{dispLastAct === null ? '-' : formatVal(dispLastAct, m.title)}</span>
-                          </div>
-                          <div className="bg-amber-50 px-3 py-1 rounded-lg border border-amber-200 flex-1 xl:flex-none flex justify-between items-center gap-3">
-                            <span className="text-[9px] font-bold text-amber-600 whitespace-nowrap">前年{isMonthly?'着地':''}</span>
-                            <span className="text-[10px] font-black text-amber-700 whitespace-nowrap">{formatVal(dispPrevYearAct, m.title)}</span>
-                          </div>
+                        {/* 「先月：」「前年：」も下段で右詰め（justify-end） */}
+                        <div className="flex flex-wrap gap-1.5 justify-end mt-0.5">
+                          <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-lg border text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                            <span className="text-slate-400 font-medium">{lastLbl}:</span>
+                            <span className="font-mono font-black">{dispLastAct === null ? '-' : formatVal(dispLastAct, m.title)}</span>
+                          </span>
+                          <span className="bg-amber-50 text-amber-800 px-2.5 py-1 rounded-lg border border-amber-200 text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                            <span className="text-amber-500 font-medium">前年:</span>
+                            <span className="font-mono font-black">{formatVal(dispPrevYearAct, m.title)}</span>
+                          </span>
                         </div>
                       </div>
                     )}
@@ -1040,7 +1070,6 @@ export default function UniversalDashboardPage() {
                   <div className={displayMode !== 'daily' ? 'flex flex-col xl:flex-row gap-4 items-stretch w-full min-w-0' : 'w-full min-w-0'}>
                     <div className="flex-1 w-full h-[220px] min-h-[220px] bg-slate-50/50 p-2 rounded-2xl border min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
-                        {/* 🌟【大改修】BarChartからComposedChartに変更し、予測ラインをオーバーレイ描画 */}
                         {isStacked ? (
                           <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1067,11 +1096,12 @@ export default function UniversalDashboardPage() {
                             {chartData.some(d => d["前年"]) && <Area type="monotone" name="前年" dataKey="前年" stroke="#fbbf24" strokeWidth={2.5} fillOpacity={0} />}
                             {chartData.some(d => d["先月"]) && <Area type="monotone" name="先月" dataKey="先月" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" fillOpacity={0} />}
                             <Area type="monotone" name="今月実績" dataKey="今月実績" stroke={primaryColor} strokeWidth={3} fillOpacity={1} fill={`url(#colorAct-${i})`} activeDot={{ r: 5 }} />
-                            {hasForecastData && <Area type="monotone" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill={`url(#colorFct-${i})`} />}
+                            {hasForecastData && <Area type="step" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill={`url(#colorFct-${i})`} />}
                           </AreaChart>
                         )}
                       </ResponsiveContainer>
                     </div>
+                    {/* 🌟【完全復活】週次・月次の時に右側に出現する黒いフォアキャストパネル */}
                     {displayMode !== 'daily' && (
                       <div className="w-full xl:w-[240px] bg-slate-900 text-white p-5 rounded-2xl flex flex-col justify-between shrink-0 shadow-inner min-w-0">
                         <div>
@@ -1088,7 +1118,7 @@ export default function UniversalDashboardPage() {
                               </div>
                               <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] md:text-xs font-black text-blue-400 whitespace-nowrap">達成率</span>
-                                <span className={`text-lg md:text-xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'textemerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
+                                <span className={`text-lg md:text-xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                               </div>
                             </div>
                           )}
@@ -1218,7 +1248,7 @@ export default function UniversalDashboardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {computedVaultProductivity.items.length === 0 ? (
                     <div className="col-span-full py-10 text-center text-slate-400 font-bold">蓄積金庫にデータが存在しません。GAS側の一括更新スイッチを起動してください。</div>
                   ) : (
