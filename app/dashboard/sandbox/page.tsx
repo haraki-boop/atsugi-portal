@@ -283,7 +283,7 @@ export default function UniversalDashboardPage() {
   }, [data]);
 
   const baseLabelsFiltered = data ? (data.labels || []) : [];
-  const currentMonthIndices = baseLabelsFiltered.map((_, idx) => idx);
+  const currentMonthIndices = baseLabelsFiltered.map((_: any, idx: number) => idx);
 
   const contractAvailableMonths = (() => {
     if (!data || !data.contractYojitsuData || data.contractYojitsuData.length === 0) return [];
@@ -513,47 +513,87 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
+  // =========================================================
+  // ⚙️ 【改修済み】物量・工数・生産性の3つの金庫データを解析するロジック
+  // =========================================================
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
     
     const targetMonthStr = `/${prodSelectedMonth.padStart(2, '0')}/`;
     
-    const vRows = (data.vaultVolume || []).filter((r: any) => r.date.includes(targetMonthStr));
-    const hTotalRows = (data.vaultTotalHours || []).filter((r: any) => r.date.includes(targetMonthStr));
+    // 💡 1. GASから届いた新しい「物量金庫」をフラット化
+    const vRows: any[] = [];
+    if (data.volumeAccumulatedData) {
+      data.volumeAccumulatedData.forEach((item: any) => {
+        const itemName = item.title.replace('蓄積実績_', '');
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            vRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
+          }
+        });
+      });
+    }
+
+    // 💡 2. GASから届いた新しい「工数金庫」をフラット化（日次・センター全体の合算用）
+    const hTotalRows: any[] = [];
+    if (data.manhoursAccumulatedData) {
+      data.manhoursAccumulatedData.forEach((item: any) => {
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            const existing = hTotalRows.find(h => h.date === date);
+            if (existing) {
+              existing.value += n(item.values[idx]);
+            } else {
+              hTotalRows.push({ date: date, value: n(item.values[idx]) });
+            }
+          }
+        });
+      });
+    }
+
+    // 💡 3. GASから届いた「生産性金庫」をフラット化
+    const pRows: any[] = [];
+    if (data.productivityAccumulatedData) {
+      data.productivityAccumulatedData.forEach((item: any) => {
+        const itemName = item.title.replace('蓄積実績_作業生産性_', '');
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            pRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
+          }
+        });
+      });
+    }
     
+    // 💡 4. 日付のユニークリストを作成し、タイムラインで並び替え
     const allDates = Array.from(new Set([
       ...vRows.map((r: any) => r.date),
-      ...hTotalRows.map((r: any) => r.date)
+      ...hTotalRows.map((r: any) => r.date),
+      ...pRows.map((r: any) => r.date)
     ])).sort();
     
     const processNames = ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
-    const prodDataAll = data.productivityData || [];
     
+    let centerTotalVolume = 0;
+    let centerTotalHours = 0;
+    
+    // 💡 5. 【カテゴリ計算】物量合計と平均生産性の計算
     const items = processNames.map(proc => {
       let procTotalVolume = 0;
       let prodSum = 0;
       let prodCount = 0;
       
-      const targetItem = prodDataAll.find((d:any) => d.title.includes(`実績_作業生産性_${proc}`));
+      // 🌟 【紐付け修正】生産性側の名前に変換するマッパー
+      let prodName = proc;
+      if (proc === "ユニー一括") prodName = "ユニー";
+      if (proc === "BB") prodName = "ブロンコビリー";
       
       const dailyList = allDates.map(dt => {
         const vMob = vRows.find((r: any) => r.date === dt && r.item === proc);
         const vol = vMob ? vMob.value : 0;
         
-        let prod = 0;
-        if (targetItem) {
-           const idx = targetItem.labels.findIndex((l:any) => {
-              const dStr = String(l).replace(/[^0-9/]/g, '');
-              const parts = dStr.split('/');
-              const dtParts = dt.split('/');
-              if (parts.length >= 2 && dtParts.length >= 2) {
-                 return parseInt(parts[parts.length-2], 10) === parseInt(dtParts[dtParts.length-2], 10) && 
-                        parseInt(parts[parts.length-1], 10) === parseInt(dtParts[dtParts.length-1], 10);
-              }
-              return false;
-           });
-           if (idx !== -1) prod = n(targetItem.values[idx]);
-        }
+        // 💡 生産性を探すときは、変換した prodName（ユニー、ブロンコビリー）を使う！
+        const pMob = pRows.find((r: any) => r.date === dt && r.item === prodName);
+        const prod = pMob ? pMob.value : 0;
         
         procTotalVolume += vol;
         if (prod > 0) {
@@ -565,21 +605,21 @@ export default function UniversalDashboardPage() {
       });
       
       const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
+      
+      // センター全体用に「対象5カテゴリ」の物量だけを加算
+      centerTotalVolume += procTotalVolume;
+
       return { process: proc, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
     });
     
-    let centerTotalVolume = 0;
-    let centerTotalHours = 0;
+    // 💡 6. 【センター全体計算】総物量と総工数から生産性を割り算で算出
+    centerTotalHours = hTotalRows.reduce((sum, r) => sum + r.value, 0);
     
     const centerDailyList = allDates.map(dt => {
       const dayVol = vRows.filter((r: any) => r.date === dt && processNames.includes(r.item)).reduce((sum: number, r: any) => sum + r.value, 0);
       const dayHrsRow = hTotalRows.find((r: any) => r.date === dt);
       const dayHrs = dayHrsRow ? dayHrsRow.value : 0;
       const dayProd = dayHrs > 0 ? dayVol / dayHrs : 0;
-      
-      centerTotalVolume += dayVol;
-      centerTotalHours += dayHrs;
-      
       return { date: dt.split('/').slice(1).join('/'), volume: dayVol, hours: dayHrs, prod: dayProd };
     });
     
@@ -596,6 +636,7 @@ export default function UniversalDashboardPage() {
     return { items, summary: { totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd } };
   }, [data, prodSelectedMonth]);
 
+  // 💡 【重要】先ほど消えてしまっていた「contractList」やその他の変数を確実に復元！
   const contractList = (() => {
     if (!data || !data.contractYojitsuData) return [];
     const cMap = new Map();
@@ -775,7 +816,6 @@ export default function UniversalDashboardPage() {
     const isCurrentlyPinned = existing ? existing.is_pinned : false;
     await handleToggleMetricSetting(metricTitle, 'is_pinned', isCurrentlyPinned);
   };
-
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
