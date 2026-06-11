@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin, Target, Award } from 'lucide-react';
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 
@@ -16,11 +16,20 @@ const n = (val: any) => {
 const getAvailableMonths = () => {
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
   const months = [];
   for (let i = 0; i < 6; i++) {
     let m = currentMonth - i;
-    if (m <= 0) m += 12;
-    months.push(m.toString());
+    let y = currentYear;
+    if (m <= 0) {
+      m += 12;
+      y -= 1;
+    }
+    months.push({
+      year: y,
+      month: m.toString(),
+      display: `${String(y).slice(-2)}年${m}月`
+    });
   }
   return months.reverse();
 };
@@ -43,41 +52,37 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 
 export default function UniversalDashboardPage() {
   // =========================================================
-  // 🏢 【拠点マスター設定】（※他拠点にコピペする時はここだけ変える！）
+  // 🏢 【拠点マスター設定】
   // =========================================================
   const LOCATION_ID = 'landport-narashino'; 
   const LOCATION_NAME = 'ランドポート習志野'; 
   
-  // 🛡️ 新仕様：直接のURLを削除し、安全な中継所を呼び出す
   const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
   const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<any>(null);
 
   // タブ管理・表示モード管理
   const [activeTab, setActiveTab] = useState('sales');
+  const [activeMonthlyTab, setActiveMonthlyTab] = useState<'salesConfirmed' | 'productivity'>('salesConfirmed');
   const [activeActionTab, setActiveActionTab] = useState<'dx' | 'env' | 'history'>('dx');
-  const [displayMode, setDisplayMode] = useState<'daily' | 'weekly'>('daily');
+  const [displayMode, setDisplayMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
 
   // 月選択ステート
   const [globalSelectedMonth, setGlobalSelectedMonth] = useState<string>('');
   const [contractSelectedMonth, setContractSelectedMonth] = useState<string>('');
-  
-  // 追加：月次確定タブ専用の年月ステート（例：2026/05）
   const [salesMonth, setSalesMonth] = useState<string>('');
+  const [prodSelectedMonth, setProdSelectedMonth] = useState<string>('');
 
   const [hideZeroContracts, setHideZeroContracts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // 非表示項目のトグリスイッチ
   const [showHiddenItems, setShowHiddenItems] = useState(false);        
   const [showHiddenMetrics, setShowHiddenMetrics] = useState(false);    
 
-  // AI診断用ステート
   const [tabAiAnalysis, setTabAiAnalysis] = useState<{ [key: string]: string }>({});
   const [isTabAnalyzing, setIsTabAnalyzing] = useState<{ [key: string]: boolean }>({});
 
-  // Supabaseデータ格納用ステート
   const [dxItems, setDxItems] = useState<any[]>([]);
   const [envItems, setEnvItems] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
@@ -125,12 +130,7 @@ export default function UniversalDashboardPage() {
       const res = await fetch('/api/supabase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: table,
-          actionMethod: method,
-          payload: (method === 'POST' || method === 'PATCH') ? cleanBody : undefined,
-          query: query
-        })
+        body: JSON.stringify({ table, actionMethod: method, payload: (method === 'POST' || method === 'PATCH') ? cleanBody : undefined, query })
       });
 
       if (!res.ok) {
@@ -174,10 +174,17 @@ export default function UniversalDashboardPage() {
       const json = await res.json();
       setData(json);
       if (!isReload && json && json.labels && json.labels.length > 0) {
-        const firstLabel = json.labels[0];
-        const extractedMonth = firstLabel.includes('/') ? parseInt(firstLabel.split('/')[0], 10).toString() : (new Date().getMonth() + 1).toString();
+        const firstLabel = String(json.labels[0]);
+        
+        let extractedMonth = (new Date().getMonth() + 1).toString();
+        if (firstLabel.includes('/')) {
+          const parts = firstLabel.split('/');
+          if (parts.length === 3) extractedMonth = parseInt(parts[1], 10).toString();
+          if (parts.length === 2) extractedMonth = parseInt(parts[0], 10).toString();
+        }
 
         setGlobalSelectedMonth(extractedMonth);
+        setProdSelectedMonth(extractedMonth);
 
         if (json.contractYojitsuData && json.contractYojitsuData.length > 0) {
           const cLabels = json.contractYojitsuData[0].labels || [];
@@ -254,7 +261,7 @@ export default function UniversalDashboardPage() {
     { id: 'volume', label: '3. 実績物量', icon: Activity, color: '#d97706', dataKey: 'volumeData' },
     { id: 'productivity', label: '4. 生産性', icon: TrendingUp, color: '#ca8a04', dataKey: 'productivityData' },
     { id: 'labor', label: '5. 労務管理', icon: CheckCircle2, color: '#ec4899', dataKey: 'laborData' },
-    { id: 'salesConfirmed', label: '6. 月次確定', icon: CheckCircle2, color: '#0ea5e9', dataKey: 'salesConfirmedData' },
+    { id: 'monthly', label: '6. 月次データ', icon: Award, color: '#0ea5e9' },
     { id: 'actions', label: '7. アクション', icon: Rocket, color: '#7c3aed' },
     { id: 'accidents', label: '8. 事故管理', icon: AccidentIcon, color: '#f59e0b' },
     { id: 'contract', label: '9. 請負予実', icon: FileText, color: '#3b82f6' },
@@ -265,13 +272,18 @@ export default function UniversalDashboardPage() {
 
   const dataMonth = useMemo(() => {
     if (!data || !data.labels || data.labels.length === 0) return (new Date().getMonth() + 1).toString();
-    const firstLabel = data.labels[0];
-    if (firstLabel.includes('/')) return parseInt(firstLabel.split('/')[0], 10).toString();
+    const firstLabel = String(data.labels[0]);
+    
+    if (firstLabel.includes('/')) {
+      const parts = firstLabel.split('/');
+      if (parts.length === 3) return parseInt(parts[1], 10).toString();
+      if (parts.length === 2) return parseInt(parts[0], 10).toString();
+    }
     return (new Date().getMonth() + 1).toString();
   }, [data]);
 
   const baseLabelsFiltered = data ? (data.labels || []) : [];
-  const currentMonthIndices = baseLabelsFiltered.map((_, idx) => idx);
+  const currentMonthIndices = baseLabelsFiltered.map((_: any, idx: number) => idx);
 
   const contractAvailableMonths = (() => {
     if (!data || !data.contractYojitsuData || data.contractYojitsuData.length === 0) return [];
@@ -293,8 +305,13 @@ export default function UniversalDashboardPage() {
     let currentWeekIndices: number[] = []; let weekCount = 1; let startLabel = baseLabelsFiltered[0];
 
     baseLabelsFiltered.forEach((label: string, idx: number) => {
-      const dayStr = label.includes('/') ? label.split('/').pop() : label.replace(/[^0-9]/g, '');
-      const dayNum = parseInt(dayStr || '1', 10);
+      const labelStr = String(label);
+      let dayStr = labelStr.replace(/[^0-9]/g, '') || '1';
+      if (labelStr.includes('/')) {
+        const parts = labelStr.split('/');
+        dayStr = parts[parts.length - 1];
+      }
+      const dayNum = parseInt(dayStr, 10);
       const currentYear = new Date().getFullYear();
       const date = new Date(currentYear, parseInt(dataMonth) - 1, dayNum);
 
@@ -330,17 +347,14 @@ export default function UniversalDashboardPage() {
 
       if (!combinedMap.has(cleanTitle)) {
         const setting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === cleanTitle);
-
         combinedMap.set(cleanTitle, {
-          title: cleanTitle,
-          labels: item.labels || baseLabelsFiltered,
+          title: cleanTitle, labels: item.labels || baseLabelsFiltered,
           actual_thisMonth: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           actual_lastMonth: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           actual_lastYear: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           forecast: new Array((item.labels || baseLabelsFiltered).length).fill(0),
           forecastType: '予測',
-          is_pinned: setting ? setting.is_pinned : false,   
-          is_hidden: setting ? setting.is_hidden : false    
+          is_pinned: setting ? setting.is_pinned : false, is_hidden: setting ? setting.is_hidden : false    
         });
       }
       const entry = combinedMap.get(cleanTitle);
@@ -354,52 +368,51 @@ export default function UniversalDashboardPage() {
       }
 
       if (isYosan && (normalizedTitle.includes('今月') || !normalizedTitle.match(/先月|前年/))) {
-  
-  // 💡 【ここを追加】すでに金庫に「予算」が入っていて、今来たのが「予測」なら上書きせずスルー！
-  if (entry.forecastType === '予算' && normalizedTitle.includes('予測')) return;
-
-  entry.forecast = item.values;
-  if (normalizedTitle.includes('予算')) entry.forecastType = '予算';
-  else if (normalizedTitle.includes('目標')) entry.forecastType = '目標';
-  else entry.forecastType = '予測';
-}
+        if (entry.forecastType === '予算' && normalizedTitle.includes('予測')) return;
+        entry.forecast = item.values;
+        if (normalizedTitle.includes('予算')) entry.forecastType = '予算';
+        else if (normalizedTitle.includes('目標')) entry.forecastType = '目標';
+        else entry.forecastType = '予測';
+      }
     });
 
     let result = Array.from(combinedMap.values());
-    if (displayMode === 'daily' || displayMode === 'weekly') {
+    if (displayMode === 'daily' || displayMode === 'weekly' || displayMode === 'monthly') {
       const hiddenKeywords = ["本部費", "償却費", "社会保険", "雇用保険", "交通費", "有給"];
       result = result.filter(m => !hiddenKeywords.some(k => m.title.includes(k)));
     }
 
     if (searchQuery) result = result.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    // 🌟スタッフ工数の合算ロジック
     if (activeTab === 'labor') {
       const staffSetting = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === 'スタッフ工数 (通常・残業・深夜)');
-
       const stackedGroups: any = {
         'スタッフ工数': { 
           title: 'スタッフ工数 (通常・残業・深夜)', 
           isStacked: true, 
-          data: {},
-          is_pinned: staffSetting ? staffSetting.is_pinned : false,
-          is_hidden: staffSetting ? staffSetting.is_hidden : false
+          data: {}, 
+          forecast: [], 
+          forecastType: '予測',
+          is_pinned: staffSetting ? staffSetting.is_pinned : false, 
+          is_hidden: staffSetting ? staffSetting.is_hidden : false 
         },
       };
-
       const finalResult: any[] = [];
       result.forEach(m => {
-        if (m.title === '社員工数_残業工数') {
-          m.title = '社員工数_残業';
-          finalResult.push(m);
-        }
-        else if (m.title === '社員工数_通常工数' || m.title === '社員工数_深夜工数') {
-        }
+        if (m.title === '社員工数_残業工数') { m.title = '社員工数_残業'; finalResult.push(m); }
+        else if (m.title === '社員工数_通常工数' || m.title === '社員工数_深夜工数') { }
         else if (m.title === 'スタッフ工数_通常工数') stackedGroups['スタッフ工数'].data['通常'] = m;
         else if (m.title === 'スタッフ工数_残業工数') stackedGroups['スタッフ工数'].data['残業'] = m;
         else if (m.title === 'スタッフ工数_深夜工数') stackedGroups['スタッフ工数'].data['深夜'] = m;
+        else if (m.title === 'スタッフ工数') {
+          stackedGroups['スタッフ工数'].forecast = m.forecast;
+          stackedGroups['スタッフ工数'].forecastType = m.forecastType;
+          stackedGroups['スタッフ工数'].actual_lastMonth = m.actual_lastMonth;
+          stackedGroups['スタッフ工数'].actual_lastYear = m.actual_lastYear;
+        }
         else finalResult.push(m);
       });
-
       if (Object.keys(stackedGroups['スタッフ工数'].data).length > 0) finalResult.push(stackedGroups['スタッフ工数']);
       return finalResult;
     }
@@ -415,10 +428,58 @@ export default function UniversalDashboardPage() {
       const isAvgMetric = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || m.title.includes("単価") || m.title.includes("時給");
       const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
 
+      if (displayMode === 'monthly') {
+        let totalBudget = 0; let totalChakuchi = 0; let validBudgetDays = 0; let validChakuchiDays = 0;
+        let totalLastMonth = 0; let totalLastYear = 0; let validLastMonthDays = 0; let validLastYearDays = 0;
+        let hasFct = false;
+
+        currentMonthIndices.forEach(idx => {
+          let actVal = 0; let fctVal = 0; let lastAct = 0; let prevYearAct = 0;
+
+          if (m.isStacked) {
+            const getStacked = (arrKey: string) => n(m.data['通常']?.[arrKey]?.[idx]) + n(m.data['残業']?.[arrKey]?.[idx]) + n(m.data['深夜']?.[arrKey]?.[idx]);
+            actVal = getStacked('actual_thisMonth');
+            fctVal = m.forecast && n(m.forecast[idx]) > 0 ? n(m.forecast[idx]) : getStacked('forecast');
+            lastAct = m.actual_lastMonth && n(m.actual_lastMonth[idx]) > 0 ? n(m.actual_lastMonth[idx]) : getStacked('actual_lastMonth');
+            prevYearAct = m.actual_lastYear && n(m.actual_lastYear[idx]) > 0 ? n(m.actual_lastYear[idx]) : getStacked('actual_lastYear');
+          } else {
+            actVal = n(m.actual_thisMonth?.[idx]);
+            fctVal = n(m.forecast?.[idx]);
+            lastAct = n(m.actual_lastMonth?.[idx]);
+            prevYearAct = n(m.actual_lastYear?.[idx]);
+          }
+
+          if (fctVal > 0) { totalBudget += fctVal; validBudgetDays++; hasFct = true; }
+          if (actVal > 0) { totalChakuchi += actVal; validChakuchiDays++; } 
+          else { totalChakuchi += fctVal; if (fctVal > 0) validChakuchiDays++; }
+          if (lastAct > 0) { totalLastMonth += lastAct; validLastMonthDays++; }
+          if (prevYearAct > 0) { totalLastYear += prevYearAct; validLastYearDays++; }
+        });
+
+        if (!hasFct && validChakuchiDays > 0 && validChakuchiDays < currentMonthIndices.length && !isAvgMetric) {
+          const dailyAvg = totalChakuchi / validChakuchiDays;
+          totalChakuchi = dailyAvg * currentMonthIndices.length;
+        }
+
+        const finalBudget = isAvgMetric && validBudgetDays > 0 ? totalBudget / validBudgetDays : totalBudget;
+        const finalChakuchi = isAvgMetric && validChakuchiDays > 0 ? totalChakuchi / validChakuchiDays : totalChakuchi;
+        const finalLastMonth = isAvgMetric && validLastMonthDays > 0 ? totalLastMonth / validLastMonthDays : totalLastMonth;
+        const finalLastYear = isAvgMetric && validLastYearDays > 0 ? totalLastYear / validLastYearDays : totalLastYear;
+
+        return { 
+          ...m, _sortVal: finalChakuchi, _monthlyBudget: finalBudget, _monthlyChakuchi: finalChakuchi, _monthlyLastAct: finalLastMonth, _monthlyPrevYearAct: finalLastYear
+        };
+      }
+
       const targetIndices = displayMode === 'weekly' ? weekIdx :
         currentMonthIndices.filter(idx => {
           if (!baseLabelsFiltered[idx]) return false;
-          const dayStr = baseLabelsFiltered[idx].includes('/') ? baseLabelsFiltered[idx].split('/').pop() : baseLabelsFiltered[idx].replace(/[^0-9]/g, '') || '1';
+          const labelStr = String(baseLabelsFiltered[idx]);
+          let dayStr = labelStr.replace(/[^0-9]/g, '') || '1';
+          if (labelStr.includes('/')) {
+            const parts = labelStr.split('/');
+            dayStr = parts[parts.length - 1];
+          }
           const dayNum = parseInt(dayStr, 10);
           const todayMonth = new Date().getMonth() + 1; const selMonth = parseInt(dataMonth, 10);
           if (selMonth !== todayMonth) return true;
@@ -430,7 +491,7 @@ export default function UniversalDashboardPage() {
         const sumKey = (key: string, metricArr: string) => targetIndices.reduce((sum, idx) => sum + n(m.data[key]?.[metricArr]?.[idx]), 0);
         actVal = sumKey('通常', 'actual_thisMonth') + sumKey('残業', 'actual_thisMonth') + sumKey('深夜', 'actual_thisMonth');
       } else {
-        const acts = targetIndices.map(idx => n(m.actual_thisMonth[idx]));
+        const acts = targetIndices.map(idx => n(m.actual_thisMonth?.[idx]));
         if (isAvgMetric) {
           const valid = acts.filter(v => v > 0);
           actVal = valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
@@ -447,13 +508,141 @@ export default function UniversalDashboardPage() {
     }
 
     return filteredMetrics.sort((a, b) => {
-      if (a.is_pinned !== b.is_pinned) {
-        return a.is_pinned ? -1 : 1; 
-      }
+      if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1; 
       return b._sortVal - a._sortVal;
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
+  // =========================================================
+  // ⚙️ 【汎用化改修】物量・工数・生産性の3つの金庫データを解析するロジック
+  // =========================================================
+  const computedVaultProductivity = useMemo(() => {
+    if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
+    
+    const targetMonthStr = `/${prodSelectedMonth.padStart(2, '0')}/`;
+    
+    // 💡 1. GASから届いた新しい「物量金庫」をフラット化
+    const vRows: any[] = [];
+    if (data.volumeAccumulatedData) {
+      data.volumeAccumulatedData.forEach((item: any) => {
+        const itemName = item.title.replace('蓄積実績_', '');
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            vRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
+          }
+        });
+      });
+    }
+
+    // 💡 2. GASから届いた新しい「工数金庫」をフラット化（日次・センター全体の合算用）
+    const hTotalRows: any[] = [];
+    if (data.manhoursAccumulatedData) {
+      data.manhoursAccumulatedData.forEach((item: any) => {
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            const existing = hTotalRows.find(h => h.date === date);
+            if (existing) {
+              existing.value += n(item.values[idx]);
+            } else {
+              hTotalRows.push({ date: date, value: n(item.values[idx]) });
+            }
+          }
+        });
+      });
+    }
+
+    // 💡 3. GASから届いた「生産性金庫」をフラット化
+    const pRows: any[] = [];
+    if (data.productivityAccumulatedData) {
+      data.productivityAccumulatedData.forEach((item: any) => {
+        const itemName = item.title.replace('蓄積実績_作業生産性_', '');
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            pRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
+          }
+        });
+      });
+    }
+    
+    // 💡 4. 日付のユニークリストを作成し、タイムラインで並び替え
+    const allDates = Array.from(new Set([
+      ...vRows.map((r: any) => r.date),
+      ...hTotalRows.map((r: any) => r.date),
+      ...pRows.map((r: any) => r.date)
+    ])).sort();
+    
+    // 🌟 【汎用化】GASの設定からターゲットカテゴリを取得（なければ昭和冷蔵デフォルト）
+    const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
+    
+    let centerTotalVolume = 0;
+    let centerTotalHours = 0;
+    
+    // 💡 5. 【カテゴリ計算】物量合計と平均生産性の計算
+    const items = processNames.map((proc: string) => {
+      let procTotalVolume = 0;
+      let prodSum = 0;
+      let prodCount = 0;
+      
+      // 🌟 【汎用化】GASの設定から名前変換マッピングを取得
+      let prodName = proc;
+      if (data.masterSettings?.NAME_MAPPING && data.masterSettings.NAME_MAPPING[proc]) {
+        prodName = data.masterSettings.NAME_MAPPING[proc];
+      } else {
+        // 万が一設定が空だった場合の昭和冷蔵用セーフティネット
+        if (proc === "ユニー一括") prodName = "ユニー";
+        if (proc === "BB") prodName = "ブロンコビリー";
+      }
+      
+      const dailyList = allDates.map(dt => {
+        const vMob = vRows.find((r: any) => r.date === dt && r.item === proc);
+        const vol = vMob ? vMob.value : 0;
+        
+        // 💡 生産性を探すときは、変換した prodName を使う
+        const pMob = pRows.find((r: any) => r.date === dt && r.item === prodName);
+        const prod = pMob ? pMob.value : 0;
+        
+        procTotalVolume += vol;
+        if (prod > 0) {
+            prodSum += prod;
+            prodCount++;
+        }
+        
+        return { date: dt.split('/').slice(1).join('/'), volume: vol, hours: 0, prod: prod };
+      });
+      
+      const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
+      
+      // センター全体用に「対象カテゴリ」の物量だけを加算
+      centerTotalVolume += procTotalVolume;
+
+      return { process: proc, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
+    });
+    
+    // 💡 6. 【センター全体計算】総物量と総工数から生産性を割り算で算出
+    centerTotalHours = hTotalRows.reduce((sum, r) => sum + r.value, 0);
+    
+    const centerDailyList = allDates.map(dt => {
+      const dayVol = vRows.filter((r: any) => r.date === dt && processNames.includes(r.item)).reduce((sum: number, r: any) => sum + r.value, 0);
+      const dayHrsRow = hTotalRows.find((r: any) => r.date === dt);
+      const dayHrs = dayHrsRow ? dayHrsRow.value : 0;
+      const dayProd = dayHrs > 0 ? dayVol / dayHrs : 0;
+      return { date: dt.split('/').slice(1).join('/'), volume: dayVol, hours: dayHrs, prod: dayProd };
+    });
+    
+    const centerTotalProd = centerTotalHours > 0 ? centerTotalVolume / centerTotalHours : 0;
+    
+    items.unshift({
+      process: "★ センター全体合計",
+      dailyList: centerDailyList,
+      totalVolume: centerTotalVolume,
+      totalHours: centerTotalHours,
+      totalProd: centerTotalProd
+    });
+    
+    return { items, summary: { totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd } };
+  }, [data, prodSelectedMonth]);
+
+  // 💡 【重要】contractListやその他の変数を確実に復元！
   const contractList = (() => {
     if (!data || !data.contractYojitsuData) return [];
     const cMap = new Map();
@@ -583,29 +772,26 @@ export default function UniversalDashboardPage() {
       setNewItem({ startDate: item.date ? item.date.replace(/\//g, '-') : '', client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●' });
     } else {
       const targetList = activeActionTab === 'dx' ? dxItems : envItems; const item = targetList[index];
-      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customer_related: item.customer_related === 'あり', ratio: item.ratio || 0 });
+      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', end_date: item.end_date ? item.end_date.replace(/\//g, '-') : '', customer_related: item.customer_related === 'あり', ratio: item.ratio || 0 });
     }
     setIsModalOpen(true);
   };
 
-  // ⚡ 爆速化適用：モーダルを一瞬で閉じて、Supabaseだけを再取得する！
   const handleSaveItem = async () => {
     setIsModalOpen(false);
-
     if (activeActionTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
-      const payload = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
+      const payload: any = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
       if (editingIndex !== null) { payload.id = historyItems[editingIndex].id; await supabaseRequest('sales_history', 'PATCH', payload); }
       else { await supabaseRequest('sales_history', 'POST', payload); }
     } else {
       if (!newItem.name) return;
-      const payload = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
+      const payload: any = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
       const targetTable = activeActionTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingIndex !== null) {
         const targetList = activeActionTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
       } else { await supabaseRequest(targetTable, 'POST', payload); }
     }
-    
     await fetchSupabaseData();
     showToast('データを保存しました', 'success');
   };
@@ -614,7 +800,6 @@ export default function UniversalDashboardPage() {
     if (activeActionTab === 'history') await supabaseRequest('sales_history', 'DELETE', { id: historyItems[indexToDelete].id });
     else if (activeActionTab === 'dx') await supabaseRequest('dx_actions', 'DELETE', { id: dxItems[indexToDelete].id });
     else await supabaseRequest('env_actions', 'DELETE', { id: envItems[indexToDelete].id });
-    
     await fetchSupabaseData();
     showToast('データを削除しました', 'success');
   };
@@ -622,9 +807,20 @@ export default function UniversalDashboardPage() {
   const handleToggleHideItem = async (item: any, table: string) => {
     const payload = { id: item.id, is_hidden: !item.is_hidden };
     await supabaseRequest(table, 'PATCH', payload);
-    
     await fetchSupabaseData();
     showToast(item.is_hidden ? '項目を再表示しました' : '項目を非表示にしました', 'success');
+  };
+
+  const handleToggleHideMetric = async (metricTitle: string) => {
+    const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
+    const isCurrentlyHidden = existing ? existing.is_hidden : false;
+    await handleToggleMetricSetting(metricTitle, 'is_hidden', isCurrentlyHidden);
+  };
+
+  const handleTogglePinMetric = async (metricTitle: string) => {
+    const existing = metricSettings.find(s => s.tab_id === activeTab && s.metric_title === metricTitle);
+    const isCurrentlyPinned = existing ? existing.is_pinned : false;
+    await handleToggleMetricSetting(metricTitle, 'is_pinned', isCurrentlyPinned);
   };
   if (!data || !isMounted) {
     return (
@@ -674,8 +870,9 @@ export default function UniversalDashboardPage() {
           </div>
           {['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab) && (
             <div className="flex bg-white md:bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shadow-sm w-[48%] md:w-auto justify-between">
-              <button onClick={() => setDisplayMode('daily')} className={`flex-1 md:flex-none px-5 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'daily' ? 'bg-slate-900 md:bg-white text-white md:text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}>日次</button>
-              <button onClick={() => setDisplayMode('weekly')} className={`flex-1 md:flex-none px-5 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'weekly' ? 'bg-slate-900 md:bg-white text-white md:text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}>週次</button>
+              <button onClick={() => setDisplayMode('daily')} className={`flex-1 md:flex-none px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'daily' ? 'bg-slate-900 md:bg-white text-white md:text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}>日次</button>
+              <button onClick={() => setDisplayMode('weekly')} className={`flex-1 md:flex-none px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'weekly' ? 'bg-slate-900 md:bg-white text-white md:text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}>週次</button>
+              <button onClick={() => setDisplayMode('monthly')} className={`flex-1 md:flex-none px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${displayMode === 'monthly' ? 'bg-slate-900 md:bg-white text-white md:text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}>月次</button>
             </div>
           )}
           {activeTab === 'actions' && <button onClick={handleOpenAddModal} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black tracking-wider transition-all shadow-md"><Plus size={14} /> 新規追加</button>}
@@ -689,10 +886,7 @@ export default function UniversalDashboardPage() {
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto justify-end">
             {['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab) && (
-              <button
-                onClick={() => setShowHiddenMetrics(!showHiddenMetrics)}
-                className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm ${showHiddenMetrics ? 'bg-slate-800 text-white border-slate-700 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-              >
+              <button onClick={() => setShowHiddenMetrics(!showHiddenMetrics)} className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm ${showHiddenMetrics ? 'bg-slate-800 text-white border-slate-700 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                 {showHiddenMetrics ? '非表示グラフを隠す(ON)' : '非表示グラフを表示'}
               </button>
             )}
@@ -700,192 +894,219 @@ export default function UniversalDashboardPage() {
               <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="項目を絞り込み検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
             </div>
+            
+            {/* 🌟 1〜5のタブでは月切り替えフィルターを非表示にし、事故管理などに限定 */}
+            {['accidents'].includes(activeTab) && (
+              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-2.5 rounded-xl shadow-sm shrink-0">
+                <Calendar size={14} className="text-blue-500" />
+                <select value={globalSelectedMonth} onChange={(e) => setGlobalSelectedMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-xs font-black focus:outline-none cursor-pointer">
+                  {availableMonths.map((m, idx) => (
+                    <option key={idx} value={m.month}>{m.display}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="text-blue-400" />
+              </div>
+            )}
           </div>
         </div>
 
-        {displayMode === 'weekly' && !['salesConfirmed', 'actions', 'accidents', 'contract'].includes(activeTab) && (
+        {displayMode === 'weekly' && !['monthly', 'actions', 'accidents', 'contract'].includes(activeTab) && (
           <div className="bg-white border border-slate-200 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-sm flex flex-wrap gap-2 items-center print:hidden">
             <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-wider mr-2 ml-1">週の選択:</span>
             {weeklyGroups.map((g, idx) => <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-4 md:px-5 py-2 rounded-xl font-black text-[10px] md:text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>)}
           </div>
         )}
 
-        {['actions', 'contract'].includes(activeTab) && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm flex flex-col md:flex-row items-start gap-4 mb-2 relative overflow-hidden print:bg-white">
-            <div className="bg-white p-3 rounded-2xl shadow-sm shrink-0 hidden md:block border"><Bot size={24} className="text-blue-600" /></div>
-            <div className="relative z-10 w-full">
-              <h3 className="text-xs md:text-[13px] font-black text-blue-900 mb-2">AI Strategy Insight (chatGPT) - 専門コンサルタント</h3>
-              {(() => {
-                const currentKey = activeTab;
-                const displayLabel = currentKey === 'actions' ? 'DX・現場改善・営業の全アクション' : '請負予実';
-                
-                if (!tabAiAnalysis[currentKey] && !isTabAnalyzing[currentKey]) {
-                  return <button onClick={() => handleStartTabAnalysis(currentKey)} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2"><Zap size={14}/> {displayLabel} データをAIに総合診断させる</button>;
-                } else if (isTabAnalyzing[currentKey]) {
-                  return <div className="flex items-center gap-2 text-blue-600 text-xs font-bold animate-pulse py-2"><BrainCircuit size={16} className="animate-spin" /> 物流プロフェッショナルAIがデータを多角分析中...</div>;
-                } else {
-                  return <div className="text-xs font-bold text-slate-700 leading-relaxed whitespace-pre-wrap bg-white/60 p-4 rounded-xl border border-slate-200">{tabAiAnalysis[currentKey]}</div>;
-                }
-              })()}
-            </div>
-          </div>
-        )}
-
         {/* =========================================
-        【1〜5】売上・工数・物量・生産性・労務管理 共通グラフ
+        【1〜5】売上・工数・物量・生産性・労務管理 共通グラフエリア
         ========================================= */}
         {['sales', 'manhours', 'volume', 'productivity', 'labor'].includes(activeTab) && (
-          <div
-            className={`grid gap-4 md:gap-6 print:grid-cols-2 print:gap-8 ${displayMode !== 'daily' ? 'grid-cols-1 lg:grid-cols-2' : ''}`}
-            style={displayMode === 'daily' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))' } : {}}
-          >
+          <div className={`grid gap-4 md:gap-6 print:grid-cols-2 print:gap-8 ${displayMode !== 'daily' ? 'grid-cols-1 lg:grid-cols-2' : ''}`} style={displayMode === 'daily' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))' } : {}}>
             {finalSortedMetrics.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">データがありません。GAS側でデータを転写してください。</div>}
 
             {finalSortedMetrics.map((m, i) => {
               const isAvgMetric = m.title.includes("生産性") || m.title.includes("%") || m.title.includes("率") || m.title.includes("単価") || m.title.includes("時給");
               const isCost = lowIsBetterMetrics.some(k => m.title.includes(k)) || activeTab === 'manhours' || m.title.includes('原価');
               const isStacked = m.isStacked;
-              const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
+              const isMonthly = displayMode === 'monthly';
+              const lastLbl = displayMode === 'weekly' ? '先週' : '先月';
 
               let chartData = [];
-              let dispAct = m._sortVal;
-              let dispFct = 0; let dispLastAct = 0; let dispPrevYearAct = 0;
-              let currentRatio = 0; let diffLastMonth = 0; let diffLastYear = 0;
-              let lastMonthRatio = 0; let lastYearRatio = 0; let hasForecastData = false;
+              let dispAct = m._sortVal; 
+              let dispFct = 0; 
+              let dispLastAct: number | null = 0; 
+              let dispPrevYearAct = 0;
+              let currentRatio = 0; 
+              let diffLastMonth = 0; 
+              let diffLastYear = 0;
+              let lastMonthRatio = 0; 
+              let lastYearRatio = 0; 
+              let hasForecastData = m.forecast?.some((v: number) => n(v) > 0) || false;
 
-              const calcAvg = (arr: number[]) => { const valid = arr.filter(v => v > 0); return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0; };
-              const targetIndices = displayMode === 'weekly' ? weekIdx :
-                currentMonthIndices.filter(idx => {
-                  if (!baseLabelsFiltered[idx]) return false;
-                  const dayStr = baseLabelsFiltered[idx].includes('/') ? baseLabelsFiltered[idx].split('/').pop() : baseLabelsFiltered[idx].replace(/[^0-9]/g, '') || '1';
-                  const dayNum = parseInt(dayStr, 10);
-                  const todayMonth = new Date().getMonth() + 1; const selMonth = parseInt(dataMonth, 10);
-                  if (selMonth !== todayMonth) return true;
-                  return dayNum <= new Date().getDate();
-                });
+              let totalChakuchi = 0; 
+              let validChakuchiDays = 0;
+              let dailyAvg = 0;
 
-              if (targetIndices.length === 0 && displayMode === 'daily') targetIndices.push(...currentMonthIndices);
-
-              if (isStacked) {
-                chartData = (displayMode === 'daily' ? currentMonthIndices : weekIdx).map(idx => ({
-                  name: baseLabelsFiltered[idx],
-                  通常: n(m.data['通常']?.actual_thisMonth[idx]),
-                  残業: n(m.data['残業']?.actual_thisMonth[idx]),
-                  深夜: n(m.data['深夜']?.actual_thisMonth[idx]),
-                }));
-
-                const sumKey = (key: string, metricArr: string) => targetIndices.reduce((sum, idx) => sum + n(m.data[key]?.[metricArr]?.[idx]), 0);
-                dispLastAct = sumKey('通常', 'actual_lastMonth') + sumKey('残業', 'actual_lastMonth') + sumKey('深夜', 'actual_lastMonth');
-                dispPrevYearAct = sumKey('通常', 'actual_lastYear') + sumKey('残業', 'actual_lastYear') + sumKey('深夜', 'actual_lastYear');
-
-                diffLastMonth = dispAct - dispLastAct; diffLastYear = dispAct - dispPrevYearAct;
-                lastMonthRatio = dispLastAct > 0 ? (dispAct / dispLastAct) * 100 : (dispAct > 0 ? 100 : 0);
-                lastYearRatio = dispPrevYearAct > 0 ? (dispAct / dispPrevYearAct) * 100 : (dispAct > 0 ? 100 : 0);
-              }
-              else {
-                chartData = (displayMode === 'daily' ? currentMonthIndices : weekIdx).map(idx => ({
-                  name: m.labels[idx],
-                  今月実績: n(m.actual_thisMonth[idx]),
-                  先月: n(m.actual_lastMonth[idx]),
-                  前年: n(m.actual_lastYear[idx]),
-                  [m.forecastType]: n(m.forecast[idx])
-                }));
-
-                const fcts = targetIndices.map(idx => n(m.forecast[idx]));
-                const lastActs = targetIndices.map(idx => n(m.actual_lastMonth[idx]));
-                const prevYearActs = targetIndices.map(idx => n(m.actual_lastYear[idx]));
-
-                if (isAvgMetric) {
-                  dispFct = calcAvg(fcts) || 1; dispLastAct = calcAvg(lastActs); dispPrevYearAct = calcAvg(prevYearActs);
-                } else {
-                  dispFct = fcts.reduce((a, b) => a + b, 0) || 1; dispLastAct = lastActs.reduce((a, b) => a + b, 0); dispPrevYearAct = prevYearActs.reduce((a, b) => a + b, 0);
+              const weekIdx = weeklyGroups[selectedWeek]?.indices || [];
+              const targetIndices = isMonthly ? currentMonthIndices : (displayMode === 'weekly' ? weekIdx : currentMonthIndices.filter(idx => {
+                if (!baseLabelsFiltered[idx]) return false;
+                const labelStr = String(baseLabelsFiltered[idx]);
+                let dayStr = labelStr.replace(/[^0-9]/g, '') || '1';
+                if (labelStr.includes('/')) {
+                  const parts = labelStr.split('/');
+                  dayStr = parts[parts.length - 1];
                 }
+                const dayNum = parseInt(dayStr, 10);
+                return (parseInt(dataMonth, 10) !== (new Date().getMonth() + 1)) || dayNum <= new Date().getDate();
+              }));
 
-                hasForecastData = m.forecast?.some((v: number) => n(v) > 0) || false;
-                currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
-                diffLastMonth = dispAct - dispLastAct; diffLastYear = dispAct - dispPrevYearAct;
-                lastMonthRatio = dispLastAct > 0 ? (dispAct / dispLastAct) * 100 : (dispAct > 0 ? 100 : 0);
-                lastYearRatio = dispPrevYearAct > 0 ? (dispAct / dispPrevYearAct) * 100 : (dispAct > 0 ? 100 : 0);
+              if (isMonthly) {
+                dispAct = m._monthlyChakuchi;
+                dispFct = m._monthlyBudget;
+                dispLastAct = m._monthlyLastAct;
+                dispPrevYearAct = m._monthlyPrevYearAct;
+                
+                currentMonthIndices.forEach(idx => {
+                  let actVal = isStacked ? (n(m.data['通常']?.actual_thisMonth[idx]) + n(m.data['残業']?.actual_thisMonth[idx]) + n(m.data['深夜']?.actual_thisMonth[idx])) : n(m.actual_thisMonth?.[idx]);
+                  if (actVal > 0) { totalChakuchi += actVal; validChakuchiDays++; }
+                });
+                dailyAvg = validChakuchiDays > 0 ? totalChakuchi / validChakuchiDays : 0;
+
+              } else if (displayMode === 'weekly') {
+                if (!isStacked) {
+                  const fcts = targetIndices.map(idx => n(m.forecast[idx]));
+                  dispFct = isAvgMetric ? (fcts.filter(v=>v>0).length>0?fcts.filter(v=>v>0).reduce((a,b)=>a+b,0)/fcts.filter(v=>v>0).length:0) : fcts.reduce((a, b) => a + b, 0);
+                } else {
+                  dispFct = m.forecast && m.forecast.length > 0 ? targetIndices.reduce((sum, idx) => sum + n(m.forecast[idx]), 0) : 0;
+                }
+                dispPrevYearAct = targetIndices.reduce((sum, idx) => sum + (isStacked ? (n(m.data['通常']?.actual_lastYear[idx])+n(m.data['残業']?.actual_lastYear[idx])+n(m.data['深夜']?.actual_lastYear[idx])) : n(m.actual_lastYear[idx])), 0);
+                if (isAvgMetric) dispPrevYearAct /= targetIndices.length || 1;
+
+                if (selectedWeek === 0) {
+                  dispLastAct = null;
+                } else {
+                  const prevWeekIndices = weeklyGroups[selectedWeek - 1].indices;
+                  dispLastAct = prevWeekIndices.reduce((sum, idx) => sum + (isStacked ? (n(m.data['通常']?.actual_thisMonth[idx])+n(m.data['残業']?.actual_thisMonth[idx])+n(m.data['深夜']?.actual_thisMonth[idx])) : n(m.actual_thisMonth[idx])), 0);
+                  if (isAvgMetric) dispLastAct /= prevWeekIndices.length || 1;
+                }
+              } else {
+                if (!isStacked) {
+                  const fcts = targetIndices.map(idx => n(m.forecast[idx]));
+                  dispFct = isAvgMetric ? (fcts.filter(v=>v>0).length>0?fcts.filter(v=>v>0).reduce((a,b)=>a+b,0)/fcts.filter(v=>v>0).length:0) : fcts.reduce((a, b) => a + b, 0);
+                } else {
+                  dispFct = m.forecast && m.forecast.length > 0 ? targetIndices.reduce((sum, idx) => sum + n(m.forecast[idx]), 0) : 0;
+                }
+                dispLastAct = targetIndices.reduce((sum, idx) => sum + (isStacked ? (n(m.data['通常']?.actual_lastMonth[idx])+n(m.data['残業']?.actual_lastMonth[idx])+n(m.data['深夜']?.actual_lastMonth[idx])) : n(m.actual_lastMonth[idx])), 0);
+                dispPrevYearAct = targetIndices.reduce((sum, idx) => sum + (isStacked ? (n(m.data['通常']?.actual_lastYear[idx])+n(m.data['残業']?.actual_lastYear[idx])+n(m.data['深夜']?.actual_lastYear[idx])) : n(m.actual_lastYear[idx])), 0);
+                if (isAvgMetric) { dispLastAct /= targetIndices.length || 1; dispPrevYearAct /= targetIndices.length || 1; }
               }
 
-              const getDiffBgBorderColor = (diff: number, isCost: boolean) => {
-                if (diff === 0) return 'text-slate-500 bg-slate-50 border-slate-200';
-                if (isCost) return diff > 0 ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-emerald-600 bg-emerald-50 border-emerald-200';
-                return diff > 0 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
-              };
+              currentRatio = dispFct > 0 ? (dispAct / dispFct) * 100 : 0;
+              diffLastMonth = dispLastAct !== null ? dispAct - dispLastAct : 0; 
+              diffLastYear = dispAct - dispPrevYearAct;
+              lastMonthRatio = dispLastAct !== null && dispLastAct > 0 ? (dispAct / dispLastAct) * 100 : (dispLastAct !== null && dispAct > 0 ? 100 : 0);
+              lastYearRatio = dispPrevYearAct > 0 ? (dispAct / dispPrevYearAct) * 100 : (dispAct > 0 ? 100 : 0);
 
-              const getDarkBadgeStyle = (diff: number, isCost: boolean) => {
-                if (diff === 0) return 'bg-slate-800 text-slate-400 border-slate-700';
-                if (isCost) return diff > 0 ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                return diff > 0 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+              const chartIndicesForRender = isMonthly ? currentMonthIndices : (displayMode === 'daily' ? currentMonthIndices : weekIdx);
+              chartData = chartIndicesForRender.map(idx => {
+                if (isStacked) {
+                  let fctVal = m.forecast ? n(m.forecast[idx]) : 0;
+                  if (fctVal === 0 && !hasForecastData && !isAvgMetric && dailyAvg > 0) {
+                    fctVal = dailyAvg;
+                  }
+                  return { 
+                    name: baseLabelsFiltered[idx], 
+                    通常: n(m.data['通常']?.actual_thisMonth[idx]), 
+                    残業: n(m.data['残業']?.actual_thisMonth[idx]), 
+                    深夜: n(m.data['深夜']?.actual_thisMonth[idx]),
+                    [m.forecastType]: fctVal
+                  };
+                }
+                
+                let fctVal = n(m.forecast[idx]);
+                if (fctVal === 0 && !hasForecastData && !isAvgMetric && dailyAvg > 0) {
+                  fctVal = dailyAvg;
+                }
+                return { name: m.labels[idx], 今月実績: n(m.actual_thisMonth[idx]), 先月: n(m.actual_lastMonth[idx]), 前年: n(m.actual_lastYear[idx]), [m.forecastType]: fctVal };
+              });
+
+              if (!hasForecastData && !isAvgMetric && dailyAvg > 0) hasForecastData = true;
+
+              const getDiffBgBorderColor = (diff: number | null, isCost: boolean) => {
+                if (diff === null || diff === 0) return 'text-slate-500 bg-slate-50 border-slate-200';
+                return (isCost ? diff > 0 : diff < 0) ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-emerald-600 bg-emerald-50 border-emerald-200';
+              };
+              const getDarkBadgeStyle = (diff: number | null, isCost: boolean) => {
+                if (diff === null || diff === 0) return 'bg-slate-800 text-slate-400 border-slate-700';
+                return (isCost ? diff > 0 : diff < 0) ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
               };
 
               const primaryColor = currentTab.color;
               const secondaryColor = '#8b5cf6';
-              const lastMonthColor = '#94a3b8';
-              const prevYearColor = '#fbbf24';
 
               return (
-                <div key={i} className={`print-avoid-break p-5 md:p-6 rounded-3xl shadow-sm flex flex-col gap-4 md:gap-5 min-w-0 overflow-hidden print:shadow-none print:border-slate-300 transition-all border relative ${m.is_hidden ? 'opacity-40 bg-slate-100 border-dashed border-amber-300' : 'bg-white border-slate-200'}`}>
+                <div key={i} className={`print-avoid-break p-4 rounded-2xl shadow-sm flex flex-col gap-3 min-w-0 overflow-hidden transition-all border ${m.is_hidden ? 'opacity-40 bg-slate-100 border-dashed border-amber-300' : 'bg-white border-slate-200'}`}>
                   
-                  {/* 📌 グラフ操作用コントロールスイッチを右上に配置（印刷時は非表示） */}
-                  <div className="absolute top-4 right-4 flex gap-1.5 print:hidden z-20">
-                    <button 
-                      onClick={() => handleToggleMetricSetting(m.title, 'is_pinned', m.is_pinned)} 
-                      className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_pinned ? 'bg-blue-100 border-blue-300 text-blue-600 font-black' : 'bg-white text-slate-400 hover:text-blue-500'}`} 
-                      title={m.is_pinned ? "最上位ピン留めを解除" : "最上位にピン留めする"}
-                    >
-                      <Pin size={13} className={m.is_pinned ? "fill-blue-600 rotate-45" : ""} />
-                    </button>
-                    <button 
-                      onClick={() => handleToggleMetricSetting(m.title, 'is_hidden', m.is_hidden)} 
-                      className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_hidden ? 'bg-amber-100 border-amber-300 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} 
-                      title={m.is_hidden ? "グラフを表示する" : "グラフを非表示にする"}
-                    >
-                      {m.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                    </button>
+                  {/* ヘッダー領域: バッジ類とタイトル */}
+                  <div className="flex flex-col gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex justify-between items-center w-full">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] md:text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shadow-sm whitespace-nowrap">{dataMonth}月</span>
+                        {m.is_pinned && <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm">📌 固定中</span>}
+                      </div>
+                      <div className="flex gap-1.5 print:hidden z-20">
+                        <button onClick={() => handleTogglePinMetric(m.title)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_pinned ? 'bg-blue-100 border-blue-300 text-blue-600 font-black' : 'bg-white text-slate-400 hover:text-blue-500'}`} title={m.is_pinned ? "最上位ピン留めを解除" : "最上位にピン留めする"}><Pin size={13} className={m.is_pinned ? "fill-blue-600 rotate-45" : ""} /></button>
+                        <button onClick={() => handleToggleHideMetric(m.title)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${m.is_hidden ? 'bg-amber-100 border-amber-300 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={m.is_hidden ? "グラフを表示する" : "グラフを非表示にする"}><Eye size={13} /></button>
+                      </div>
+                    </div>
+                    <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tighter leading-snug truncate" title={m.title}>{m.title}</h4>
                   </div>
 
-                  <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 border-b border-slate-100 pb-4 print:border-slate-200">
-                    <div className="flex-1 flex flex-col items-start min-w-0 w-full pr-16">
-                      <div className="flex items-center gap-3 mb-1.5 w-full">
-                        <span className="text-[10px] md:text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shadow-sm whitespace-nowrap shrink-0">
-                          {dataMonth}月
-                        </span>
-                        {m.is_pinned && <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm shrink-0">📌 固定中</span>}
-                        <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tighter uppercase leading-tight truncate">
-                          {m.title}
-                        </h4>
+                  {/* 実績額と進捗率、比較バッジ */}
+                  <div className="flex flex-col gap-2.5 pt-0.5 pb-1">
+                    <div className="flex justify-between items-start w-full gap-4">
+                      <div className="flex-1">
+                        {(displayMode === 'daily' || displayMode === 'monthly') && (
+                          <div className="mt-0">
+                            {isMonthly && <span className="text-[10px] font-bold text-slate-400 block mb-0.5">月末着地予測</span>}
+                            <p className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-none">{formatVal(dispAct, m.title)}</p>
+                          </div>
+                        )}
                       </div>
-                      {displayMode === 'daily' && <p className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-none mt-1.5">{formatVal(dispAct, m.title)}</p>}
+                      
+                      {/* 進捗率を右端へ */}
+                      {(displayMode === 'daily' || displayMode === 'monthly') && (hasForecastData || isMonthly) && !isStacked && (
+                        <div className="flex items-center gap-2 bg-slate-900 text-white px-3 py-1.5 rounded-xl shadow-sm text-right shrink-0">
+                          <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">{isMonthly ? '予算達成率' : '進捗率'}</span>
+                          <span className={`text-sm sm:text-base font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
+                        </div>
+                      )}
                     </div>
 
-                    {displayMode === 'daily' && (
-                      <div className="flex flex-col gap-2 shrink-0 w-full xl:w-auto">
-                        <div className="flex gap-2">
-                          {hasForecastData && !isStacked ? (
-                            <div className="flex items-center gap-3 bg-white border px-4 py-1.5 rounded-xl shadow-sm flex-1 xl:flex-none justify-center">
-                              <span className="text-xs font-bold text-slate-400 whitespace-nowrap">進捗率</span>
-                              <span className={`text-xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{currentRatio.toFixed(1)}%</span>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex flex-col bg-white border px-3 py-1 rounded-xl flex-1 items-center justify-center"><span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">先月比</span><span className={`text-sm font-black whitespace-nowrap ${diffLastMonth >= 0 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{lastMonthRatio.toFixed(1)}%</span></div>
-                              <div className="flex flex-col bg-white border px-3 py-1 rounded-xl flex-1 items-center justify-center"><span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">前年比</span><span className={`text-sm font-black whitespace-nowrap ${diffLastYear >= 0 ? (isCost ? 'text-rose-600' : 'text-emerald-600') : (isCost ? 'text-emerald-600' : 'text-rose-600')}`}>{lastYearRatio.toFixed(1)}%</span></div>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <span className={`flex-1 xl:flex-none text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center justify-between gap-3 border ${getDiffBgBorderColor(diffLastMonth, isCost)}`}>
-                            <span className="whitespace-nowrap">先月比</span> <span className="whitespace-nowrap font-black">{diffLastMonth > 0 ? '+' : diffLastMonth < 0 ? '-' : '±'}{hasForecastData && !isStacked ? formatVal(Math.abs(diffLastMonth), m.title) : `${lastMonthRatio.toFixed(1)}%`}</span>
+                    {/* 先月差・前年差のバッジ右詰め */}
+                    {(displayMode === 'daily' || displayMode === 'monthly') && (
+                      <div className="flex flex-col gap-1.5 w-full mt-0.5">
+                        <div className="flex flex-wrap gap-1.5 justify-end">
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border shadow-sm ${getDiffBgBorderColor(dispLastAct === null ? null : diffLastMonth, isCost)}`}>
+                            <span className="text-slate-400 font-medium">{lastLbl}{isMonthly ? '差' : '比'}:</span>
+                            <span className="font-black">{dispLastAct === null ? '-' : (diffLastMonth > 0 ? '+' : '') + formatVal(diffLastMonth, m.title)}</span>
+                            {dispLastAct !== null && <span className="text-[9px] opacity-75">({lastMonthRatio.toFixed(1)}%)</span>}
                           </span>
-                          <span className={`flex-1 xl:flex-none text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center justify-between gap-3 border ${getDiffBgBorderColor(diffLastYear, isCost)}`}>
-                            <span className="whitespace-nowrap">前年比</span> <span className="whitespace-nowrap font-black">{diffLastYear > 0 ? '+' : diffLastYear < 0 ? '-' : '±'}{hasForecastData && !isStacked ? formatVal(Math.abs(diffLastYear), m.title) : `${lastYearRatio.toFixed(1)}%`}</span>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border shadow-sm ${getDiffBgBorderColor(diffLastYear, isCost)}`}>
+                            <span className="text-slate-400 font-medium">前年{isMonthly ? '差' : '比'}:</span>
+                            <span className="font-black">{diffLastYear > 0 ? '+' : ''} {formatVal(diffLastYear, m.title)}</span>
+                            <span className="text-[9px] opacity-75">({lastYearRatio.toFixed(1)}%)</span>
                           </span>
                         </div>
-                        <div className="flex gap-2">
-                          <div className="bg-slate-50 px-3 py-1 rounded-lg border flex-1 xl:flex-none flex justify-between items-center gap-3"><span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">先月</span><span className="text-[10px] font-black text-slate-600 whitespace-nowrap">{formatVal(dispLastAct, m.title)}</span></div>
-                          <div className="bg-amber-50 px-3 py-1 rounded-lg border border-amber-200 flex-1 xl:flex-none flex justify-between items-center gap-3"><span className="text-[9px] font-bold text-amber-600 whitespace-nowrap">前年</span><span className="text-[10px] font-black text-amber-700 whitespace-nowrap">{formatVal(dispPrevYearAct, m.title)}</span></div>
+                        <div className="flex flex-wrap gap-1.5 justify-end mt-0.5">
+                          <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-lg border text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                            <span className="text-slate-400 font-medium">{lastLbl}:</span>
+                            <span className="font-mono font-black">{dispLastAct === null ? '-' : formatVal(dispLastAct, m.title)}</span>
+                          </span>
+                          <span className="bg-amber-50 text-amber-800 px-2.5 py-1 rounded-lg border border-amber-200 text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                            <span className="text-amber-500 font-medium">前年:</span>
+                            <span className="font-mono font-black">{formatVal(dispPrevYearAct, m.title)}</span>
+                          </span>
                         </div>
                       </div>
                     )}
@@ -895,7 +1116,7 @@ export default function UniversalDashboardPage() {
                     <div className="flex-1 w-full h-[220px] min-h-[220px] bg-slate-50/50 p-2 rounded-2xl border min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                         {isStacked ? (
-                          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                             <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} axisLine={false} tickLine={false} />
                             <YAxis stroke="#94a3b8" fontSize={9} axisLine={false} tickLine={false} tickFormatter={(v) => v.toLocaleString()} />
@@ -904,7 +1125,8 @@ export default function UniversalDashboardPage() {
                             <Bar name="通常" dataKey="通常" stackId="a" fill="#0ea5e9" />
                             <Bar name="残業" dataKey="残業" stackId="a" fill="#ef4444" />
                             <Bar name="深夜" dataKey="深夜" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                          </BarChart>
+                            {hasForecastData && <Area type="step" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2} strokeDasharray="5 5" fillOpacity={0} />}
+                          </ComposedChart>
                         ) : (
                           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
@@ -916,50 +1138,45 @@ export default function UniversalDashboardPage() {
                             <YAxis stroke="#94a3b8" fontSize={9} axisLine={false} tickLine={false} tickFormatter={(v) => v.toLocaleString()} />
                             <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
                             <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingBottom: '10px' }} />
-                            {chartData.some(d => d["前年"]) && <Area type="monotone" name="前年" dataKey="前年" stroke={prevYearColor} strokeWidth={2.5} fillOpacity={0} />}
-                            {chartData.some(d => d["先月"]) && <Area type="monotone" name="先月" dataKey="先月" stroke={lastMonthColor} strokeWidth={2} strokeDasharray="4 4" fillOpacity={0} />}
+                            {chartData.some(d => d["前年"]) && <Area type="monotone" name="前年" dataKey="前年" stroke="#fbbf24" strokeWidth={2.5} fillOpacity={0} />}
+                            {chartData.some(d => d["先月"]) && <Area type="monotone" name="先月" dataKey="先月" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" fillOpacity={0} />}
                             <Area type="monotone" name="今月実績" dataKey="今月実績" stroke={primaryColor} strokeWidth={3} fillOpacity={1} fill={`url(#colorAct-${i})`} activeDot={{ r: 5 }} />
-                            {hasForecastData && <Area type="monotone" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill={`url(#colorFct-${i})`} />}
+                            {hasForecastData && <Area type="step" name={m.forecastType} dataKey={m.forecastType} stroke={secondaryColor} strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill={`url(#colorFct-${i})`} />}
                           </AreaChart>
                         )}
                       </ResponsiveContainer>
                     </div>
+                    {/* 週次・月次の時に右側に出現する黒いフォアキャストパネル */}
                     {displayMode !== 'daily' && (
                       <div className="w-full xl:w-[240px] bg-slate-900 text-white p-5 rounded-2xl flex flex-col justify-between shrink-0 shadow-inner min-w-0">
                         <div>
-                          <p className="text-[9px] font-black tracking-widest text-blue-400 uppercase">当週{!isAvgMetric ? '合計':'平均'}確認</p>
-                          <div className="flex justify-between items-baseline mt-3">
-                            <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">
-                              {!isAvgMetric ? '当週合計実績' : '当週平均実績'}
-                            </span>
-                            <span className="text-xl md:text-2xl font-black text-white">{formatVal(dispAct, m.title)}</span>
+                          <p className="text-[9px] font-black tracking-widest text-blue-400 uppercase mb-3">{isMonthly ? '月次フォアキャスト確定' : (!isAvgMetric ? '当週合計確認':'当週平均確認')}</p>
+                          <div className="mb-3">
+                            <span className="text-[10px] md:text-[11px] font-bold text-slate-400 block mb-0.5">{isMonthly ? '月末着地予測' : (!isAvgMetric ? '当週合計実績' : '当週平均実績')}</span>
+                            <span className="text-2xl md:text-3xl font-black text-white block tracking-tighter">{formatVal(dispAct, m.title)}</span>
                           </div>
-
-                          {hasForecastData && !isStacked && (
-                            <>
-                              <div className="flex justify-between items-baseline mt-2">
-                                <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">
-                                  {!isAvgMetric ? `当週${m.forecastType}` : `当週平均${m.forecastType}`}
-                                </span>
+                          {(hasForecastData || isMonthly) && !isStacked && (
+                            <div className="space-y-2 mt-3 pt-3 border-t border-slate-700/50">
+                              <div className="flex justify-between items-baseline">
+                                <span className="text-[10px] md:text-xs font-bold text-slate-400 whitespace-nowrap">{isMonthly ? '今月目標設定' : (!isAvgMetric ? `当週${m.forecastType}` : `当週平均${m.forecastType}`)}</span>
                                 <span className="text-sm md:text-base font-bold text-slate-300">{formatVal(dispFct, m.title)}</span>
                               </div>
-                              <div className="flex justify-between items-baseline mt-2.5 border-t border-slate-700/50 pt-2.5">
+                              <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] md:text-xs font-black text-blue-400 whitespace-nowrap">達成率</span>
-                                <span className={`text-xl md:text-2xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
+                                <span className={`text-lg md:text-xl font-black whitespace-nowrap ${currentRatio >= 100 ? (isCost ? 'text-rose-400' : 'text-emerald-400') : (isCost ? 'text-emerald-400' : 'text-rose-400')}`}>{currentRatio.toFixed(1)}%</span>
                               </div>
-                            </>
+                            </div>
                           )}
                         </div>
-
                         <div className="border-t border-slate-800 pt-3 mt-3 flex flex-col gap-2">
                           <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">先月比</span>
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border whitespace-nowrap ${getDarkBadgeStyle(diffLastMonth, isCost)}`}>
-                              {diffLastMonth > 0 ? '▲' : diffLastMonth < 0 ? '▼' : ''} {lastMonthRatio.toFixed(1)}%
+                            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">{lastLbl}{isMonthly?'着地':'比'}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border whitespace-nowrap ${getDarkBadgeStyle(dispLastAct === null ? null : diffLastMonth, isCost)}`}>
+                              {dispLastAct === null ? '-' : `${diffLastMonth > 0 ? '▲' : diffLastMonth < 0 ? '▼' : ''} ${lastMonthRatio.toFixed(1)}%`}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">前年比</span>
+                            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">前年{isMonthly?'着地':'比'}</span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border whitespace-nowrap ${getDarkBadgeStyle(diffLastYear, isCost)}`}>
                               {diffLastYear > 0 ? '▲' : diffLastYear < 0 ? '▼' : ''} {lastYearRatio.toFixed(1)}%
                             </span>
@@ -975,57 +1192,151 @@ export default function UniversalDashboardPage() {
         )}
 
         {/* =========================================
-        【6】月次確定（売上確定）タブ
+        🌟【統合】6. 月次データ統合タブ（サブタブ式）
         ========================================= */}
-        {activeTab === 'salesConfirmed' && (
-          <div className="space-y-4 md:space-y-6">
-            <div className="border-b border-slate-200 pb-3 md:pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
+        {activeTab === 'monthly' && (
+          <div className="space-y-6">
+            <div className="border-b border-slate-200 pb-3 md:pb-4 flex flex-col gap-4">
               <div>
-                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3">
-                  <CheckCircle2 className="text-sky-500" size={24} /> 6. 月次確定 (売上確定)
-                </h2>
-                <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Monthly Confirmed Sales Report</p>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3"><Award className="text-sky-500" size={24} /> 6. 月次統合データ</h2>
+                <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Monthly Confirmed & Productivity Report</p>
               </div>
-              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl print:hidden shadow-sm">
-                <Calendar size={12} className="text-blue-500" />
-                <select value={salesMonth} onChange={(e) => setSalesMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
-                  {Object.keys(data?.salesConfirmedData || {}).sort().reverse().map((m, idx) => (
-                    <option key={idx} value={m}>{m} 確定データ</option>
-                  ))}
-                </select>
-                <ChevronDown size={11} className="text-blue-400" />
+              
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shadow-sm w-full sm:w-auto self-start print:hidden">
+                <button onClick={() => setActiveMonthlyTab('salesConfirmed')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${activeMonthlyTab === 'salesConfirmed' ? 'bg-white text-sky-600 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}><CheckCircle2 size={14} /> 売上確定</button>
+                <button onClick={() => setActiveMonthlyTab('productivity')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${activeMonthlyTab === 'productivity' ? 'bg-white text-amber-600 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}><Award size={14} /> 生産性推移</button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-              {(!data?.salesConfirmedData || !data.salesConfirmedData[salesMonth] || data.salesConfirmedData[salesMonth].length === 0) ? (
-                <div className="col-span-full py-10 text-center text-slate-400 font-bold">選択された月度（{salesMonth}）の月次確定データがありません。シートの転写マクロを実行してください。</div>
-              ) : (
-                data.salesConfirmedData[salesMonth].map((item: any, i: number) => {
-                  const diffLastMonth = item.今月 - item.先月;
-                  return (
-                    <div key={i} className="bg-white border border-slate-200 p-4 md:p-5 rounded-2xl shadow-sm flex flex-col justify-between gap-3 transition-all hover:shadow-md border-t-4 print:break-inside-avoid print:shadow-none print:border-slate-300" style={{ borderTopColor: '#0ea5e9' }}>
-                      <h4 className="text-sm md:text-base font-black text-slate-800 tracking-tight line-clamp-2">{item.title}</h4>
-                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2 print:bg-white print:border-slate-200">
-                        <div className="flex justify-between items-end mb-2">
-                          <span className="text-[10px] md:text-xs font-bold text-sky-600 whitespace-nowrap">当月確定</span>
-                          <span className="text-lg md:text-xl font-black text-slate-900 whitespace-nowrap">{formatVal(item.今月, item.title)}</span>
-                        </div>
-                        <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 whitespace-nowrap">前月確定</span>
-                            <div className="text-right flex items-center">
-                              <span className="text-xs font-bold text-slate-600 mr-2 whitespace-nowrap">{formatVal(item.先月, item.title)}</span>
-                              <span className={`text-[9px] font-black w-16 text-right whitespace-nowrap ${diffLastMonth > 0 ? 'text-emerald-500' : diffLastMonth < 0 ? 'text-rose-500' : 'text-slate-400'}`}>{diffLastMonth > 0 ? '▲' : diffLastMonth < 0 ? '▼' : '±'} {formatVal(Math.abs(diffLastMonth), item.title)}</span>
+            {/* サブタブ内訳1: 月次売上確定 */}
+            {activeMonthlyTab === 'salesConfirmed' && (
+              <div className="space-y-4">
+                <div className="flex justify-end print:hidden">
+                  <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl shadow-sm">
+                    <Calendar size={12} className="text-blue-500" />
+                    <select value={salesMonth} onChange={(e) => setSalesMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
+                      {Object.keys(data?.salesConfirmedData || {}).sort().reverse().map((m, idx) => {
+                        const parts = m.split('/');
+                        const displayStr = parts.length === 2 ? `${parts[0].slice(-2)}年${parseInt(parts[1], 10)}月` : m;
+                        return <option key={idx} value={m}>{displayStr}</option>;
+                      })}
+                    </select>
+                    <ChevronDown size={11} className="text-blue-400" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+                  {(!data?.salesConfirmedData || !data.salesConfirmedData[salesMonth] || data.salesConfirmedData[salesMonth].length === 0) ? (
+                    <div className="col-span-full py-10 text-center text-slate-400 font-bold">選択された月度の月次確定データがありません。シートの転写マクロを実行してください。</div>
+                  ) : (
+                    data.salesConfirmedData[salesMonth].map((item: any, i: number) => {
+                      const diffLastMonth = item.今月 - item.先月;
+                      return (
+                        <div key={i} className="bg-white border border-slate-200 p-4 md:p-5 rounded-2xl shadow-sm flex flex-col justify-between gap-3 transition-all hover:shadow-md border-t-4 print:break-inside-avoid print:shadow-none print:border-slate-300" style={{ borderTopColor: '#0ea5e9' }}>
+                          <h4 className="text-sm md:text-base font-black text-slate-800 tracking-tight line-clamp-2">{item.title}</h4>
+                          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2 print:bg-white print:border-slate-200">
+                            <div className="flex justify-between items-end mb-2">
+                              <span className="text-[10px] md:text-xs font-bold text-sky-600 whitespace-nowrap">当月確定</span>
+                              <span className="text-lg md:text-xl font-black text-slate-900 whitespace-nowrap">{formatVal(item.今月, item.title)}</span>
+                            </div>
+                            <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 whitespace-nowrap">前月確定</span>
+                                <div className="text-right flex items-center">
+                                  <span className="text-xs font-bold text-slate-600 mr-2 whitespace-nowrap">{formatVal(item.先月, item.title)}</span>
+                                  <span className={`text-[9px] font-black w-16 text-right whitespace-nowrap ${diffLastMonth > 0 ? 'text-emerald-500' : diffLastMonth < 0 ? 'text-rose-500' : 'text-slate-400'}`}>{diffLastMonth > 0 ? '▲' : diffLastMonth < 0 ? '▼' : '±'} {formatVal(Math.abs(diffLastMonth), item.title)}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* サブタブ内訳2: 月次生産性推移（データテーブル＋巨大サマリーカード） */}
+            {activeMonthlyTab === 'productivity' && (
+              <div className="space-y-6">
+                <div className="flex justify-end print:hidden">
+                  <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl shadow-sm">
+                    <Calendar size={12} className="text-blue-500" />
+                    <select value={prodSelectedMonth} onChange={(e) => setProdSelectedMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
+                      {availableMonths.map((m, idx) => (
+                        <option key={idx} value={m.month}>{m.display}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={11} className="text-blue-400" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 bg-slate-900 text-white p-6 md:p-8 rounded-[2rem] shadow-xl border border-slate-800">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-amber-400 tracking-widest uppercase block">月間総実績物量 (指定カテゴリ合計)</span>
+                    <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
+                      <AnimatedNumber value={computedVaultProductivity.summary.totalVolume} /> <span className="text-xs font-bold text-slate-400">点</span>
+                    </h3>
+                  </div>
+                  <div className="space-y-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6">
+                    <span className="text-[10px] font-black text-sky-400 tracking-widest uppercase block">月間総実績工数 (センター総工数金庫)</span>
+                    <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
+                      <AnimatedNumber value={computedVaultProductivity.summary.totalHours} /> <span className="text-xs font-bold text-slate-400">h</span>
+                    </h3>
+                  </div>
+                  <div className="space-y-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6 bg-gradient-to-r from-transparent to-amber-500/5 rounded-xl">
+                    <span className="text-[10px] font-black text-emerald-400 tracking-widest uppercase block">総作業生産性 (総物量 ÷ 総工数)</span>
+                    <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-emerald-400">
+                      {computedVaultProductivity.summary.totalProd.toFixed(1)} <span className="text-xs font-bold text-emerald-500/60">個/h</span>
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {computedVaultProductivity.items.length === 0 ? (
+                    <div className="col-span-full py-10 text-center text-slate-400 font-bold">蓄積金庫にデータが存在しません。GAS側の一括更新スイッチを起動してください。</div>
+                  ) : (
+                    computedVaultProductivity.items.map((item, idx) => (
+                      <div key={idx} className={`p-5 md:p-6 rounded-3xl shadow-sm flex flex-col gap-4 border bg-white border-slate-200 print-avoid-break print:shadow-none ${idx === 0 ? 'border-l-8 border-l-blue-600 bg-blue-50/5' : ''}`}>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2.5 h-2.5 rounded-full ${idx === 0 ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tight">{item.process}</h4>
+                          </div>
+                          <div className="flex gap-4 text-[10px] md:text-xs font-bold text-slate-500 bg-slate-50 border border-slate-100 px-3 py-1 rounded-xl">
+                            <div>期間物量: <span className="font-black text-slate-800">{item.totalVolume.toLocaleString()}</span></div>
+                            {idx === 0 && <div>期間工数: <span className="font-black text-slate-800">{item.totalHours.toLocaleString()}h</span></div>}
+                            <div className="text-blue-600">{idx === 0 ? '期間生産性' : '平均生産性'}: <span className="font-black">{item.totalProd.toFixed(1)}</span></div>
+                          </div>
+                        </div>
+
+                        <div className="max-h-[250px] overflow-y-auto border border-slate-200/60 rounded-xl divide-y divide-slate-100 bg-slate-50/30">
+                          <div className={`grid ${idx === 0 ? 'grid-cols-4' : 'grid-cols-3'} bg-slate-100 px-4 py-2 text-[9px] md:text-[10px] font-black text-slate-400 tracking-wider uppercase sticky top-0 z-10 border-b border-slate-200`}>
+                            <div>日付</div>
+                            <div className="text-right">実績物量</div>
+                            {idx === 0 && <div className="text-right">実績工数</div>}
+                            <div className="text-right text-blue-600">作業生産性</div>
+                          </div>
+                          {item.dailyList.filter((d: any) => d.volume > 0 || d.hours > 0 || d.prod > 0).length === 0 ? (
+                            <div className="p-8 text-center text-xs text-slate-400 font-bold">この月の稼働蓄積データはありません。</div>
+                          ) : (
+                            item.dailyList.filter((d: any) => d.volume > 0 || d.hours > 0 || d.prod > 0).map((day: any, dIdx: number) => (
+                              <div key={dIdx} className={`grid ${idx === 0 ? 'grid-cols-4' : 'grid-cols-3'} px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-white transition-colors items-center`}>
+                                <div className="font-mono text-slate-400">{day.date}</div>
+                                <div className="text-right font-mono text-slate-800">{day.volume.toLocaleString()}</div>
+                                {idx === 0 && <div className="text-right font-mono text-slate-800">{day.hours.toLocaleString()} h</div>}
+                                <div className="text-right font-mono font-black text-blue-600 bg-blue-50/50 py-0.5 px-1.5 rounded w-fit ml-auto">{day.prod > 0 ? day.prod.toFixed(1) : '0.0'}</div>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1036,19 +1347,12 @@ export default function UniversalDashboardPage() {
           <div className="space-y-6">
             <div className="border-b border-slate-200 pb-3 md:pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
               <div>
-                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3">
-                  <Rocket className="text-purple-500" size={24} /> 7. アクション施策管理
-                </h2>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3"><Rocket className="text-purple-500" size={24} /> 7. アクション施策管理</h2>
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Operation & DX Action Roadmap</p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowHiddenItems(!showHiddenItems)}
-                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${showHiddenItems ? 'bg-purple-600 text-white border-purple-700 shadow-inner' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}
-                >
-                  {showHiddenItems ? '非表示項目を隠す(ON)' : '非表示項目を表示'}
-                </button>
-              </div>
+              <button onClick={() => setShowHiddenItems(!showHiddenItems)} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${showHiddenItems ? 'bg-purple-600 text-white border-purple-700 shadow-inner' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}>
+                {showHiddenItems ? '非表示項目を隠す(ON)' : '非表示項目を表示'}
+              </button>
             </div>
 
             <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shadow-sm max-w-md print:hidden">
@@ -1066,31 +1370,20 @@ export default function UniversalDashboardPage() {
                   const themeColor = activeActionTab === 'dx' ? '#7c3aed' : '#10b981';
                   
                   if (displayItems.length === 0) return <div className="col-span-1 lg:col-span-2 bg-white border p-8 md:p-12 rounded-2xl md:rounded-[2.5rem] text-center text-slate-400 font-bold text-xs md:text-sm">💡 該当する施策アクションはありません。</div>;
-                  
                   return displayItems.map((item, index) => {
                     const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio))));
-                    const chartPieData = [{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }];
                     return (
                       <div key={index} className={`print-avoid-break bg-white border p-5 md:p-8 rounded-3xl shadow-sm flex flex-col md:flex-row gap-4 md:gap-6 items-center transition-all relative overflow-hidden print:shadow-none print:border-slate-300 ${item.is_hidden ? 'opacity-40 bg-slate-100 border-dashed' : item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                         <div className="absolute top-3 right-3 flex gap-1.5 print:hidden">
-                          <button onClick={() => handleToggleHideItem(item, targetTable)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${item.is_hidden ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={item.is_hidden ? "再表示する" : "隠す"}>
-                            {item.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                          </button>
+                          <button onClick={() => handleToggleHideItem(item, targetTable)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${item.is_hidden ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={item.is_hidden ? "再表示する" : "隠す"}>{item.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}</button>
                           <button onClick={() => handleOpenEditModal(index)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-blue-500 transition-all"><Edit2 size={13} /></button>
                           <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(index); }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-rose-500 transition-all"><X size={14} /></button>
                         </div>
                         <div className="w-[120px] h-[120px] md:w-[140px] md:h-[140px] relative shrink-0 min-w-0 mt-6 md:mt-0 print:w-[140px] print:h-[140px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie data={chartPieData} cx="50%" cy="50%" innerRadius="65%" outerRadius="85%" startAngle={90} endAngle={-270} dataKey="value">
-                                <Cell fill={item.is_hidden ? "#94a3b8" : themeColor} /> <Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} />
-                              </Pie>
-                            </PieChart>
+                            <PieChart><Pie data={[{ name: '完了', value: itemRatio }, { name: '未完了', value: 100 - itemRatio }]} cx="50%" cy="50%" innerRadius="65%" outerRadius="85%" startAngle={90} endAngle={-270} dataKey="value"><Cell fill={item.is_hidden ? "#94a3b8" : themeColor} /><Cell fill={item.customer_related === 'あり' ? "#ffe4e6" : "#f1f5f9"} /></Pie></PieChart>
                           </ResponsiveContainer>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-xl md:text-2xl font-black tracking-tighter" style={{ color: item.is_hidden ? '#64748b' : themeColor }}>{itemRatio}%</span>
-                            <span className="text-[7px] md:text-[8px] font-bold text-slate-400 uppercase tracking-widest">{itemRatio === 100 ? '完了' : '進捗率'}</span>
-                          </div>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-xl md:text-2xl font-black tracking-tighter" style={{ color: item.is_hidden ? '#64748b' : themeColor }}>{itemRatio}%</span><span className="text-[7px] md:text-[8px] font-bold text-slate-400 uppercase tracking-widest">{itemRatio === 100 ? '完了' : '進捗率'}</span></div>
                         </div>
                         <div className="flex-1 space-y-3 w-full pr-0 md:pr-10">
                           <div>
@@ -1109,7 +1402,7 @@ export default function UniversalDashboardPage() {
                 })()}
               </div>
             )}
-
+            
             {activeActionTab === 'history' && (
               <div className="bg-white border border-slate-200 p-4 md:p-8 rounded-3xl shadow-sm space-y-4 md:space-y-6 print:shadow-none print:border-none print:p-0">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 py-2 print:grid-cols-2">
@@ -1162,34 +1455,21 @@ export default function UniversalDashboardPage() {
                 <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3"><AccidentIcon className="text-amber-500" size={24} /> 8. カテゴリ別 事故件数 ({globalSelectedMonth}月度)</h2>
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Category-wise Safety Performance</p>
               </div>
-
               <div className="flex flex-wrap items-center gap-3.5 flex-1 justify-start lg:justify-center px-2 md:px-6 print:hidden">
                 <div className={`flex items-center gap-5 px-5 py-2.5 rounded-2xl border shadow-sm transition-all ${accidentSummary.ratio >= 100 ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse font-black' : 'bg-emerald-50/60 border-emerald-100 text-emerald-800'}`}>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">センター全体の当月総事故</span>
                     <div className="flex items-baseline gap-2 mt-0.5">
                       <span className="text-base md:text-lg font-extrabold">{accidentSummary.thisTotal} 件</span>
-                      <span className="text-[10px] text-slate-500">
-                        (先月: {accidentSummary.lastTotal}件 / 前月差: {accidentSummary.diff >= 0 ? `+${accidentSummary.diff}` : accidentSummary.diff}件)
-                      </span>
+                      <span className="text-[10px] text-slate-500">(先月: {accidentSummary.lastTotal}件 / 前月差: {accidentSummary.diff >= 0 ? `+${accidentSummary.diff}` : accidentSummary.diff}件)</span>
                     </div>
                   </div>
                   <div className="h-8 w-[1px] bg-slate-200" />
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">事故発生率 (先月比)</span>
-                    <span className="text-xs md:text-base font-extrabold tracking-tight mt-0.5 flex items-center gap-1">
-                      {accidentSummary.ratio.toFixed(1)}% {accidentSummary.ratio >= 100 ? '🚨 [目標超過]' : '✅ [安全圏]'}
-                    </span>
+                    <span className="text-xs md:text-base font-extrabold tracking-tight mt-0.5 flex items-center gap-1">{accidentSummary.ratio.toFixed(1)}% {accidentSummary.ratio >= 100 ? '🚨 [目標超過]' : '✅ [安全圏]'}</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl print:hidden shadow-sm">
-                <Calendar size={12} className="text-blue-500" />
-                <select value={globalSelectedMonth} onChange={(e) => setGlobalSelectedMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-[11px] font-black focus:outline-none cursor-pointer">
-                  {availableMonths.map((m, idx) => <option key={idx} value={m}>{m}月度 事故統計</option>)}
-                </select>
-                <ChevronDown size={11} className="text-blue-400" />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 print:grid-cols-2 print:gap-6">
@@ -1199,9 +1479,7 @@ export default function UniversalDashboardPage() {
                 return (
                   <div key={i} className={`print-avoid-break bg-white border-2 ${styles.cardBorder} p-5 md:p-6 rounded-3xl md:rounded-[2rem] shadow-sm relative transition-all flex flex-col justify-between print:shadow-none`}>
                     <div className="flex justify-between items-start mb-5 md:mb-6">
-                      <div className="flex items-center gap-2">
-                        {styles.icon} <h3 className="text-base md:text-xl font-black text-slate-800">{cat.name}</h3>
-                      </div>
+                      <div className="flex items-center gap-2">{styles.icon} <h3 className="text-base md:text-xl font-black text-slate-800">{cat.name}</h3></div>
                       <div className="bg-slate-900 text-white px-3 md:px-4 py-1.5 rounded-xl md:rounded-2xl flex items-center gap-1.5 md:gap-2 shadow-md print:shadow-none print:border print:bg-white print:text-slate-800">
                         <span className="text-[8px] md:text-[10px] font-bold text-blue-400 tracking-wider">無事故</span>
                         <span className="text-lg md:text-2xl font-black italic tracking-tighter"><AnimatedNumber value={daysSince} /></span>
@@ -1217,15 +1495,11 @@ export default function UniversalDashboardPage() {
                     </div>
                     <div className="flex justify-center gap-2 md:gap-4 text-[10px] md:text-sm font-bold">
                       <div className="flex-1 flex flex-col items-center justify-center p-2.5 md:p-4 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 min-w-0">
-                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-wider mb-1 text-center truncate w-full">
-                          {data?.accidentTitles?.chaseOn || "追走あり"}
-                        </span>
+                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-wider mb-1 text-center truncate w-full">{data?.accidentTitles?.chaseOn || "追走あり"}</span>
                         <div className="flex items-baseline gap-1"><span className="text-xl md:text-3xl font-black"><AnimatedNumber value={cat.chaseOn}/></span><span className="text-[10px] md:text-xs">件</span></div>
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center p-2.5 md:p-4 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 min-w-0">
-                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-wider mb-1 text-center truncate w-full">
-                          {data?.accidentTitles?.chaseOff || "追走なし"}
-                        </span>
+                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-wider mb-1 text-center truncate w-full">{data?.accidentTitles?.chaseOff || "追走なし"}</span>
                         <div className="flex items-baseline gap-1"><span className="text-base md:text-2xl font-black"><AnimatedNumber value={cat.chaseOff}/></span><span className="text-[9px] md:text-[11px]">件</span></div>
                       </div>
                     </div>
@@ -1244,28 +1518,17 @@ export default function UniversalDashboardPage() {
           <div className="space-y-4 md:space-y-6">
             <div className="border-b border-slate-200 pb-3 md:pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
               <div>
-                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3">
-                  <FileText className="text-blue-500" size={24} /> 9. 請負予実ダッシュボード
-                </h2>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3"><FileText className="text-blue-500" size={24} /> 9. 請負予実ダッシュボード</h2>
                 <p className="text-slate-400 text-xs md:text-sm font-bold mt-1 uppercase tracking-widest">Contract Performance vs Budget</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                <button
-                  onClick={() => setHideZeroContracts(!hideZeroContracts)}
-                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${hideZeroContracts ? 'bg-blue-600 text-white border-blue-700 shadow-inner' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`}
-                >
+                <button onClick={() => setHideZeroContracts(!hideZeroContracts)} className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border transition-all whitespace-nowrap shrink-0 shadow-sm print:hidden ${hideZeroContracts ? 'bg-blue-600 text-white border-blue-700 shadow-inner' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`}>
                   {hideZeroContracts ? '0の項目を隠す(ON)' : '0の項目も表示'}
                 </button>
                 <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl shadow-sm">
                   <Calendar size={12} className="text-blue-500" />
-                  <select
-                    value={contractSelectedMonth}
-                    onChange={(e) => setContractSelectedMonth(e.target.value)}
-                    className="bg-transparent border-none text-blue-800 text-[10px] md:text-xs font-black focus:outline-none cursor-pointer"
-                  >
-                    {contractAvailableMonths.map((m, idx) => (
-                      <option key={idx} value={m}>{m}月度 データ</option>
-                    ))}
+                  <select value={contractSelectedMonth} onChange={(e) => setContractSelectedMonth(e.target.value)} className="bg-transparent border-none text-blue-800 text-[10px] md:text-xs font-black focus:outline-none cursor-pointer">
+                    {contractAvailableMonths.map((m, idx) => <option key={idx} value={m}>{m}月度 データ</option>)}
                   </select>
                   <ChevronDown size={11} className="text-blue-400" />
                 </div>

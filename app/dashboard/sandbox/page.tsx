@@ -514,7 +514,7 @@ export default function UniversalDashboardPage() {
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
   // =========================================================
-  // ⚙️ 【改修済み】物量・工数・生産性の3つの金庫データを解析するロジック
+  // ⚙️ 【汎用化改修】物量・工数・生産性の3つの金庫データを解析するロジック
   // =========================================================
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
@@ -571,27 +571,33 @@ export default function UniversalDashboardPage() {
       ...pRows.map((r: any) => r.date)
     ])).sort();
     
-    const processNames = ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
+    // 🌟 【汎用化】GASの設定からターゲットカテゴリを取得（なければ昭和冷蔵デフォルト）
+    const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
     
     let centerTotalVolume = 0;
     let centerTotalHours = 0;
     
     // 💡 5. 【カテゴリ計算】物量合計と平均生産性の計算
-    const items = processNames.map(proc => {
+    const items = processNames.map((proc: string) => {
       let procTotalVolume = 0;
       let prodSum = 0;
       let prodCount = 0;
       
-      // 🌟 【紐付け修正】生産性側の名前に変換するマッパー
+      // 🌟 【汎用化】GASの設定から名前変換マッピングを取得
       let prodName = proc;
-      if (proc === "ユニー一括") prodName = "ユニー";
-      if (proc === "BB") prodName = "ブロンコビリー";
+      if (data.masterSettings?.NAME_MAPPING && data.masterSettings.NAME_MAPPING[proc]) {
+        prodName = data.masterSettings.NAME_MAPPING[proc];
+      } else {
+        // 万が一設定が空だった場合の昭和冷蔵用セーフティネット
+        if (proc === "ユニー一括") prodName = "ユニー";
+        if (proc === "BB") prodName = "ブロンコビリー";
+      }
       
       const dailyList = allDates.map(dt => {
         const vMob = vRows.find((r: any) => r.date === dt && r.item === proc);
         const vol = vMob ? vMob.value : 0;
         
-        // 💡 生産性を探すときは、変換した prodName（ユニー、ブロンコビリー）を使う！
+        // 💡 生産性を探すときは、変換した prodName を使う
         const pMob = pRows.find((r: any) => r.date === dt && r.item === prodName);
         const prod = pMob ? pMob.value : 0;
         
@@ -606,7 +612,7 @@ export default function UniversalDashboardPage() {
       
       const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
       
-      // センター全体用に「対象5カテゴリ」の物量だけを加算
+      // センター全体用に「対象カテゴリ」の物量だけを加算
       centerTotalVolume += procTotalVolume;
 
       return { process: proc, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
@@ -636,7 +642,7 @@ export default function UniversalDashboardPage() {
     return { items, summary: { totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd } };
   }, [data, prodSelectedMonth]);
 
-  // 💡 【重要】先ほど消えてしまっていた「contractList」やその他の変数を確実に復元！
+  // 💡 【重要】contractListやその他の変数を確実に復元！
   const contractList = (() => {
     if (!data || !data.contractYojitsuData) return [];
     const cMap = new Map();
@@ -1056,7 +1062,7 @@ export default function UniversalDashboardPage() {
                     <h4 className="text-sm md:text-base font-black text-slate-900 tracking-tighter leading-snug truncate" title={m.title}>{m.title}</h4>
                   </div>
 
-                  {/* 🌟真・案A: 実績額と進捗率、その下に比較バッジ（左右に配置） */}
+                  {/* 実績額と進捗率、比較バッジ */}
                   <div className="flex flex-col gap-2.5 pt-0.5 pb-1">
                     <div className="flex justify-between items-start w-full gap-4">
                       <div className="flex-1">
@@ -1077,7 +1083,7 @@ export default function UniversalDashboardPage() {
                       )}
                     </div>
 
-                    {/* 🌟【完璧修正】先月差・前年差のバッジも右詰め（justify-end）に統一！ */}
+                    {/* 先月差・前年差のバッジ右詰め */}
                     {(displayMode === 'daily' || displayMode === 'monthly') && (
                       <div className="flex flex-col gap-1.5 w-full mt-0.5">
                         <div className="flex flex-wrap gap-1.5 justify-end">
@@ -1092,7 +1098,6 @@ export default function UniversalDashboardPage() {
                             <span className="text-[9px] opacity-75">({lastYearRatio.toFixed(1)}%)</span>
                           </span>
                         </div>
-                        {/* 「先月：」「前年：」も下段で右詰め（justify-end） */}
                         <div className="flex flex-wrap gap-1.5 justify-end mt-0.5">
                           <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-lg border text-[10px] font-bold flex items-center gap-1 shadow-sm">
                             <span className="text-slate-400 font-medium">{lastLbl}:</span>
@@ -1141,7 +1146,7 @@ export default function UniversalDashboardPage() {
                         )}
                       </ResponsiveContainer>
                     </div>
-                    {/* 🌟【完全復活】週次・月次の時に右側に出現する黒いフォアキャストパネル */}
+                    {/* 週次・月次の時に右側に出現する黒いフォアキャストパネル */}
                     {displayMode !== 'daily' && (
                       <div className="w-full xl:w-[240px] bg-slate-900 text-white p-5 rounded-2xl flex flex-col justify-between shrink-0 shadow-inner min-w-0">
                         <div>
@@ -1313,10 +1318,10 @@ export default function UniversalDashboardPage() {
                             {idx === 0 && <div className="text-right">実績工数</div>}
                             <div className="text-right text-blue-600">作業生産性</div>
                           </div>
-                          {item.dailyList.filter(d => d.volume > 0 || d.hours > 0 || d.prod > 0).length === 0 ? (
+                          {item.dailyList.filter((d: any) => d.volume > 0 || d.hours > 0 || d.prod > 0).length === 0 ? (
                             <div className="p-8 text-center text-xs text-slate-400 font-bold">この月の稼働蓄積データはありません。</div>
                           ) : (
-                            item.dailyList.filter(d => d.volume > 0 || d.hours > 0 || d.prod > 0).map((day, dIdx) => (
+                            item.dailyList.filter((d: any) => d.volume > 0 || d.hours > 0 || d.prod > 0).map((day: any, dIdx: number) => (
                               <div key={dIdx} className={`grid ${idx === 0 ? 'grid-cols-4' : 'grid-cols-3'} px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-white transition-colors items-center`}>
                                 <div className="font-mono text-slate-400">{day.date}</div>
                                 <div className="text-right font-mono text-slate-800">{day.volume.toLocaleString()}</div>
@@ -1406,8 +1411,8 @@ export default function UniversalDashboardPage() {
                       const parseDate = (dStr: string) => {
                         if (!dStr) return new Date(0);
                         const parts = dStr.split('/');
-                        if (parts.length === 3) return new Date(parts[0], parseInt(parts[1]) - 1, parts[2]);
-                        if (parts.length === 2) return new Date(2026, parseInt(parts[0]) - 1, parts[1]);
+                        if (parts.length === 3) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        if (parts.length === 2) return new Date(2026, parseInt(parts[0]) - 1, parseInt(parts[1]));
                         return new Date(dStr);
                       };
                       return parseDate(b.date).getTime() - parseDate(a.date).getTime();
@@ -1550,7 +1555,7 @@ export default function UniversalDashboardPage() {
                       </div>
                       <div className="flex justify-between items-end">
                         <span className="text-[8px] text-slate-400 font-bold whitespace-nowrap">予算</span>
-                        <span className="text-[9px] md:text-[10px] font-bold text-slate-50 whitespace-nowrap">{formatVal(fctVal, m.title)}</span>
+                        <span className="text-[9px] md:text-[10px] font-bold text-slate-500 whitespace-nowrap">{formatVal(fctVal, m.title)}</span>
                       </div>
                       <div className="flex justify-between items-end border-t border-dashed border-slate-200 pt-1">
                         <span className="text-[8px] text-slate-400 font-bold whitespace-nowrap">差異</span>
