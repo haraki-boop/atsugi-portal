@@ -289,29 +289,25 @@ export default function CompareDashboardPage() {
     }).sort((a, b) => b["売上高"] - a["売上高"]);
   }, [filteredData]);
 
-  // 左：真・隠れコスト詳細分析タワー ＆ 右：案A 労働生産性タワーデータ
+  // 💡 【修正点】雇用保険と予算_旅費交通費を完全に削除しました
   const sideBySideChartData = useMemo(() => {
     return filteredData.map(item => {
       const basePay = Number(item["実績_給与手当（原）"]) || 0;
       const shaho = Number(item["実績_社会保険"]) || 0;
-      const koho = Number(item["実績_雇用保険"]) || 0;
       const yukyu = Number(item["実績_有給"]) || 0;
       const travelActual = Number(item["実績_旅費交通費（原）"]) || 0;
-      const travelBudget = Number(item["予算_旅費交通費（原）"]) || 0;
       const laborCostActual = Number(item["実績_労務費"]) || 0;
       const grossProfit = Number(item["実績_当期純利益"]) || Number(item["実績_純売上高"]) || Number(item["実績_利益"]) || 0;
 
-      // 総人件費の算出
-      const totalLaborCost = basePay + shaho + koho + yukyu + travelActual;
+      // 💡 総人件費の算出からも雇用保険を除外
+      const totalLaborCost = basePay + shaho + yukyu + travelActual;
 
       return {
         name: item["現場名"],
         "ベース給与": basePay,
         "社会保険": shaho,
-        "雇用保険": koho,
         "有給コスト": yukyu,
         "旅費交通費": travelActual,
-        "予算_旅費交通費": travelBudget,
         "実績_労務費": laborCostActual,
         "総人件費": totalLaborCost,
         "生み出した利益": grossProfit
@@ -326,7 +322,6 @@ export default function CompareDashboardPage() {
 
   const areaDisplayName = selectedArea === 'all' ? '全社' : selectedArea === 'kanto' ? '関東エリア' : selectedArea === 'kansai' ? '関西エリア' : selectedArea === 'chubu' ? '中部エリア' : 'クリンネス部門';
 
-  // 💡 【ふつくしい起動ローディング画面】完全大復活マウント！
   if (loading || !isMounted) {
     return (
       <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -529,16 +524,13 @@ export default function CompareDashboardPage() {
               </div>
             </div>
 
-            {/* 💡 【大注目：2画面並列配置】
-                左：有給・旅費交通費・社会保険・雇用保険を網羅した「ベース給与 vs 隠れコスト詳細分析」
-                右：総人件費 vs 粗利益（労働生産性効果） */}
             <div className="flex flex-col xl:flex-row gap-5 w-full">
               
-              {/* 左翼：大将軍特製 隠れコスト詳細分析チャート */}
+              {/* 左翼：隠れコスト詳細分析チャート */}
               <div className="w-full xl:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[400px]">
                 <div className="flex flex-col mb-4 shrink-0 border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><TrendingUp size={16} className="text-indigo-600"/> ベース給与 vs 隠れコスト詳細分析</h3>
-                  <p className="text-[10px] text-slate-400 font-bold">有給・交通費(予・実)・社会保険・雇用保険を網羅しベース給与＆総労務費と対比</p>
+                  <p className="text-[10px] text-slate-400 font-bold">有給・交通費実績・社会保険を網羅しベース給与＆総労務費と対比</p>
                 </div>
                 <div className="flex-1 w-full min-h-0 relative">
                   <ResponsiveContainer width="100%" height="100%">
@@ -553,11 +545,8 @@ export default function CompareDashboardPage() {
                       <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }} verticalAlign="top" />
                       
                       <Bar yAxisId="left" dataKey="社会保険" stackId="hidden_cost" fill="#3b82f6" name="実績_社会保険" />
-                      <Bar yAxisId="left" dataKey="雇用保険" stackId="hidden_cost" fill="#06b6d4" name="実績_雇用保険" />
                       <Bar yAxisId="left" dataKey="有給コスト" stackId="hidden_cost" fill="#8b5cf6" name="実績_有給" />
                       <Bar yAxisId="left" dataKey="旅費交通費" stackId="hidden_cost" fill="#f59e0b" name="実績_旅費交通費（原）" radius={[4, 4, 0, 0]} />
-                      
-                      <Line yAxisId="left" type="step" dataKey="予算_旅費交通費" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 4" name="予算_旅費交通費（原）" dot={false} />
                       
                       <Line yAxisId="right" type="monotone" dataKey="ベース給与" stroke="#ec4899" strokeWidth={2.5} name="実績_給与手当（原）" dot={{ r: 4, fill: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                       <Line yAxisId="right" type="monotone" dataKey="実績_労務費" stroke="#1d4ed8" strokeWidth={2.5} name="実績_労務費" dot={{ r: 4, fill: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
@@ -566,7 +555,7 @@ export default function CompareDashboardPage() {
                 </div>
               </div>
 
-              {/* 右翼：案A 労働生産性効果タワーチャート */}
+              {/* 右翼：労働生産性効果タワーチャート */}
               <div className="w-full xl:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[400px]">
                 <div className="flex flex-col mb-4 shrink-0 border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Layers size={16} className="text-emerald-600"/> 総人件費 vs 粗利益（労働生産性効果）</h3>
@@ -584,7 +573,7 @@ export default function CompareDashboardPage() {
                       <RechartsTooltip contentStyle={modernTooltipStyle} cursor={{fill: '#f1f5f9'}} formatter={(val: any) => `¥${Number(val).toLocaleString()}`} />
                       <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }} verticalAlign="top" />
                       
-                      <Bar yAxisId="left" dataKey="総人件費" fill="#10b981" name="総人件費 (給与+社保+雇保+有給+交通費)" radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="総人件費" fill="#10b981" name="総人件費 (給与+社保+有給+交通費)" radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="生み出した利益" stroke="#f43f5e" strokeWidth={2.5} name="実績粗利益" dot={{ r: 4, fill: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                     </ComposedChart>
                   </ResponsiveContainer>
