@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
       // 🏢 清掃部門
       case 'afs-bisai-seiso': targetGasUrl = process.env.GAS_URL_OWARI_BISAI_AFS_SEISO || ''; break;
-      case 'himeji-seiso': targetGasUrl = process.env.GAS_URL_HYOGO_HIMEJI_AFS_SEISO || ''; break;
+      case 'himeji-afs-seiso': targetGasUrl = process.env.GAS_URL_HYOGO_HIMEJI_AFS_SEISO || ''; break;
       case 'mandai-saito': targetGasUrl = process.env.GAS_URL_MANDAI_SAITO || ''; break;
       
       // 該当しない現場IDが来た場合
