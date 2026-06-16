@@ -91,8 +91,9 @@ export default function UniversalDashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
+  // 🌟 urlを追加した完全な初期ステート
   const [newItem, setNewItem] = useState({
-    name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●'
+    name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●', url: ''
   });
 
   const [toastInfo, setToastInfo] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({show: false, msg: '', type: 'success'});
@@ -512,7 +513,7 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【100%動いていた元の金庫データ解析ロジック（volumeAccumulatedData等）を完全に死守】
+  // 🌟【100%動いていた元の金庫データ解析ロジック（volumeAccumulatedData等）】
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
     
@@ -745,32 +746,34 @@ export default function UniversalDashboardPage() {
 
   const handleOpenAddModal = () => {
     setEditingIndex(null);
-    setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●' });
+    setNewItem({ name: '', effect: '', startDate: '', endDate: '', customerRelated: false, ratio: 0, client: '', proposal: '', detail: '', result: '●', url: '' });
     setIsModalOpen(true);
   };
 
+  // 🌟 URLを含む編集データのセット
   const handleOpenEditModal = (index: number) => {
     setEditingIndex(index);
     if (activeActionTab === 'history') {
       const item = historyItems[index];
-      setNewItem({ startDate: item.date ? item.date.replace(/\//g, '-') : '', client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●' });
+      setNewItem({ name: '', effect: '', endDate: '', customerRelated: false, ratio: 0, startDate: item.date ? item.date.replace(/\//g, '-') : '', client: item.client || '', proposal: item.proposal || '', detail: item.detail || '', result: item.result || '●', url: item.url || '' });
     } else {
       const targetList = activeActionTab === 'dx' ? dxItems : envItems; const item = targetList[index];
-      setNewItem({ name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', end_date: item.end_date ? item.end_date.replace(/\//g, '-') : '', customer_related: item.customer_related === 'あり', ratio: item.ratio || 0 });
+      setNewItem({ client: '', proposal: '', detail: '', result: '●', name: item.name || '', effect: item.effect === '未入力' ? '' : (item.effect || ''), startDate: item.start_date ? item.start_date.replace(/\//g, '-') : '', endDate: item.end_date ? item.end_date.replace(/\//g, '-') : '', customerRelated: item.customer_related === 'あり', ratio: item.ratio || 0, url: item.url || '' });
     }
     setIsModalOpen(true);
   };
 
+  // 🌟 URLを含むデータの保存処理
   const handleSaveItem = async () => {
     setIsModalOpen(false);
     if (activeActionTab === 'history') {
       if (!newItem.client || !newItem.proposal) return;
-      const payload: any = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result };
+      const payload: any = { location_id: LOCATION_ID, date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', client: newItem.client, proposal: newItem.proposal, detail: newItem.detail || '', result: newItem.result, url: newItem.url || '' };
       if (editingIndex !== null) { payload.id = historyItems[editingIndex].id; await supabaseRequest('sales_history', 'PATCH', payload); }
       else { await supabaseRequest('sales_history', 'POST', payload); }
     } else {
       if (!newItem.name) return;
-      const payload: any = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio) };
+      const payload: any = { location_id: LOCATION_ID, name: newItem.name, effect: newItem.effect || '未入力', start_date: newItem.startDate ? newItem.startDate.replace(/-/g, '/') : '', end_date: newItem.endDate ? newItem.endDate.replace(/-/g, '/') : '', customer_related: newItem.customerRelated ? 'あり' : 'なし', ratio: Number(newItem.ratio), url: newItem.url || '' };
       const targetTable = activeActionTab === 'dx' ? 'dx_actions' : 'env_actions';
       if (editingIndex !== null) {
         const targetList = activeActionTab === 'dx' ? dxItems : envItems; payload.id = targetList[editingIndex].id; await supabaseRequest(targetTable, 'PATCH', payload);
@@ -1368,10 +1371,8 @@ export default function UniversalDashboardPage() {
                         <div className="absolute top-3 right-3 flex gap-1.5 print:hidden">
                           <button onClick={() => handleToggleHideItem(item, targetTable)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${item.is_hidden ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={item.is_hidden ? "再表示する" : "隠す"}>{item.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}</button>
                           
-                          {/* 🌟引数を realIdx に変更 */}
                           <button onClick={() => handleOpenEditModal(realIdx)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-blue-500 transition-all"><Edit2 size={13} /></button>
                           
-                          {/* 🌟引数を realIdx に変更 */}
                           <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(realIdx); }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-rose-500 transition-all"><X size={14} /></button>
                         </div>
                         <div className="w-[120px] h-[120px] md:w-[140px] md:h-[140px] relative shrink-0 min-w-0 mt-6 md:mt-0 print:w-[140px] print:h-[140px]">
@@ -1390,6 +1391,13 @@ export default function UniversalDashboardPage() {
                             <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-snug">{item.name}</h3>
                           </div>
                           {item.effect && item.effect !== "未入力" && <div className="text-[10px] md:text-[11px] font-medium text-slate-600 bg-slate-50 border p-2.5 md:p-3 rounded-xl print:bg-white print:border-slate-200"><span className="text-amber-500 font-black">💡 狙う効果:</span> {item.effect}</div>}
+                          
+                          {/* 🌟 URLリンク表示ボタン */}
+                          {item.url && (
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 mt-2 text-[11px] font-black hover:underline transition-colors px-3 py-1.5 rounded-lg border border-transparent bg-slate-100 hover:bg-slate-200`} style={{ color: themeColor }}>
+                              <FileText size={12} /> 関連資料・リンクを開く
+                            </a>
+                          )}
                         </div>
                       </div>
                     );
@@ -1425,10 +1433,8 @@ export default function UniversalDashboardPage() {
                               {log.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
                             
-                            {/* 🌟引数を realIdx に変更 */}
                             <button onClick={() => handleOpenEditModal(realIdx)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-blue-500 transition-all"><Edit2 size={13} /></button>
                             
-                            {/* 🌟引数を realIdx に変更 */}
                             <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(realIdx); }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-rose-500 transition-all"><X size={14} /></button>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 md:gap-3 pr-24 print:pr-0">
@@ -1439,6 +1445,13 @@ export default function UniversalDashboardPage() {
                           </div>
                           {log.proposal && <div className="text-[10px] md:text-xs font-black text-slate-800 bg-white border px-2.5 md:px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
                           {log.detail && <p className="text-[11px] md:text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
+                          
+                          {/* 🌟 営業履歴用：URL資料リンク表示ボタンを追加 */}
+                          {log.url && (
+                            <a href={log.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-black hover:underline transition-colors px-3 py-1.5 rounded-lg border border-transparent bg-rose-100 text-rose-600">
+                              <FileText size={12} /> 関連資料・リンクを開く
+                            </a>
+                          )}
                         </div>
                       );
                     });
@@ -1603,8 +1616,12 @@ export default function UniversalDashboardPage() {
                 <div className="space-y-1"><label className="text-slate-400">2. 誰に *必須</label><input type="text" value={newItem.client} onChange={(e) => setNewItem({...newItem, client: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-16 resize-none font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">4. 内容詳細</label><textarea value={newItem.detail} onChange={(e) => setNewItem({...newItem, detail: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-20 md:h-24 resize-none font-semibold text-slate-900" /></div>
+                
+                {/* 🌟 営業履歴用：URLリンクの入力欄を追加 */}
+                <div className="space-y-1"><label className="text-slate-400">5. 関連URLリンク</label><input type="url" placeholder="https://..." value={newItem.url} onChange={(e) => setNewItem({...newItem, url: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+                
                 <div className="space-y-1">
-                  <label className="text-slate-400">5. 商談結果</label>
+                  <label className="text-slate-400">6. 商談結果</label>
                   <div className="grid grid-cols-3 gap-2 md:gap-3">
                     {['●', '×', '△'].map(res => (
                       <button key={res} type="button" onClick={() => setNewItem({...newItem, result: res})} className={`py-2 md:py-2.5 rounded-xl font-black border transition-all ${newItem.result === res ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600'}`}>{res}</button>
@@ -1616,6 +1633,10 @@ export default function UniversalDashboardPage() {
               <div className="space-y-3 md:space-y-4 text-[11px] md:text-xs font-bold text-slate-700">
                 <div className="space-y-1"><label className="text-slate-400">項目名 *必須</label><input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">想定効果</label><textarea value={newItem.effect} onChange={(e) => setNewItem({...newItem, effect: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-16 resize-none font-semibold text-slate-900" /></div>
+                
+                {/* 🌟 DX・現場改善用：URLリンクの入力欄を追加 */}
+                <div className="space-y-1"><label className="text-slate-400">関連URLリンク</label><input type="url" placeholder="https://..." value={newItem.url} onChange={(e) => setNewItem({...newItem, url: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
+
                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <input type="date" value={newItem.startDate} onChange={(e) => setNewItem({...newItem, startDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" />
                   <input type="date" value={newItem.endDate} onChange={(e) => setNewItem({...newItem, endDate: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" />
