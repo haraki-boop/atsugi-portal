@@ -512,47 +512,82 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
+  // 🌟【100%動いていた元の金庫データ解析ロジック（volumeAccumulatedData等）を完全に死守】
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
     
     const targetMonthStr = `/${prodSelectedMonth.padStart(2, '0')}/`;
     
-    const vRows = (data.vaultVolume || []).filter((r: any) => r.date.includes(targetMonthStr));
-    const hTotalRows = (data.vaultTotalHours || []).filter((r: any) => r.date.includes(targetMonthStr));
+    const vRows: any[] = [];
+    if (data.volumeAccumulatedData) {
+      data.volumeAccumulatedData.forEach((item: any) => {
+        const itemName = item.title.replace('蓄積実績_', '');
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            vRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
+          }
+        });
+      });
+    }
+
+    const hTotalRows: any[] = [];
+    if (data.manhoursAccumulatedData) {
+      data.manhoursAccumulatedData.forEach((item: any) => {
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            const existing = hTotalRows.find(h => h.date === date);
+            if (existing) {
+              existing.value += n(item.values[idx]);
+            } else {
+              hTotalRows.push({ date: date, value: n(item.values[idx]) });
+            }
+          }
+        });
+      });
+    }
+
+    const pRows: any[] = [];
+    if (data.productivityAccumulatedData) {
+      data.productivityAccumulatedData.forEach((item: any) => {
+        const itemName = item.title.replace('蓄積実績_作業生産性_', '');
+        item.labels.forEach((date: string, idx: number) => {
+          if (date.includes(targetMonthStr)) {
+            pRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
+          }
+        });
+      });
+    }
     
     const allDates = Array.from(new Set([
       ...vRows.map((r: any) => r.date),
-      ...hTotalRows.map((r: any) => r.date)
+      ...hTotalRows.map((r: any) => r.date),
+      ...pRows.map((r: any) => r.date)
     ])).sort();
     
-    const processNames = ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
-    const prodDataAll = data.productivityData || [];
+    const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
     
-    const items = processNames.map(proc => {
+    let centerTotalVolume = 0;
+    let centerTotalHours = 0;
+    
+    const items = processNames.map((proc: string) => {
       let procTotalVolume = 0;
       let prodSum = 0;
       let prodCount = 0;
       
-      const targetItem = prodDataAll.find((d:any) => d.title.includes(`実績_作業生産性_${proc}`));
+      let prodName = proc;
+      if (data.masterSettings?.NAME_MAPPING && data.masterSettings.NAME_MAPPING[proc]) {
+        prodName = data.masterSettings.NAME_MAPPING[proc];
+      } else {
+        if (proc === "ユニー一括") prodName = "ユニー";
+        if (proc === "BB") prodName = "ブロンコビリー";
+      }
       
       const dailyList = allDates.map(dt => {
         const vMob = vRows.find((r: any) => r.date === dt && r.item === proc);
         const vol = vMob ? vMob.value : 0;
         
-        let prod = 0;
-        if (targetItem) {
-           const idx = targetItem.labels.findIndex((l:any) => {
-              const dStr = String(l).replace(/[^0-9/]/g, '');
-              const parts = dStr.split('/');
-              const dtParts = dt.split('/');
-              if (parts.length >= 2 && dtParts.length >= 2) {
-                 return parseInt(parts[parts.length-2], 10) === parseInt(dtParts[dtParts.length-2], 10) && 
-                        parseInt(parts[parts.length-1], 10) === parseInt(dtParts[dtParts.length-1], 10);
-              }
-              return false;
-           });
-           if (idx !== -1) prod = n(targetItem.values[idx]);
-        }
+        const pMob = pRows.find((r: any) => r.date === dt && r.item === prodName);
+        const prod = pMob ? pMob.value : 0;
         
         procTotalVolume += vol;
         if (prod > 0) {
@@ -564,21 +599,18 @@ export default function UniversalDashboardPage() {
       });
       
       const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
+      centerTotalVolume += procTotalVolume;
+
       return { process: proc, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
     });
     
-    let centerTotalVolume = 0;
-    let centerTotalHours = 0;
+    centerTotalHours = hTotalRows.reduce((sum, r) => sum + r.value, 0);
     
     const centerDailyList = allDates.map(dt => {
       const dayVol = vRows.filter((r: any) => r.date === dt && processNames.includes(r.item)).reduce((sum: number, r: any) => sum + r.value, 0);
       const dayHrsRow = hTotalRows.find((r: any) => r.date === dt);
       const dayHrs = dayHrsRow ? dayHrsRow.value : 0;
       const dayProd = dayHrs > 0 ? dayVol / dayHrs : 0;
-      
-      centerTotalVolume += dayVol;
-      centerTotalHours += dayHrs;
-      
       return { date: dt.split('/').slice(1).join('/'), volume: dayVol, hours: dayHrs, prod: dayProd };
     });
     
@@ -797,6 +829,7 @@ export default function UniversalDashboardPage() {
       </div>
     );
   }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 notranslate print:bg-white print:pb-0 print:block" translate="no">
       <style dangerouslySetInnerHTML={{__html: `@media print { @page { size: A4 portrait; margin: 10mm; } body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } main { zoom: 0.65; } .print-avoid-break { page-break-inside: avoid; } }`}} />
@@ -1370,15 +1403,20 @@ export default function UniversalDashboardPage() {
                     });
                     const displayHistory = showHiddenItems ? sortedHistoryItems : sortedHistoryItems.filter((log: any) => !log.is_hidden);
                     if (displayHistory.length === 0) return <div className="col-span-1 lg:col-span-2 text-slate-400 text-[11px] md:text-sm font-bold pl-2 py-4">💡 該当する商談営業履歴ログはありません。</div>;
+                    
                     return displayHistory.map((log, index) => {
+                      // 🌟ここが本物の修正：元の配列から本当のID（realIdx）を探し出す
                       const realIdx = historyItems.findIndex(x => x.id === log.id);
+
                       return (
                         <div key={index} className={`print-avoid-break bg-slate-50 border p-4 md:p-6 rounded-2xl md:rounded-3xl space-y-3 relative group transition-all print:bg-white print:border-slate-300 ${log.is_hidden ? 'opacity-40 bg-slate-200 border-dashed shadow-none' : 'border-slate-100 hover:shadow-md'}`}>
                           <div className="absolute top-3 right-3 flex gap-1.5 print:hidden">
                             <button onClick={() => handleToggleHideItem(log, 'sales_history')} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${log.is_hidden ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={log.is_hidden ? "再表示する" : "隠す"}>
                               {log.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
+                            {/* 🌟引数を realIdx に変更 */}
                             <button onClick={() => handleOpenEditModal(realIdx)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-blue-500 transition-all"><Edit2 size={13} /></button>
+                            {/* 🌟引数を realIdx に変更 */}
                             <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(realIdx); }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-rose-500 transition-all"><X size={14} /></button>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 md:gap-3 pr-24 print:pr-0">
