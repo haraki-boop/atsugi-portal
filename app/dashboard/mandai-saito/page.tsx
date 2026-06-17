@@ -33,8 +33,8 @@ export default function UniversalDashboardPage() {
   // =========================================================
   // 🏢 【拠点マスター設定】
   // =========================================================
-  const LOCATION_ID = 'himeji-afs-seiso';
-  const LOCATION_NAME = '兵庫姫路_AFS_清掃';
+  const LOCATION_ID = 'mandai-saito';
+  const LOCATION_NAME = '万代彩都';
 
   const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
   const [isMounted, setIsMounted] = useState(false);
@@ -81,6 +81,7 @@ export default function UniversalDashboardPage() {
     
     return `¥${Math.round(val).toLocaleString()}`;
   };
+
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastInfo({ show: true, msg, type });
     setTimeout(() => setToastInfo({ show: false, msg: '', type: 'success' }), 3000);

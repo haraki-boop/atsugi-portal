@@ -134,12 +134,14 @@ export default function CompareDashboardPage() {
   // アクションタブ専用ステート
   const [activeTopTab, setActiveTopTab] = useState<'dashboard' | 'actions'>('dashboard');
   const [actionCategory, setActionCategory] = useState<'dx' | 'env' | 'history'>('dx');
-  const [actionMonthFilter, setActionMonthFilter] = useState<string>('all');
   const [actionLocationFilter, setActionLocationFilter] = useState<string>('all');
   const [actionSearchQuery, setActionSearchQuery] = useState<string>('');
   const [allActions, setAllActions] = useState<any[]>([]);
 
-  // 🌟 追加: チェックボックス（レ点フィルター）用ステート
+  // 🌟 追加: 年次・月次独立フィルター用ステート
+  const [actionYearFilter, setActionYearFilter] = useState<string>('all');
+  const [actionMonthFilter, setActionMonthFilter] = useState<string>('all');
+
   const [filterDxCustomer, setFilterDxCustomer] = useState<boolean>(true);
   const [filterDxInternal, setFilterDxInternal] = useState<boolean>(true);
   const [filterHistSuccess, setFilterHistSuccess] = useState<boolean>(true);
@@ -369,14 +371,14 @@ export default function CompareDashboardPage() {
     }).sort((a, b) => b["ベース給与"] - a["ベース給与"]).slice(0, 15);
   }, [filteredData]);
 
-  // アクション一覧用のフィルターデータ
-  const availableActionMonths = useMemo(() => {
-    const months = allActions.map(a => {
+  // 🌟 アクション一覧用の「年」の抽出
+  const availableActionYears = useMemo(() => {
+    const years = allActions.map(a => {
       if (!a.dateStr) return '';
       const parts = a.dateStr.split('/');
-      return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : '';
+      return parts.length > 0 ? parts[0] : '';
     }).filter(Boolean);
-    return Array.from(new Set(months)).sort().reverse();
+    return Array.from(new Set(years)).sort().reverse();
   }, [allActions]);
 
   const availableActionLocations = useMemo(() => {
@@ -384,43 +386,19 @@ export default function CompareDashboardPage() {
     return Array.from(new Set(locs));
   }, [allActions]);
 
-  // 🌟 検索フィルター＋レ点チェック込みのアクション一覧生成ロジック
+  // 検索フィルター＋レ点チェック込みのアクション一覧生成ロジック
   const filteredActionsForView = useMemo(() => {
     return allActions.filter(a => {
       const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
-      const matchMonth = actionMonthFilter === 'all' || (a.dateStr && a.dateStr.startsWith(actionMonthFilter));
       const matchLoc = actionLocationFilter === 'all' || a.location_id === actionLocationFilter;
       
-      const searchLower = actionSearchQuery.toLowerCase();
-      const matchSearch = actionSearchQuery === '' || 
-        (a.name || '').toLowerCase().includes(searchLower) ||
-        (a.client || '').toLowerCase().includes(searchLower) ||
-        (a.effect || '').toLowerCase().includes(searchLower) ||
-        (a.proposal || '').toLowerCase().includes(searchLower) ||
-        (a.detail || '').toLowerCase().includes(searchLower) ||
-        (LOCATION_NAME_MAP[a.location_id] || a.location_id).toLowerCase().includes(searchLower);
-
-      // 🌟 レ点チェックの条件判定
-      let matchStatus = false;
-      if (actionCategory === 'dx' || actionCategory === 'env') {
-        const isCustomer = a.customer_related === 'あり';
-        matchStatus = (isCustomer && filterDxCustomer) || (!isCustomer && filterDxInternal);
-      } else {
-        const res = a.result;
-        if (res === '●' || res === '〇') matchStatus = filterHistSuccess;
-        else if (res === '×') matchStatus = filterHistLost;
-        else matchStatus = filterHistPending; // △ やその他はすべて保留/継続チェックに連動
-      }
-
-      return matchType && matchMonth && matchLoc && matchSearch && matchStatus;
-    });
-  }, [allActions, actionCategory, actionMonthFilter, actionLocationFilter, actionSearchQuery, filterDxCustomer, filterDxInternal, filterHistSuccess, filterHistPending, filterHistLost]);
-
-  // 🌟 レ点チェック込みのアクション件数を集計するロジック（ランキンググラフ用）
-  const actionCountByLocation = useMemo(() => {
-    const baseActions = allActions.filter(a => {
-      const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
-      const matchMonth = actionMonthFilter === 'all' || (a.dateStr && a.dateStr.startsWith(actionMonthFilter));
+      // 🌟 年・月ごとの独立フィルタリング
+      const dateParts = (a.dateStr || '').split('/');
+      const y = dateParts[0] || '';
+      const m = dateParts[1] ? dateParts[1].padStart(2, '0') : '';
+      
+      const matchYear = actionYearFilter === 'all' || y === actionYearFilter;
+      const matchMonth = actionMonthFilter === 'all' || m === actionMonthFilter;
       
       const searchLower = actionSearchQuery.toLowerCase();
       const matchSearch = actionSearchQuery === '' || 
@@ -431,7 +409,6 @@ export default function CompareDashboardPage() {
         (a.detail || '').toLowerCase().includes(searchLower) ||
         (LOCATION_NAME_MAP[a.location_id] || a.location_id).toLowerCase().includes(searchLower);
 
-      // 🌟 レ点チェックの条件判定
       let matchStatus = false;
       if (actionCategory === 'dx' || actionCategory === 'env') {
         const isCustomer = a.customer_related === 'あり';
@@ -443,7 +420,43 @@ export default function CompareDashboardPage() {
         else matchStatus = filterHistPending;
       }
 
-      return matchType && matchMonth && matchSearch && matchStatus; // locationFilterはランキング全体比較のため除外
+      return matchType && matchYear && matchMonth && matchLoc && matchSearch && matchStatus;
+    });
+  }, [allActions, actionCategory, actionYearFilter, actionMonthFilter, actionLocationFilter, actionSearchQuery, filterDxCustomer, filterDxInternal, filterHistSuccess, filterHistPending, filterHistLost]);
+
+  // アクション件数を集計するロジック（ランキンググラフ用）
+  const actionCountByLocation = useMemo(() => {
+    const baseActions = allActions.filter(a => {
+      const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
+      
+      const dateParts = (a.dateStr || '').split('/');
+      const y = dateParts[0] || '';
+      const m = dateParts[1] ? dateParts[1].padStart(2, '0') : '';
+      
+      const matchYear = actionYearFilter === 'all' || y === actionYearFilter;
+      const matchMonth = actionMonthFilter === 'all' || m === actionMonthFilter;
+      
+      const searchLower = actionSearchQuery.toLowerCase();
+      const matchSearch = actionSearchQuery === '' || 
+        (a.name || '').toLowerCase().includes(searchLower) ||
+        (a.client || '').toLowerCase().includes(searchLower) ||
+        (a.effect || '').toLowerCase().includes(searchLower) ||
+        (a.proposal || '').toLowerCase().includes(searchLower) ||
+        (a.detail || '').toLowerCase().includes(searchLower) ||
+        (LOCATION_NAME_MAP[a.location_id] || a.location_id).toLowerCase().includes(searchLower);
+
+      let matchStatus = false;
+      if (actionCategory === 'dx' || actionCategory === 'env') {
+        const isCustomer = a.customer_related === 'あり';
+        matchStatus = (isCustomer && filterDxCustomer) || (!isCustomer && filterDxInternal);
+      } else {
+        const res = a.result;
+        if (res === '●' || res === '〇') matchStatus = filterHistSuccess;
+        else if (res === '×') matchStatus = filterHistLost;
+        else matchStatus = filterHistPending;
+      }
+
+      return matchType && matchYear && matchMonth && matchSearch && matchStatus;
     });
 
     const counts: { [key: string]: number } = {};
@@ -459,7 +472,7 @@ export default function CompareDashboardPage() {
     const maxVal = sorted.length > 0 ? Math.max(...sorted.map(d => d.value)) : 1;
     const adjustedMax = Math.ceil(maxVal * 1.15); 
     return sorted.map(d => ({ ...d, maxValue: adjustedMax }));
-  }, [allActions, actionCategory, actionMonthFilter, actionSearchQuery, filterDxCustomer, filterDxInternal, filterHistSuccess, filterHistPending, filterHistLost]);
+  }, [allActions, actionCategory, actionYearFilter, actionMonthFilter, actionSearchQuery, filterDxCustomer, filterDxInternal, filterHistSuccess, filterHistPending, filterHistLost]);
 
   const maxActionBarValue = actionCountByLocation.length > 0 ? actionCountByLocation[0].maxValue : 1;
 
@@ -556,22 +569,27 @@ export default function CompareDashboardPage() {
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-400">拠点:</span>
-                    <select value={actionLocationFilter} onChange={(e) => setActionLocationFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer">
+                    <select value={actionLocationFilter} onChange={(e) => setActionLocationFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer">
                       <option value="all">すべての拠点</option>
                       {availableActionLocations.map(loc => <option key={loc} value={loc}>{LOCATION_NAME_MAP[loc] || loc}</option>)}
                     </select>
                   </div>
+                  {/* 🌟 年と月を分けたプルダウン */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400">月度:</span>
-                    <select value={actionMonthFilter} onChange={(e) => setActionMonthFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer">
+                    <span className="text-xs font-bold text-slate-400">時期:</span>
+                    <select value={actionYearFilter} onChange={(e) => setActionYearFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer">
+                      <option value="all">すべての年</option>
+                      {availableActionYears.map(y => <option key={y} value={y}>{y}年</option>)}
+                    </select>
+                    <select value={actionMonthFilter} onChange={(e) => setActionMonthFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer">
                       <option value="all">すべての月</option>
-                      {availableActionMonths.map(m => <option key={m} value={m}>{m} アクション</option>)}
+                      {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => <option key={m} value={m}>{parseInt(m, 10)}月</option>)}
                     </select>
                   </div>
                 </div>
               </div>
 
-              {/* 🌟 追加：チェックボックス（レ点フィルター）エリア */}
+              {/* チェックボックス（レ点フィルター）エリア */}
               <div className="w-full flex items-center flex-wrap gap-4 pt-3 mt-1 border-t border-slate-100">
                 <span className="text-xs font-bold text-slate-400">表示絞り込み:</span>
                 {actionCategory === 'history' ? (
@@ -616,7 +634,7 @@ export default function CompareDashboardPage() {
                   }
 
                   if (actionCategory === 'dx' || actionCategory === 'env') {
-                    const themeColor = actionCategory === 'dx' ? '#9333ea' : '#10b981'; // より鮮やかな紫と緑
+                    const themeColor = actionCategory === 'dx' ? '#9333ea' : '#10b981'; 
                     const bgLightColor = actionCategory === 'dx' ? 'bg-purple-50' : 'bg-emerald-50';
                     return (
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5">
@@ -625,7 +643,6 @@ export default function CompareDashboardPage() {
                           const locName = LOCATION_NAME_MAP[item.location_id] || item.location_id;
                           return (
                             <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-3 relative overflow-hidden transition-all hover:shadow-md group">
-                              {/* 左端のアクセントライン */}
                               <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: themeColor }}></div>
                               
                               <div className="flex justify-between items-start pl-2">
@@ -633,7 +650,6 @@ export default function CompareDashboardPage() {
                                   <span className="px-2 py-0.5 rounded text-[10px] font-black text-white shadow-sm" style={{ backgroundColor: themeColor }}>{locName}</span>
                                   {item.dateStr && <span className="text-[10px] font-bold text-slate-400">📅 {item.dateStr}</span>}
                                   
-                                  {/* 🌟 顧客関連/社内施策 バッジ追加 */}
                                   {item.customer_related === 'あり' ? (
                                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 shadow-sm">🚨 顧客関連</span>
                                   ) : (
@@ -644,7 +660,6 @@ export default function CompareDashboardPage() {
                               
                               <h3 className="text-sm font-black text-slate-800 leading-snug pl-2">{item.name}</h3>
                               
-                              {/* 🌟 スマートなリニアプログレスバー */}
                               <div className="space-y-1 pl-2 mt-1">
                                 <div className="flex justify-between text-[10px] font-black">
                                   <span className="text-slate-400 uppercase tracking-wider">Progress</span>
@@ -673,14 +688,12 @@ export default function CompareDashboardPage() {
                       </div>
                     );
                   } else {
-                    // 営業履歴のカード表示
                     return (
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5">
                         {filteredActionsForView.map((log, idx) => {
                           const locName = LOCATION_NAME_MAP[log.location_id] || log.location_id;
                           return (
                             <div key={idx} className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col space-y-3 relative overflow-hidden hover:shadow-md transition-all group">
-                              {/* 左端のアクセントライン */}
                               <div className="absolute top-0 left-0 w-1.5 h-full bg-rose-500"></div>
 
                               <div className="flex justify-between items-start pl-2">
@@ -688,7 +701,6 @@ export default function CompareDashboardPage() {
                                   <span className="px-2 py-0.5 rounded text-[10px] font-black text-white shadow-sm bg-rose-500">{locName}</span>
                                   {log.dateStr && <span className="text-[10px] font-bold text-slate-400">📅 {log.dateStr}</span>}
                                   
-                                  {/* 🌟 営業履歴：〇△×の専用カラーバッジ */}
                                   {(() => {
                                     const res = log.result;
                                     if (res === '●' || res === '〇') return <span className="text-[9px] font-black px-1.5 py-0.5 rounded border shadow-sm bg-emerald-50 text-emerald-700 border-emerald-200">🟢 成功/前進</span>;
@@ -706,7 +718,7 @@ export default function CompareDashboardPage() {
                                 {log.detail && <p className="text-[11px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap line-clamp-3">{log.detail}</p>}
                                 
                                 {log.url && (
-                                  <a href={log.url} target="_blank" rel="noopener noreferrer" className="inline-flex w-fit items-center gap-1 mt-1 text-[10px] font-black hover:underline transition-colors px-2 py-1.5 rounded-lg border border-transparent bg-slate-50 text-rose-600">
+                                  <a href={log.url} target="_blank" rel="noopener noreferrer" className="inline-flex w-fit items-center gap-1 mt-1 text-[10px] font-black hover:underline transition-colors px-2 py-1.5 rounded-lg border border-transparent bg-rose-50 text-rose-600">
                                     <FileText size={12} /> 関連リンクを開く
                                   </a>
                                 )}
