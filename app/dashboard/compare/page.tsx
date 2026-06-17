@@ -5,10 +5,10 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   ScatterChart, Scatter, ZAxis, Cell, LabelList, Line, Legend, Area, ComposedChart,
-  PieChart, Pie
+  PieChart, Pie, LineChart, AreaChart
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart3, Loader2, Globe, MapPin, Sparkles, TrendingUp, Target, Layers, Trophy, Settings2, ShieldAlert, Rocket, Leaf, MessageSquare, FileText, Search } from 'lucide-react';
+import { BarChart3, Loader2, Globe, MapPin, Sparkles, TrendingUp, Target, Layers, Trophy, Settings2, ShieldAlert, Rocket, Leaf, MessageSquare, FileText, Search, Activity, ChevronDown, PieChart as PieChartIcon, Calendar } from 'lucide-react';
 
 const GAS_API_URL = "/api/compare";
 
@@ -39,6 +39,8 @@ const LOCATION_NAME_MAP: { [key: string]: string } = {
   "binisai-seiso": "尾西清掃"
 };
 
+const PROD_COLORS = ['#3b82f6', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#f43f5e', '#84cc16', '#6366f1', '#14b8a6', '#d946ef', '#f97316'];
+
 const getAreaForSite = (actualSiteName: string) => {
   if (!actualSiteName) return 'unknown';
   const matchedKey = Object.keys(SITE_AREA_MAP).find(key => actualSiteName.includes(key));
@@ -67,6 +69,65 @@ const AnimatedNumber = ({ value }: { value: string | number }) => {
   );
 };
 
+const CustomDropdown = ({ value, options, onChange, align = 'left' }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="relative inline-block text-left z-40">
+      <div
+        className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="font-black text-blue-600 text-[11px] truncate max-w-[120px]">{value}</span>
+        <ChevronDown size={14} className="text-slate-400 shrink-0" />
+      </div>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
+          <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 w-56 bg-white rounded-xl shadow-2xl z-50 border border-slate-100 max-h-64 overflow-y-auto custom-scrollbar`}>
+            <div className="p-1">
+              {options.map((opt: string) => (
+                <div
+                  key={opt}
+                  className={`px-3 py-2 text-xs font-bold rounded-lg cursor-pointer transition-colors ${value === opt ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:bg-slate-50'}`}
+                  onClick={() => { onChange(opt); setIsOpen(false); }}
+                >
+                  {opt}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const DiffBadge = ({ curr, prev, isInverse = false, isDecimal = false, label, asPercentChange = false }: any) => {
+  if (!prev) return <span className="text-slate-300 text-[9px] font-bold flex w-full justify-center">-</span>;
+  const diff = curr - prev;
+  if (diff === 0) return <span className="text-slate-400 text-[9px] font-bold flex w-full justify-center items-center gap-0.5">±0 <span className="font-medium opacity-70 scale-90">{label}</span></span>;
+  
+  const isPositive = diff > 0;
+  const isGood = isInverse ? !isPositive : isPositive;
+  const color = isGood ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100';
+  const arrow = isPositive ? '↑' : '↓';
+  const prefix = isPositive ? '+' : '';
+  
+  let diffStr = '';
+  if (asPercentChange) {
+    const pct = (diff / prev) * 100;
+    diffStr = `${pct.toFixed(1)}%`;
+  } else {
+    diffStr = isDecimal ? diff.toFixed(1) : Math.round(diff).toLocaleString();
+  }
+  
+  return (
+    <span className={`${color} text-[9px] font-black px-1.5 py-[2px] rounded border flex items-center justify-center w-full gap-0.5 tracking-tighter`}>
+      {arrow}{prefix}{diffStr} <span className="font-medium text-[8px] opacity-70 scale-90">{label}</span>
+    </span>
+  );
+};
+
 const DualRingChart = ({ 
   siteName, annualBudget, plannedSales, achievedSales 
 }: { 
@@ -74,15 +135,12 @@ const DualRingChart = ({
 }) => {
   const actualRatio = annualBudget > 0 ? (achievedSales / annualBudget) * 100 : 0;
   const planRatio = annualBudget > 0 ? (plannedSales / annualBudget) * 100 : 0;
-  
   const radiusOuter = 58;
   const radiusInner = 44;
   const circOuter = 2 * Math.PI * radiusOuter;
   const circInner = 2 * Math.PI * radiusInner;
-  
   const offsetOuter = circOuter - (Math.min(actualRatio, 100) / 100) * circOuter;
   const offsetInner = circInner - (Math.min(planRatio, 100) / 100) * circInner;
-
   const diff = achievedSales - plannedSales;
   const formatM = (val: number) => Math.round(val / 10000).toLocaleString() + '万';
 
@@ -91,25 +149,21 @@ const DualRingChart = ({
       <div className="text-center w-full mb-2 border-b border-slate-100 pb-1.5">
         <h4 className="font-extrabold text-[#1e254c] text-xs truncate px-1" title={siteName}>{siteName}</h4>
       </div>
-      
       <div className="relative w-[140px] h-[140px] flex items-center justify-center">
         <svg width="140" height="140" className="transform -rotate-90">
           <circle cx="70" cy="70" r={radiusOuter} stroke="#e2e8f0" strokeWidth="8" fill="none" />
           <circle cx="70" cy="70" r={radiusOuter} stroke="#00a6c0" strokeWidth="8" fill="none"
                   strokeDasharray={circOuter} strokeDashoffset={offsetOuter} strokeLinecap="round" className="transition-all duration-1000" />
-          
           <circle cx="70" cy="70" r={radiusInner} stroke="#e2e8f0" strokeWidth="8" fill="none" />
           <circle cx="70" cy="70" r={radiusInner} stroke="#1e254c" strokeWidth="8" fill="none"
                   strokeDasharray={circInner} strokeDashoffset={offsetInner} strokeLinecap="round" className="transition-all duration-1000" />
         </svg>
-        
         <div className="absolute flex flex-col items-center justify-center text-center">
           <span className="text-[14px] font-black text-[#1e254c] tracking-tight">{formatM(achievedSales)}</span>
           <span className={`text-[11px] font-bold mt-0.5 ${diff >= 0 ? 'text-[#00a6c0]' : 'text-[#e6005c]'}`}>
             {diff >= 0 ? '+' : ''}{formatM(diff)}
           </span>
         </div>
-
         <div className="absolute top-0 left-0 text-[9px] font-bold text-[#00a6c0] bg-white/80 px-1 rounded">実績 {actualRatio.toFixed(0)}%</div>
         <div className="absolute bottom-0 left-0 text-[9px] font-bold text-[#1e254c] bg-white/80 px-1 rounded">予定 {planRatio.toFixed(0)}%</div>
         <div className="absolute top-0 right-0 text-[9px] font-bold text-slate-400 bg-white/80 px-1 rounded">予算:{formatM(annualBudget)}</div>
@@ -125,20 +179,20 @@ export default function CompareDashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedArea, setSelectedArea] = useState<'all' | 'kanto' | 'kansai' | 'chubu' | 'cleanness' | 'actions'>('all');
+  const [selectedArea, setSelectedArea] = useState<'all' | 'kanto' | 'kansai' | 'chubu' | 'cleanness' | 'productivity' | 'actions'>('all');
 
   const [rankingTarget, setRankingTarget] = useState<string>('実績_売上高');
   const [scatterX, setScatterX] = useState<string>('実績_売上高');
   const [scatterY, setScatterY] = useState<string>('実績_純売上高');
 
-  // アクションタブ専用ステート
-  const [activeTopTab, setActiveTopTab] = useState<'dashboard' | 'actions'>('dashboard');
+  const [activeTopTab, setActiveTopTab] = useState<'dashboard' | 'productivity' | 'actions'>('dashboard');
+  
+  const [prodAreaFilters, setProdAreaFilters] = useState({ kanto: true, chubu: true, kansai: true });
+
   const [actionCategory, setActionCategory] = useState<'dx' | 'env' | 'history'>('dx');
   const [actionLocationFilter, setActionLocationFilter] = useState<string>('all');
   const [actionSearchQuery, setActionSearchQuery] = useState<string>('');
   const [allActions, setAllActions] = useState<any[]>([]);
-
-  // 🌟 追加: 年次・月次独立フィルター用ステート
   const [actionYearFilter, setActionYearFilter] = useState<string>('all');
   const [actionMonthFilter, setActionMonthFilter] = useState<string>('all');
 
@@ -148,7 +202,6 @@ export default function CompareDashboardPage() {
   const [filterHistPending, setFilterHistPending] = useState<boolean>(true);
   const [filterHistLost, setFilterHistLost] = useState<boolean>(true);
 
-  // UTC日付バグ迎撃用フォーマット関数
   const formatMonth = (dateStr: string) => {
     if (!dateStr) return "";
     const cleanStr = String(dateStr).trim().replace(/度/g, '');
@@ -196,7 +249,6 @@ export default function CompareDashboardPage() {
     fetchData();
   }, []);
 
-  // 全拠点アクションデータ（清掃拠点除外）の取得
   useEffect(() => {
     const fetchAllActions = async () => {
       try {
@@ -214,10 +266,7 @@ export default function CompareDashboardPage() {
           ...dx.map((d: any) => ({ ...d, actionType: 'DX推進', dateStr: d.start_date })),
           ...env.map((e: any) => ({ ...e, actionType: '現場改善', dateStr: e.start_date })),
           ...history.map((h: any) => ({ ...h, actionType: '営業履歴', dateStr: h.date }))
-        ].filter(a => {
-          const siteName = LOCATION_NAME_MAP[a.location_id] || a.location_id;
-          return getAreaForSite(siteName) !== 'cleanness'; // 清掃拠点を除外
-        }).sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        ].sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
         
         setAllActions(combined);
       } catch (err) { 
@@ -240,7 +289,7 @@ export default function CompareDashboardPage() {
   const monthFilteredData = rawData.filter(item => item["日付"] === selectedMonth);
   const filteredData = monthFilteredData.filter(item => {
     if (selectedArea === 'all') return true;
-    if (selectedArea === 'actions') return false; 
+    if (selectedArea === 'actions' || selectedArea === 'productivity') return false; 
     return getAreaForSite(item["現場名"]) === selectedArea;
   });
 
@@ -250,9 +299,131 @@ export default function CompareDashboardPage() {
   ];
 
   const term27Data = rawData.filter(item => {
-    if (selectedArea !== 'all' && selectedArea !== 'actions' && getAreaForSite(item["現場名"]) !== selectedArea) return false;
+    if (selectedArea !== 'all' && selectedArea !== 'actions' && selectedArea !== 'productivity' && getAreaForSite(item["現場名"]) !== selectedArea) return false;
     return term27Months.includes(item["日付"]);
   });
+
+  const uniqueSitesProd = useMemo(() => Array.from(new Set(rawData
+    .filter(d => term27Months.includes(d["日付"]))
+    .map(d => d["現場名"])
+    .filter(site => {
+      const area = getAreaForSite(site);
+      if (area === 'cleanness') return false;
+      if (area === 'kanto' && !prodAreaFilters.kanto) return false;
+      if (area === 'chubu' && !prodAreaFilters.chubu) return false;
+      if (area === 'kansai' && !prodAreaFilters.kansai) return false;
+      return true;
+    }) 
+  )), [rawData, term27Months, prodAreaFilters]);
+
+  const siteCardsData = useMemo(() => {
+    const selectedIdx = months.indexOf(selectedMonth);
+    const prevMonthStr = selectedIdx >= 0 && selectedIdx + 1 < months.length ? months[selectedIdx + 1] : null;
+    const prev2MonthStr = selectedIdx >= 0 && selectedIdx + 2 < months.length ? months[selectedIdx + 2] : null;
+
+    let totalVol = 0; let totalHrs = 0;
+    let prevTotalVol = 0; let prevTotalHrs = 0;
+    let prev2TotalVol = 0; let prev2TotalHrs = 0;
+
+    const list = uniqueSitesProd.map(site => {
+      const getSiteData = (m: string | null) => {
+        if (!m) return { prod: 0, vol: 0, hrs: 0 };
+        const d = rawData.find(item => item["日付"] === m && item["現場名"] === site);
+        return d ? {
+          prod: Number(d["作業生産性"]) || 0,
+          vol: Number(d["実績_物量"]) || 0,
+          hrs: Number(d["実績_工数"]) || 0
+        } : { prod: 0, vol: 0, hrs: 0 };
+      };
+
+      const current = getSiteData(selectedMonth);
+      const prev = getSiteData(prevMonthStr);
+      const prev2 = getSiteData(prev2MonthStr);
+
+      totalVol += current.vol; totalHrs += current.hrs;
+      prevTotalVol += prev.vol; prevTotalHrs += prev.hrs;
+      prev2TotalVol += prev2.vol; prev2TotalHrs += prev2.hrs;
+
+      const trendData = term27Months.map(m => {
+        if (m > selectedMonth) {
+          return { month: m.split('/')[1] + '月' }; 
+        }
+        const d = getSiteData(m);
+        return { 
+          month: m.split('/')[1] + '月', 
+          prod: d.prod > 0 ? d.prod : null, 
+          vol: d.vol > 0 ? d.vol : null, 
+          hrs: d.hrs > 0 ? d.hrs : null 
+        };
+      });
+
+      return { site, current, prev, prev2, trendData };
+    });
+
+    list.sort((a, b) => b.current.prod - a.current.prod);
+
+    const currentAvgProd = totalHrs > 0 ? totalVol / totalHrs : 0;
+    const prevAvgProd = prevTotalHrs > 0 ? prevTotalVol / prevTotalHrs : 0;
+    const prev2AvgProd = prev2TotalHrs > 0 ? prev2TotalVol / prev2TotalHrs : 0;
+
+    return {
+      list,
+      totals: { 
+        currentAvgProd, prevAvgProd, prev2AvgProd, 
+        totalVol, prevTotalVol, prev2TotalVol, 
+        totalHrs, prevTotalHrs, prev2TotalHrs 
+      }
+    };
+  }, [rawData, selectedMonth, uniqueSitesProd, term27Months, months]);
+
+  const productivityChartData = useMemo(() => {
+    return term27Months.map(m => {
+      const monthData: any = { month: m.split('/')[1] + '月' };
+      
+      if (m <= selectedMonth) {
+        uniqueSitesProd.forEach(site => {
+          const d = rawData.find(item => item["日付"] === m && item["現場名"] === site);
+          if (d) {
+            const prod = Number(d['作業生産性']);
+            monthData[site] = prod > 0 ? prod : null;
+            monthData[`${site}_vol`] = Number(d['実績_物量']) || 0;
+            monthData[`${site}_hrs`] = Number(d['実績_工数']) || 0;
+          }
+        });
+      }
+      return monthData;
+    });
+  }, [rawData, selectedMonth, uniqueSitesProd, term27Months]);
+
+  // 💡【修正】スクロール廃止 ＆ ポンと一発で表示する3列グリッドレイアウト
+  const ProductivityTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={modernTooltipStyle} className="pointer-events-none shadow-2xl bg-white/95 backdrop-blur-md border border-slate-200">
+          <p className="font-extrabold text-slate-900 mb-2 border-b border-slate-200 pb-1">{label}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 max-w-[600px]">
+            {payload.map((entry: any, index: number) => {
+              const site = entry.dataKey;
+              const val = entry.value;
+              const vol = entry.payload[`${site}_vol`];
+              const hrs = entry.payload[`${site}_hrs`];
+              if(val == null && !vol && !hrs) return null;
+              return (
+                <div key={index} className="flex flex-col">
+                  <p className="text-[11px] font-bold truncate w-full" style={{ color: entry.color }}>■ {site}</p>
+                  <div className="pl-2 mt-0.5 text-[9px] text-slate-500 flex flex-col gap-0.5">
+                    <span className="font-black text-slate-800">生産性: {Number(val).toFixed(2)}</span>
+                    <span>物: {Number(vol).toLocaleString()} / 工: {Number(hrs).toLocaleString()}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const parseTarget = (val: any) => {
     if (!val) return 0;
@@ -262,10 +433,13 @@ export default function CompareDashboardPage() {
 
   const siteProgressData = Array.from(new Set(filteredData.map(item => item["現場名"]))).map(siteName => {
     const siteDataList = rawData.filter(d => d["現場名"] === siteName);
-    const targetBudget = Math.max(...siteDataList.map(d => parseTarget(d["27期予算"]) || parseTarget(d["予算_売上高"])));
+    const annual27 = Math.max(...siteDataList.map(d => parseTarget(d["27期予算"])));
+    const sumMonthly = siteDataList.filter(d => term27Months.includes(d["日付"])).reduce((sum, d) => sum + parseTarget(d["予算_売上高"]), 0);
+    const targetBudget = annual27 > 0 ? annual27 : sumMonthly;
+
     const siteAchievedData = siteDataList.filter(d => term27Months.includes(d["日付"]) && d["日付"] <= selectedMonth);
     const achievedSales = siteAchievedData.reduce((sum, d) => sum + (Number(d["実績_売上高"]) || Number(d["確定売上"]) || 0), 0);
-    const plannedSales = (targetBudget / 12) * siteAchievedData.length;
+    const plannedSales = targetBudget > 0 ? (targetBudget / 12) * siteAchievedData.length : 0;
     const progress = targetBudget > 0 ? (achievedSales / targetBudget) * 100 : 0;
     return { name: siteName, progress, annualBudget: targetBudget, plannedSales, achievedSales };
   }).sort((a, b) => b.progress - a.progress);
@@ -277,7 +451,8 @@ export default function CompareDashboardPage() {
   const cumulativeTrendData = term27Months.map(m => {
     const mData = term27Data.filter(d => d["日付"] === m);
     const mActual = mData.reduce((sum, d) => sum + (Number(d["実績_売上高"]) || Number(d["確定売上"]) || 0), 0);
-    const mTarget = mData.reduce((sum, d) => sum + (parseTarget(d["27期予算"]) / 12 || parseTarget(d["予算_売上高"]) / 12 || 0), 0); 
+    const mTarget = mData.reduce((sum, d) => sum + (parseTarget(d["27期予算"]) / 12 || parseTarget(d["予算_売上高"]) || 0), 0);
+    
     accBudget += mTarget;
     let displayActual = null;
     if (m <= selectedMonth) {
@@ -371,7 +546,6 @@ export default function CompareDashboardPage() {
     }).sort((a, b) => b["ベース給与"] - a["ベース給与"]).slice(0, 15);
   }, [filteredData]);
 
-  // 🌟 アクション一覧用の「年」の抽出
   const availableActionYears = useMemo(() => {
     const years = allActions.map(a => {
       if (!a.dateStr) return '';
@@ -386,13 +560,11 @@ export default function CompareDashboardPage() {
     return Array.from(new Set(locs));
   }, [allActions]);
 
-  // 検索フィルター＋レ点チェック込みのアクション一覧生成ロジック
   const filteredActionsForView = useMemo(() => {
     return allActions.filter(a => {
       const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
       const matchLoc = actionLocationFilter === 'all' || a.location_id === actionLocationFilter;
       
-      // 🌟 年・月ごとの独立フィルタリング
       const dateParts = (a.dateStr || '').split('/');
       const y = dateParts[0] || '';
       const m = dateParts[1] ? dateParts[1].padStart(2, '0') : '';
@@ -424,7 +596,6 @@ export default function CompareDashboardPage() {
     });
   }, [allActions, actionCategory, actionYearFilter, actionMonthFilter, actionLocationFilter, actionSearchQuery, filterDxCustomer, filterDxInternal, filterHistSuccess, filterHistPending, filterHistLost]);
 
-  // アクション件数を集計するロジック（ランキンググラフ用）
   const actionCountByLocation = useMemo(() => {
     const baseActions = allActions.filter(a => {
       const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
@@ -477,8 +648,8 @@ export default function CompareDashboardPage() {
   const maxActionBarValue = actionCountByLocation.length > 0 ? actionCountByLocation[0].maxValue : 1;
 
   const modernTooltipStyle = {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(8px)', border: 'none', borderRadius: '12px',
-    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', fontWeight: 'bold', color: '#1e293b', padding: '12px'
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(12px)', border: '1px solid #e2e8f0', borderRadius: '16px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', fontWeight: 'bold', color: '#1e293b', padding: '16px'
   };
 
   const areaDisplayName = selectedArea === 'all' ? '全社' : selectedArea === 'kanto' ? '関東エリア' : selectedArea === 'kansai' ? '関西エリア' : selectedArea === 'chubu' ? '中部エリア' : selectedArea === 'cleanness' ? 'クリンネス部門' : '全拠点アクション';
@@ -508,7 +679,7 @@ export default function CompareDashboardPage() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#f4f6f8] text-slate-800 font-sans overflow-hidden notranslate" translate="no">
+    <div className="flex h-screen w-full bg-[#f8fafc] text-slate-800 font-sans overflow-hidden notranslate" translate="no">
       
       <svg width="0" height="0">
         <defs>
@@ -525,19 +696,182 @@ export default function CompareDashboardPage() {
         </a>
         <div className="w-full border-t border-slate-100 my-1"></div>
         
-        {['all', 'kanto', 'chubu', 'kansai', 'cleanness', 'actions'].map((area) => (
+        {['all', 'kanto', 'chubu', 'kansai', 'cleanness', 'productivity', 'actions'].map((area) => (
           <button 
-            key={area} onClick={() => { setSelectedArea(area as any); setActiveTopTab(area === 'actions' ? 'actions' : 'dashboard'); }} 
-            className={`w-12 h-12 md:w-14 md:h-14 rounded-xl flex flex-col items-center justify-center gap-0.5 md:gap-1 transition-all text-[9px] md:text-[10px] font-black shrink-0 ${selectedArea === area ? (area === 'actions' ? 'bg-purple-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md') : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}
+            key={area} onClick={() => { setSelectedArea(area as any); setActiveTopTab(area === 'actions' ? 'actions' : area === 'productivity' ? 'productivity' : 'dashboard'); }} 
+            className={`w-12 h-12 md:w-14 md:h-14 rounded-xl flex flex-col items-center justify-center gap-0.5 md:gap-1 transition-all text-[9px] md:text-[10px] font-black shrink-0 ${selectedArea === area ? (area === 'actions' ? 'bg-purple-600 text-white shadow-md' : area === 'productivity' ? 'bg-indigo-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md') : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}
           >
-            {area === 'all' ? <Globe size={15} /> : area === 'cleanness' ? <Sparkles size={15} /> : area === 'actions' ? <Rocket size={15} /> : <MapPin size={15} />}
-            <span>{area === 'all' ? '全社' : area === 'kanto' ? '関東' : area === 'chubu' ? '中部' : area === 'kansai' ? '関西' : area === 'cleanness' ? 'ｸﾘﾝﾈｽ' : 'ｱｸｼｮﾝ'}</span>
+            {area === 'all' ? <Globe size={15} /> : area === 'cleanness' ? <Sparkles size={15} /> : area === 'actions' ? <Rocket size={15} /> : area === 'productivity' ? <Activity size={15} /> : <MapPin size={15} />}
+            <span>{area === 'all' ? '全社' : area === 'kanto' ? '関東' : area === 'chubu' ? '中部' : area === 'kansai' ? '関西' : area === 'cleanness' ? 'ｸﾘﾝﾈｽ' : area === 'productivity' ? '生産性' : 'ｱｸｼｮﾝ'}</span>
           </button>
         ))}
       </aside>
 
-      {/* 画面の切り替え： アクション画面 or 既存のKPI画面 */}
-      {activeTopTab === 'actions' ? (
+      {activeTopTab === 'productivity' ? (
+        <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative bg-slate-50/50">
+          <header className="px-6 py-5 flex flex-col md:flex-row md:items-center justify-between shrink-0 bg-white border-b border-slate-200 z-30 shadow-sm gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 rounded-lg border border-indigo-100"><Activity className="w-6 h-6 text-indigo-600" /></div>
+              <div>
+                <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">全拠点 パフォーマンスボード</h1>
+                <p className="text-[11px] font-bold text-slate-400 mt-0.5">現場別の生産性・物量・工数を可視化</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-lg border border-slate-200 shadow-inner">
+                <span className="text-[10px] font-bold text-slate-400 mr-2 ml-1">エリア絞り込み:</span>
+                <label className="flex items-center gap-1 cursor-pointer text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors px-2">
+                  <input type="checkbox" checked={prodAreaFilters.kanto} onChange={(e) => setProdAreaFilters(p => ({...p, kanto: e.target.checked}))} className="accent-indigo-600 w-3.5 h-3.5" />
+                  関東
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors px-2 border-l border-slate-300">
+                  <input type="checkbox" checked={prodAreaFilters.chubu} onChange={(e) => setProdAreaFilters(p => ({...p, chubu: e.target.checked}))} className="accent-indigo-600 w-3.5 h-3.5" />
+                  中部
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors px-2 border-l border-slate-300">
+                  <input type="checkbox" checked={prodAreaFilters.kansai} onChange={(e) => setProdAreaFilters(p => ({...p, kansai: e.target.checked}))} className="accent-indigo-600 w-3.5 h-3.5" />
+                  関西
+                </label>
+              </div>
+              <CustomDropdown value={selectedMonth} options={months} onChange={setSelectedMonth} align="right" />
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 w-full space-y-6">
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 shrink-0">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-shadow">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+                <p className="text-[11px] font-black text-slate-500 mb-1 relative z-10 flex items-center gap-1.5"><Activity size={14} className="text-indigo-500"/>選択エリア平均 作業生産性</p>
+                <div className="flex items-end justify-between relative z-10 mt-auto">
+                  <p className="text-4xl font-extrabold text-slate-900 tracking-tighter"><AnimatedNumber value={siteCardsData.totals.currentAvgProd.toFixed(1)}/></p>
+                  <div className="flex flex-col gap-1 w-24">
+                    <DiffBadge curr={siteCardsData.totals.currentAvgProd} prev={siteCardsData.totals.prevAvgProd} asPercentChange label="vs先月" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-shadow">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+                <p className="text-[11px] font-black text-slate-500 mb-1 relative z-10 flex items-center gap-1.5"><Layers size={14} className="text-blue-500"/>選択エリア合算 総物量</p>
+                <div className="flex items-end justify-between relative z-10 mt-auto">
+                  <p className="text-4xl font-extrabold text-slate-900 tracking-tighter"><AnimatedNumber value={Math.round(siteCardsData.totals.totalVol).toLocaleString()}/></p>
+                  <div className="flex flex-col gap-1 w-24">
+                    <DiffBadge curr={siteCardsData.totals.totalVol} prev={siteCardsData.totals.prevTotalVol} label="vs先月" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-shadow">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+                <p className="text-[11px] font-black text-slate-500 mb-1 relative z-10 flex items-center gap-1.5"><Target size={14} className="text-rose-500"/>選択エリア合算 総工数</p>
+                <div className="flex items-end justify-between relative z-10 mt-auto">
+                  <p className="text-4xl font-extrabold text-slate-900 tracking-tighter"><AnimatedNumber value={Math.round(siteCardsData.totals.totalHrs).toLocaleString()}/></p>
+                  <div className="flex flex-col gap-1 w-24">
+                    <DiffBadge curr={siteCardsData.totals.totalHrs} prev={siteCardsData.totals.prevTotalHrs} isInverse label="vs先月" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[320px]">
+              <div className="flex justify-between items-center mb-4 shrink-0">
+                <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-indigo-500" /> エリア内 全現場推移チャート: 作業生産性
+                </h3>
+              </div>
+              <div className="flex-1 w-full min-h-0 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={productivityChartData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    {/* 💡【修正】スクロール操作用の pointerEvents: 'auto' は不要になったので削除しました */}
+                    <RechartsTooltip 
+                      content={<ProductivityTooltip />} 
+                      cursor={{ stroke: '#cbd5e1', strokeWidth: 2, strokeDasharray: '5 5' }} 
+                    />
+                    <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold', paddingTop: '10px' }} />
+                    {uniqueSitesProd.map((site, idx) => (
+                      <Line key={site} type="monotone" dataKey={site} stroke={PROD_COLORS[idx % PROD_COLORS.length]} strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1.5 }} activeDot={{ r: 6 }} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {siteCardsData.list.map((card, idx) => (
+                <div key={card.site} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col min-h-[440px] relative overflow-hidden group">
+                  
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-1.5 z-10">
+                      <MapPin size={16} className="text-indigo-400"/>
+                      {card.site}
+                    </h3>
+                    <div className="bg-slate-100 text-slate-500 px-2 py-1 rounded-md text-[10px] font-black border border-slate-200 shadow-sm z-10 flex items-center gap-1">
+                      <Calendar size={12} /> {selectedMonth} 実績
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mb-4 z-10">
+                    <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-100 flex flex-col items-center text-center">
+                      <p className="text-[9px] font-bold text-slate-400 mb-0.5">生産性</p>
+                      <p className="text-base font-black text-indigo-600 tracking-tight">{card.current.prod.toFixed(1)}</p>
+                      <div className="flex flex-col w-full gap-1 mt-1.5 px-0.5">
+                        <DiffBadge curr={card.current.prod} prev={card.prev.prod} asPercentChange label="vs先月" />
+                        <DiffBadge curr={card.current.prod} prev={card.prev2.prod} asPercentChange label="vs先々月" />
+                      </div>
+                    </div>
+                    <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-100 flex flex-col items-center text-center">
+                      <p className="text-[9px] font-bold text-slate-400 mb-0.5">物量</p>
+                      <p className="text-[13px] font-black text-slate-700 tracking-tight mt-1">{Math.round(card.current.vol).toLocaleString()}</p>
+                      <div className="flex flex-col w-full gap-1 mt-2 px-0.5">
+                        <DiffBadge curr={card.current.vol} prev={card.prev.vol} label="vs先月" />
+                        <DiffBadge curr={card.current.vol} prev={card.prev2.vol} label="vs先々月" />
+                      </div>
+                    </div>
+                    <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-100 flex flex-col items-center text-center">
+                      <p className="text-[9px] font-bold text-slate-400 mb-0.5">工数</p>
+                      <p className="text-[13px] font-black text-slate-700 tracking-tight mt-1">{Math.round(card.current.hrs).toLocaleString()}</p>
+                      <div className="flex flex-col w-full gap-1 mt-2 px-0.5">
+                        <DiffBadge curr={card.current.hrs} prev={card.prev.hrs} isInverse label="vs先月" />
+                        <DiffBadge curr={card.current.hrs} prev={card.prev2.hrs} isInverse label="vs先々月" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 w-full relative z-10 mt-2 border-t border-slate-100 pt-3">
+                    <p className="text-[9px] font-bold text-slate-300 absolute top-3 left-0 z-0">12 Month Trend (Prod, Vol, Hrs)</p>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={card.trendData} margin={{ top: 15, right: 5, left: 5, bottom: 5 }}>
+                        <YAxis yAxisId="vol" domain={['auto', 'auto']} hide />
+                        <YAxis yAxisId="hrs" domain={['auto', 'auto']} hide />
+                        <YAxis yAxisId="prod" domain={['auto', 'auto']} hide />
+                        <RechartsTooltip 
+                          contentStyle={{...modernTooltipStyle, padding: '8px'}} 
+                          formatter={(value: any, name: any) => {
+                            if (name === "prod") return [Number(value).toFixed(1), "生産性"];
+                            if (name === "vol") return [Number(value).toLocaleString(), "物量"];
+                            if (name === "hrs") return [Number(value).toLocaleString(), "工数"];
+                            return [value, name];
+                          }}
+                          labelStyle={{fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px'}}
+                        />
+                        <Area yAxisId="vol" type="monotone" dataKey="vol" fill="#e0f2fe" stroke="none" name="vol" />
+                        <Bar yAxisId="hrs" dataKey="hrs" fill="#fecdd3" name="hrs" radius={[2,2,0,0]} barSize={8} />
+                        <Line yAxisId="prod" type="monotone" dataKey="prod" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} name="prod" />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </main>
+
+      ) : activeTopTab === 'actions' ? (
         <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
           <header className="px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center justify-between shrink-0 bg-white border-b border-slate-200 z-30 gap-4">
             <div className="flex items-center gap-2 md:gap-3">
@@ -569,27 +903,22 @@ export default function CompareDashboardPage() {
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-400">拠点:</span>
-                    <select value={actionLocationFilter} onChange={(e) => setActionLocationFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer">
-                      <option value="all">すべての拠点</option>
-                      {availableActionLocations.map(loc => <option key={loc} value={loc}>{LOCATION_NAME_MAP[loc] || loc}</option>)}
-                    </select>
+                    <CustomDropdown value={actionLocationFilter === 'all' ? 'すべての拠点' : (LOCATION_NAME_MAP[actionLocationFilter] || actionLocationFilter)} options={['すべての拠点', ...availableActionLocations.map(l => LOCATION_NAME_MAP[l] || l)]} onChange={(val: string) => {
+                      if(val === 'すべての拠点') setActionLocationFilter('all');
+                      else {
+                        const originalKey = Object.keys(LOCATION_NAME_MAP).find(k => LOCATION_NAME_MAP[k] === val) || val;
+                        setActionLocationFilter(originalKey);
+                      }
+                    }} />
                   </div>
-                  {/* 🌟 年と月を分けたプルダウン */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-400">時期:</span>
-                    <select value={actionYearFilter} onChange={(e) => setActionYearFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer">
-                      <option value="all">すべての年</option>
-                      {availableActionYears.map(y => <option key={y} value={y}>{y}年</option>)}
-                    </select>
-                    <select value={actionMonthFilter} onChange={(e) => setActionMonthFilter(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer">
-                      <option value="all">すべての月</option>
-                      {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => <option key={m} value={m}>{parseInt(m, 10)}月</option>)}
-                    </select>
+                    <CustomDropdown value={actionYearFilter === 'all' ? 'すべての年' : `${actionYearFilter}年`} options={['すべての年', ...availableActionYears.map(y => `${y}年`)]} onChange={(val: string) => setActionYearFilter(val === 'すべての年' ? 'all' : val.replace('年', ''))} />
+                    <CustomDropdown value={actionMonthFilter === 'all' ? 'すべての月' : `${parseInt(actionMonthFilter, 10)}月`} options={['すべての月', ...['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => `${parseInt(m, 10)}月`)]} onChange={(val: string) => setActionMonthFilter(val === 'すべての月' ? 'all' : val.replace('月', '').padStart(2, '0'))} />
                   </div>
                 </div>
               </div>
 
-              {/* チェックボックス（レ点フィルター）エリア */}
               <div className="w-full flex items-center flex-wrap gap-4 pt-3 mt-1 border-t border-slate-100">
                 <span className="text-xs font-bold text-slate-400">表示絞り込み:</span>
                 {actionCategory === 'history' ? (
@@ -623,10 +952,7 @@ export default function CompareDashboardPage() {
 
             </div>
 
-            {/* アクションリストとグラフの左右分割レイアウト */}
             <div className="flex flex-col lg:flex-row gap-6 items-start relative">
-              
-              {/* 左半分：アクションリスト（洗練されたカード群） */}
               <div className="w-full lg:w-[55%] xl:w-[60%] order-2 lg:order-1">
                 {(() => {
                   if (filteredActionsForView.length === 0) {
@@ -732,7 +1058,6 @@ export default function CompareDashboardPage() {
                 })()}
               </div>
 
-              {/* 右半分：ランキンググラフ（スクロール追従） */}
               <div className="w-full lg:w-[45%] xl:w-[40%] bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[500px] lg:sticky lg:top-4 order-1 lg:order-2">
                 <div className="flex items-center justify-between mb-4 shrink-0 border-b border-slate-100 pb-3">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
@@ -771,16 +1096,13 @@ export default function CompareDashboardPage() {
               <h1 className="text-lg md:text-2xl font-extrabold text-slate-800 tracking-tight">{areaDisplayName} 業績比較ダッシュボード</h1>
             </div>
             <div className="flex gap-2">
-              <select value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); }} className="bg-white border border-slate-300 text-slate-700 rounded px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-medium shadow-sm cursor-pointer outline-none">
-                {months.map(m => <option key={m} value={m}>{m}度 (実績)</option>)}
-              </select>
+              <CustomDropdown value={selectedMonth} options={months} onChange={setSelectedMonth} align="right" />
             </div>
           </header>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 w-full space-y-6">
             <div className="flex flex-col gap-5 w-full">
               
-              {/* 4大KPIボックス */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0 w-full">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden h-24 md:h-28">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none"></div>
@@ -836,16 +1158,13 @@ export default function CompareDashboardPage() {
                 </div>
               )}
 
-              {/* 実績ランキング ＆ 巨大化バブル散布図 */}
               <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[380px] shrink-0 w-full">
                 <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[320px] lg:h-full min-w-0">
                   <div className="flex items-center justify-between mb-2 shrink-0 border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Trophy size={16} className="text-amber-500" />現場別 実績ランキング</h3>
                     <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-sm">
                       <span className="text-slate-400 font-bold text-[10px]">実績項目:</span>
-                      <select value={rankingTarget} onChange={(e) => setRankingTarget(e.target.value)} className="bg-transparent font-black text-blue-600 outline-none w-32 truncate cursor-pointer">
-                        {actualNumericKeys.map(k => <option key={k} value={k}>{k}</option>)}
-                      </select>
+                      <CustomDropdown value={rankingTarget} options={actualNumericKeys} onChange={setRankingTarget} align="right" />
                     </div>
                   </div>
                   <div className="flex-1 w-full min-h-0 relative">
@@ -869,19 +1188,11 @@ export default function CompareDashboardPage() {
                   <div className="flex flex-col gap-2 mb-2 shrink-0 border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Settings2 size={16} className="text-blue-600" />フリースタイル・戦略分析チャート（散布図）</h3>
                     <div className="flex gap-2 items-center text-xs">
-                      <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border shadow-sm">
-                        <span className="text-slate-400 font-bold text-[10px]">X軸:</span>
-                        <select value={scatterX} onChange={(e) => setScatterX(e.target.value)} className="bg-transparent font-black text-slate-700 outline-none w-28 truncate cursor-pointer">
-                          {numericKeys.map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
-                      </div>
-                      <span className="text-slate-300 font-bold">vs</span>
-                      <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border shadow-sm">
-                        <span className="text-slate-400 font-bold text-[10px]">Y軸:</span>
-                        <select value={scatterY} onChange={(e) => setScatterY(e.target.value)} className="bg-transparent font-black text-slate-700 outline-none w-28 truncate pointer-events-auto cursor-pointer">
-                          {numericKeys.map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
-                      </div>
+                      <span className="text-slate-400 font-bold text-[10px]">X軸:</span>
+                      <CustomDropdown value={scatterX} options={numericKeys} onChange={setScatterX} />
+                      <span className="text-slate-300 font-bold ml-1">vs</span>
+                      <span className="text-slate-400 font-bold text-[10px] ml-1">Y軸:</span>
+                      <CustomDropdown value={scatterY} options={numericKeys} onChange={setScatterY} align="right" />
                     </div>
                   </div>
                   <div className="flex-1 w-full min-h-0 relative mt-2">
@@ -915,8 +1226,6 @@ export default function CompareDashboardPage() {
               </div>
 
               <div className="flex flex-col xl:flex-row gap-5 w-full">
-                
-                {/* 左翼：隠れコスト詳細分析チャート */}
                 <div className="w-full xl:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[400px]">
                   <div className="flex flex-col mb-4 shrink-0 border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><TrendingUp size={16} className="text-indigo-600"/> ベース給与 vs 隠れコスト詳細分析</h3>
@@ -945,7 +1254,6 @@ export default function CompareDashboardPage() {
                   </div>
                 </div>
 
-                {/* 右翼：労働生産性効果タワーチャート */}
                 <div className="w-full xl:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[400px]">
                   <div className="flex flex-col mb-4 shrink-0 border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Layers size={16} className="text-emerald-600"/> 総人件費 vs 粗利益（労働生産性効果）</h3>
@@ -972,10 +1280,8 @@ export default function CompareDashboardPage() {
 
               </div>
 
-              {/* 3大戦略積み上げタワー（スタックチャート） */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 w-full">
                 
-                {/* ① 原価の解剖 */}
                 <div className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col h-[350px]">
                   <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-2 text-[#2563eb]"><Layers size={14}/> 1. 現場別 利益・原価の解剖 (100%スタック)</h3>
                   <div className="flex-1 w-full min-h-0">
@@ -993,7 +1299,6 @@ export default function CompareDashboardPage() {
                   </div>
                 </div>
 
-                {/* ② リスク＆コンプライアンス要塞タワー */}
                 <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col h-[350px]">
                   <h3 className="text-xs font-black flex items-center gap-1.5 mb-2 text-rose-400"><ShieldAlert size={14}/> 2. リスク・コンプライアンス要塞タワー (損失金額)</h3>
                   <div className="flex-1 w-full min-h-0">
@@ -1012,7 +1317,6 @@ export default function CompareDashboardPage() {
                   </div>
                 </div>
 
-                {/* ③ 売上高 vs 原価＋利益 */}
                 <div className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col h-[350px]">
                   <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-2 text-[#7c3aed]"><BarChart3 size={14}/> 3. 総売上高 vs 原価・純利益 (ツインタワー)</h3>
                   <div className="flex-1 w-full min-h-0">
@@ -1033,10 +1337,11 @@ export default function CompareDashboardPage() {
 
               </div>
 
-              {/* 最新データマトリックス */}
               <div className="flex flex-col lg:flex-row gap-4 w-full shrink-0">
                 <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-auto">
-                  <h3 className="text-sm font-bold text-slate-900 mb-2">現場別 最新データマトリックス (横スクロール対応)</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-bold text-slate-900">現場別 最新データマトリックス (全項目プレビュー)</h3>
+                  </div>
                   <div className="flex-1 w-full overflow-x-auto custom-scrollbar border rounded-lg border-slate-200">
                     <table className="w-full text-[11px] text-center border-collapse whitespace-nowrap">
                       <thead>
@@ -1064,7 +1369,6 @@ export default function CompareDashboardPage() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-[9px] text-slate-400 mt-2 font-bold text-right">※全項目（スプレッドシートの有効列すべて）をプレビューしています。</p>
                 </div>
               </div>
 
@@ -1074,10 +1378,10 @@ export default function CompareDashboardPage() {
       )}
       
       <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: padding-box; }
       `}} />
     </div>
   );
