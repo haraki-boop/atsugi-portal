@@ -12,14 +12,16 @@ import { BarChart3, Loader2, Globe, MapPin, Sparkles, TrendingUp, Target, Layers
 
 const GAS_API_URL = "/api/compare";
 
+// 💡【修正】afs-bisai-seiso を清掃エリアとして完全認識させる
 const SITE_AREA_MAP: { [key: string]: 'kanto' | 'kansai' | 'chubu' | 'cleanness' } = {
   "昭和冷蔵": "kanto", "asf南関東": "kanto", "AFS南関東": "kanto", "afs南関東": "kanto", "クラフトデリカ": "kanto", "ランドポート習志野": "kanto", "東急ストア": "kanto",
   "三井食品": "chubu", "afs尾西": "chubu", "AFS尾西": "chubu", "ヤマナカ": "chubu",
   "尾家産業": "kansai", "メディエントランス": "kansai", "カインズ神戸": "kansai", "カインズ福岡": "kansai",
   "尾西清盛": "cleanness", "尾西清鎖": "cleanness", "尾西清掃": "cleanness", "兵庫清掃": "cleanness", "姫路清掃": "cleanness", "万代彩都": "cleanness", "万代綾都": "cleanness",
-  "himeji-afs-seiso": "cleanness", "hyogo-seiso": "cleanness", "binisai-seiso": "cleanness"
+  "himeji-afs-seiso": "cleanness", "hyogo-seiso": "cleanness", "binisai-seiso": "cleanness", "afs-bisai-seiso": "cleanness"
 };
 
+// 💡【修正】afs-bisai-seiso の翻訳名を追加
 const LOCATION_NAME_MAP: { [key: string]: string } = {
   "afs-bisai": "afs尾西",
   "afs-minamikanto": "afs南関東",
@@ -36,7 +38,8 @@ const LOCATION_NAME_MAP: { [key: string]: string } = {
   "mandai-saito": "万代彩都",
   "himeji-afs-seiso": "姫路清掃",
   "hyogo-seiso": "兵庫清掃",
-  "binisai-seiso": "尾西清掃"
+  "binisai-seiso": "尾西清掃",
+  "afs-bisai-seiso": "尾西清掃"
 };
 
 const PROD_COLORS = ['#3b82f6', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#f43f5e', '#84cc16', '#6366f1', '#14b8a6', '#d946ef', '#f97316'];
@@ -395,7 +398,6 @@ export default function CompareDashboardPage() {
     });
   }, [rawData, selectedMonth, uniqueSitesProd, term27Months]);
 
-  // 💡【修正】スクロール廃止 ＆ ポンと一発で表示する3列グリッドレイアウト
   const ProductivityTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -556,12 +558,18 @@ export default function CompareDashboardPage() {
   }, [allActions]);
 
   const availableActionLocations = useMemo(() => {
-    const locs = allActions.map(a => a.location_id).filter(Boolean);
+    const locs = allActions.filter(a => {
+      const locName = LOCATION_NAME_MAP[a.location_id] || a.location_id;
+      return getAreaForSite(locName) !== 'cleanness' && getAreaForSite(a.location_id) !== 'cleanness';
+    }).map(a => a.location_id).filter(Boolean);
     return Array.from(new Set(locs));
   }, [allActions]);
 
   const filteredActionsForView = useMemo(() => {
     return allActions.filter(a => {
+      const locName = LOCATION_NAME_MAP[a.location_id] || a.location_id;
+      if (getAreaForSite(locName) === 'cleanness' || getAreaForSite(a.location_id) === 'cleanness') return false;
+
       const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
       const matchLoc = actionLocationFilter === 'all' || a.location_id === actionLocationFilter;
       
@@ -598,6 +606,9 @@ export default function CompareDashboardPage() {
 
   const actionCountByLocation = useMemo(() => {
     const baseActions = allActions.filter(a => {
+      const locName = LOCATION_NAME_MAP[a.location_id] || a.location_id;
+      if (getAreaForSite(locName) === 'cleanness' || getAreaForSite(a.location_id) === 'cleanness') return false;
+
       const matchType = actionCategory === 'dx' ? a.actionType === 'DX推進' : actionCategory === 'env' ? a.actionType === '現場改善' : a.actionType === '営業履歴';
       
       const dateParts = (a.dateStr || '').split('/');
@@ -692,7 +703,7 @@ export default function CompareDashboardPage() {
 
       <aside className="w-16 md:w-20 bg-white border-r border-slate-200 flex flex-col items-center py-4 space-y-3 shrink-0 z-10 shadow-sm overflow-y-auto">
         <a href="https://palproductivity-dashboard.vercel.app/" className="p-2 text-slate-400 hover:text-blue-600 transition-colors mb-2">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 0 001 1m-6 0h6"/></svg>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 0h6"/></svg>
         </a>
         <div className="w-full border-t border-slate-100 my-1"></div>
         
@@ -784,11 +795,7 @@ export default function CompareDashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                    {/* 💡【修正】スクロール操作用の pointerEvents: 'auto' は不要になったので削除しました */}
-                    <RechartsTooltip 
-                      content={<ProductivityTooltip />} 
-                      cursor={{ stroke: '#cbd5e1', strokeWidth: 2, strokeDasharray: '5 5' }} 
-                    />
+                    <RechartsTooltip content={<ProductivityTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 2, strokeDasharray: '5 5' }} />
                     <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold', paddingTop: '10px' }} />
                     {uniqueSitesProd.map((site, idx) => (
                       <Line key={site} type="monotone" dataKey={site} stroke={PROD_COLORS[idx % PROD_COLORS.length]} strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1.5 }} activeDot={{ r: 6 }} />
