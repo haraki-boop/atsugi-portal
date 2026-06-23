@@ -195,6 +195,7 @@ export default function MapPortalPage() {
       locations.forEach(loc => markersRef.current[loc.id].setIcon(getNormalIcon(L, loc)) );
     }
   }, [isEmergencyMode, map, weatherData, isFetchingWeather]);
+
   const handleLocationClick = (loc: any) => {
     setSelectedLocation(loc);
     if (map && window.L) {
@@ -266,15 +267,38 @@ export default function MapPortalPage() {
           </div>
 
           <div className="space-y-2">
+            
+            {/* 🚪 ここに2つのアイコンを並べて配置しました！ */}
             <div className="flex items-center justify-between px-1">
               <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">拠点一覧 ({locations.length})</p>
-              <Link 
-                href="https://palproductivity-dashboard.vercel.app/dashboard/compare" 
-                title="15現場 業績比較ダッシュボードを開く" 
-                className="text-slate-400 hover:text-blue-600 transition-all p-1 rounded-lg hover:bg-slate-50 duration-200 flex items-center justify-center"
-              >
-                <DoorOpen size={18} />
-              </Link>
+              <div className="flex items-center gap-1">
+                {/* 1. 既存のドアアイコン */}
+                <Link 
+                  href="https://palproductivity-dashboard.vercel.app/dashboard/compare" 
+                  title="15現場 業績比較ダッシュボードを開く" 
+                  className="text-slate-400 hover:text-blue-600 transition-all p-1 rounded-lg hover:bg-slate-50 duration-200 flex items-center justify-center"
+                >
+                  <DoorOpen size={18} />
+                </Link>
+                
+                {/* 2. 新規のマテハンアイコン（ロボットアーム） */}
+                <Link 
+                  href="https://matehan-system.vercel.app/" 
+                  title="マテハンシステムを開く" 
+                  className="text-slate-400 hover:text-cyan-600 transition-all p-1 rounded-lg hover:bg-slate-50 duration-200 flex items-center justify-center"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 22h10" />
+                    <path d="M6 22v-2a3 3 0 0 1 6 0v2" />
+                    <circle cx="9" cy="16" r="2" />
+                    <path d="M10 14l3-4" />
+                    <circle cx="14" cy="9" r="2" />
+                    <path d="M15 10l2 3" />
+                    <path d="M16 14l-2 2" />
+                    <path d="M18 12l2 -2" />
+                  </svg>
+                </Link>
+              </div>
             </div>
             
             <div className="space-y-2 max-h-[30vh] md:max-h-full overflow-y-auto pr-1">
