@@ -532,12 +532,45 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【100%動いていた元の金庫データ解析ロジック（volumeAccumulatedData等）】
+  // 🌟【先月比計算＆「★ 合計」への名称短縮】
   const computedVaultProductivity = useMemo(() => {
-    if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0 } };
+    if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0, lastMonthRatio: { vol: 0, hrs: 0, prod: 0 } } };
     
     const targetMonthStr = `/${prodSelectedMonth.padStart(2, '0')}/`;
     
+    let prevM = parseInt(prodSelectedMonth, 10) - 1;
+    if (prevM <= 0) prevM += 12;
+    const prevMonthStr = `/${String(prevM).padStart(2, '0')}/`;
+
+    const getMonthSummary = (monthStr: string) => {
+        let vol = 0;
+        let hrs = 0;
+        const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
+
+        if (data.volumeAccumulatedData) {
+            data.volumeAccumulatedData.forEach((item: any) => {
+                const itemName = item.title.replace('蓄積実績_', '');
+                if (processNames.includes(itemName)) {
+                    item.labels.forEach((date: string, idx: number) => {
+                        if (date.includes(monthStr)) vol += n(item.values[idx]);
+                    });
+                }
+            });
+        }
+        if (data.manhoursAccumulatedData) {
+            data.manhoursAccumulatedData.forEach((item: any) => {
+                item.labels.forEach((date: string, idx: number) => {
+                    if (date.includes(monthStr)) hrs += n(item.values[idx]);
+                });
+            });
+        }
+        const prod = hrs > 0 ? vol / hrs : 0;
+        return { vol, hrs, prod };
+    };
+
+    const prevSummary = getMonthSummary(prevMonthStr);
+    const calcRatio = (curr: number, prev: number) => prev > 0 ? (curr / prev) * 100 : 0;
+
     const vRows: any[] = [];
     if (data.volumeAccumulatedData) {
       data.volumeAccumulatedData.forEach((item: any) => {
@@ -637,14 +670,26 @@ export default function UniversalDashboardPage() {
     const centerTotalProd = centerTotalHours > 0 ? centerTotalVolume / centerTotalHours : 0;
     
     items.unshift({
-      process: "★ センター全体合計",
+      process: "★ 合計", // 💡 左端カードのタイトル短縮
       dailyList: centerDailyList,
       totalVolume: centerTotalVolume,
       totalHours: centerTotalHours,
       totalProd: centerTotalProd
     });
     
-    return { items, summary: { totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd } };
+    return { 
+      items, 
+      summary: { 
+        totalVolume: centerTotalVolume, 
+        totalHours: centerTotalHours, 
+        totalProd: centerTotalProd,
+        lastMonthRatio: {
+            vol: calcRatio(centerTotalVolume, prevSummary.vol),
+            hrs: calcRatio(centerTotalHours, prevSummary.hrs),
+            prod: calcRatio(centerTotalProd, prevSummary.prod)
+        }
+      } 
+    };
   }, [data, prodSelectedMonth]);
 
   const contractList = (() => {
@@ -668,7 +713,7 @@ export default function UniversalDashboardPage() {
   })();
 
   // =========================================================
-  // 🚨 事故管理ダッシュボード用の計算ロジック（完璧版）
+  // 🚨 事故管理ダッシュボード用の計算ロジック
   // =========================================================
 
   const getLevelStyles = (count: number) => {
@@ -684,6 +729,15 @@ export default function UniversalDashboardPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  // 💡 スプレッドシートの項目名を「_」や「/」で分割して単位を取り出す関数
+  const splitLabelAndUnit = (rawName: string) => {
+    const parts = rawName.split(/_|\\|\//);
+    if (parts.length > 1) {
+        return { name: parts[0], unit: parts[1] };
+    }
+    return { name: rawName, unit: '件' }; // 指定がなければデフォルトで「件」
+  };
+
   const accidentCategories = (() => {
     if (!data) return [];
     const rawRecords = data.accidentData || [];
@@ -697,7 +751,8 @@ export default function UniversalDashboardPage() {
       const name = row.category || row['カテゴリー'] || row['作業部門'];
       if (!name) return;
       
-      if (row.date) {
+      // 💡 事故件数が1件以上の日付のみを最終発生日として記録する（未来日付バグ対策）
+      if (row.date && n(row.total) > 0) {
         const rowDate = new Date(row.date);
         if (!isNaN(rowDate.getTime())) { if (!absoluteLastDateMap[name] || rowDate > new Date(absoluteLastDateMap[name])) { absoluteLastDateMap[name] = row.date; } }
       }
@@ -800,7 +855,6 @@ export default function UniversalDashboardPage() {
     }
     return Array.from(types);
   }, [data, accidentMeasures]);
-
   const getBeforeAfterStats = (categoryName: string, startDateStr: string) => {
     if (!startDateStr || !data?.accidentData || !categoryName) return { beforeAvg: 0, afterAvg: 0, hasData: false };
     const startDate = new Date(startDateStr);
@@ -842,7 +896,7 @@ export default function UniversalDashboardPage() {
       .join('\n\n');
     
     if (!textToCopy) {
-      showToast('事故NOまたはURLが設定されているデータがありません', 'error');
+      showToast('事故NOとURLが設定されているデータがありません', 'error');
       return;
     }
 
@@ -894,7 +948,6 @@ export default function UniversalDashboardPage() {
     setIsModalOpen(true);
   };
 
-  // 🌟 URLを含む編集データのセット
   const handleOpenEditModal = (index: number) => {
     setEditingIndex(index);
     if (activeActionTab === 'history') {
@@ -907,7 +960,6 @@ export default function UniversalDashboardPage() {
     setIsModalOpen(true);
   };
 
-  // 🌟 URLを含むデータの保存処理
   const handleSaveItem = async () => {
     setIsModalOpen(false);
     if (activeActionTab === 'history') {
@@ -997,6 +1049,7 @@ export default function UniversalDashboardPage() {
     await fetchSupabaseData();
     showToast('対策を削除しました', 'success');
   };
+
   if (!data || !isMounted) {
     return (
       <div className="h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden notranslate" translate="no">
@@ -1091,7 +1144,6 @@ export default function UniversalDashboardPage() {
             {weeklyGroups.map((g, idx) => <button key={idx} onClick={() => setSelectedWeek(idx)} className={`px-4 md:px-5 py-2 rounded-xl font-black text-[10px] md:text-xs transition-all ${selectedWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{g.label}</button>)}
           </div>
         )}
-
         {/* =========================================
         【1〜5】売上・工数・物量・生産性・労務管理 共通グラフエリア
         ========================================= */}
@@ -1432,7 +1484,7 @@ export default function UniversalDashboardPage() {
               </div>
             )}
 
-            {/* サブタブ内訳2: 月次生産性推移（データテーブル＋巨大サマリーカード） */}
+            {/* 🌟 サブタブ内訳2: 月次生産性推移（データテーブル＋巨大サマリーカード） + 横並び％ */}
             {activeMonthlyTab === 'productivity' && (
               <div className="space-y-6">
                 <div className="flex justify-end print:hidden">
@@ -1450,21 +1502,42 @@ export default function UniversalDashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 bg-slate-900 text-white p-6 md:p-8 rounded-[2rem] shadow-xl border border-slate-800">
                   <div className="space-y-1">
                     <span className="text-[10px] font-black text-amber-400 tracking-widest uppercase block">月間総実績物量 (指定カテゴリ合計)</span>
-                    <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
-                      <AnimatedNumber value={computedVaultProductivity.summary.totalVolume} /> <span className="text-xs font-bold text-slate-400">点</span>
-                    </h3>
+                    <div className="flex items-baseline gap-3">
+                      <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
+                        <AnimatedNumber value={computedVaultProductivity.summary.totalVolume} /> <span className="text-xs font-bold text-slate-400">点</span>
+                      </h3>
+                      {computedVaultProductivity.summary.lastMonthRatio.vol > 0 && (
+                        <span className={`text-[11px] md:text-xs font-black ${computedVaultProductivity.summary.lastMonthRatio.vol >= 100 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          先月比: {computedVaultProductivity.summary.lastMonthRatio.vol.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6">
                     <span className="text-[10px] font-black text-sky-400 tracking-widest uppercase block">月間総実績工数 (センター総工数金庫)</span>
-                    <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
-                      <AnimatedNumber value={computedVaultProductivity.summary.totalHours} /> <span className="text-xs font-bold text-slate-400">h</span>
-                    </h3>
+                    <div className="flex items-baseline gap-3">
+                      <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
+                        <AnimatedNumber value={computedVaultProductivity.summary.totalHours} /> <span className="text-xs font-bold text-slate-400">h</span>
+                      </h3>
+                      {computedVaultProductivity.summary.lastMonthRatio.hrs > 0 && (
+                        <span className={`text-[11px] md:text-xs font-black ${computedVaultProductivity.summary.lastMonthRatio.hrs <= 100 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          先月比: {computedVaultProductivity.summary.lastMonthRatio.hrs.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6 bg-gradient-to-r from-transparent to-amber-500/5 rounded-xl">
                     <span className="text-[10px] font-black text-emerald-400 tracking-widest uppercase block">総作業生産性 (総物量 ÷ 総工数)</span>
-                    <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-emerald-400">
-                      {computedVaultProductivity.summary.totalProd.toFixed(1)} <span className="text-xs font-bold text-emerald-500/60">個/h</span>
-                    </h3>
+                    <div className="flex items-baseline gap-3">
+                      <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-emerald-400">
+                        {computedVaultProductivity.summary.totalProd.toFixed(1)} <span className="text-xs font-bold text-emerald-500/60">個/h</span>
+                      </h3>
+                      {computedVaultProductivity.summary.lastMonthRatio.prod > 0 && (
+                        <span className={`text-[11px] md:text-xs font-black ${computedVaultProductivity.summary.lastMonthRatio.prod >= 100 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          先月比: {computedVaultProductivity.summary.lastMonthRatio.prod.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1540,10 +1613,7 @@ export default function UniversalDashboardPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 print:grid-cols-2">
                 {(() => {
                   const currentItems = activeActionTab === 'dx' ? filteredDxItems : filteredEnvItems;
-                  
-                  // 🌟開始日（start_date）の降順（新しい順）にソート処理を適用
                   const sortedItems = [...currentItems].sort((a: any, b: any) => (b.start_date || '').localeCompare(a.start_date || ''));
-                  
                   const targetTable = activeActionTab === 'dx' ? 'dx_actions' : 'env_actions';
                   const displayItems = showHiddenItems ? sortedItems : sortedItems.filter((item: any) => !item.is_hidden);
                   const themeColor = activeActionTab === 'dx' ? '#7c3aed' : '#10b981';
@@ -1551,17 +1621,13 @@ export default function UniversalDashboardPage() {
                   if (displayItems.length === 0) return <div className="col-span-1 lg:col-span-2 bg-white border p-8 md:p-12 rounded-2xl md:rounded-[2.5rem] text-center text-slate-400 font-bold text-xs md:text-sm">💡 該当する施策アクションはありません。</div>;
                   return displayItems.map((item, index) => {
                     const itemRatio = Math.min(100, Math.max(0, Math.round(n(item.ratio))));
-                    
-                    // 🌟ソート順変更に伴うデータ誤操作を防ぐため、本当のインデックスを特定
                     const realIdx = (activeActionTab === 'dx' ? dxItems : envItems).findIndex(x => x.id === item.id);
 
                     return (
                       <div key={index} className={`print-avoid-break bg-white border p-5 md:p-8 rounded-3xl shadow-sm flex flex-col md:flex-row gap-4 md:gap-6 items-center transition-all relative overflow-hidden print:shadow-none print:border-slate-300 ${item.is_hidden ? 'opacity-40 bg-slate-100 border-dashed' : item.customer_related === 'あり' ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'}`}>
                         <div className="absolute top-3 right-3 flex gap-1.5 print:hidden">
                           <button onClick={() => handleToggleHideItem(item, targetTable)} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${item.is_hidden ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={item.is_hidden ? "再表示する" : "隠す"}>{item.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}</button>
-                          
                           <button onClick={() => handleOpenEditModal(realIdx)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-blue-500 transition-all"><Edit2 size={13} /></button>
-                          
                           <button onClick={() => { if(confirm("削除しますか？")) handleDeleteItem(realIdx); }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-rose-500 transition-all"><X size={14} /></button>
                         </div>
                         <div className="w-[120px] h-[120px] md:w-[140px] md:h-[140px] relative shrink-0 min-w-0 mt-6 md:mt-0 print:w-[140px] print:h-[140px]">
@@ -1580,8 +1646,6 @@ export default function UniversalDashboardPage() {
                             <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-snug">{item.name}</h3>
                           </div>
                           {item.effect && item.effect !== "未入力" && <div className="text-[10px] md:text-[11px] font-medium text-slate-600 bg-slate-50 border p-2.5 md:p-3 rounded-xl print:bg-white print:border-slate-200"><span className="text-amber-500 font-black">💡 狙う効果:</span> {item.effect}</div>}
-                          
-                          {/* 🌟 URLリンク表示ボタン */}
                           {item.url && (
                             <a href={item.url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 mt-2 text-[11px] font-black hover:underline transition-colors px-3 py-1.5 rounded-lg border border-transparent bg-slate-100 hover:bg-slate-200`} style={{ color: themeColor }}>
                               <FileText size={12} /> 関連資料・リンクを開く
@@ -1613,7 +1677,6 @@ export default function UniversalDashboardPage() {
                     if (displayHistory.length === 0) return <div className="col-span-1 lg:col-span-2 text-slate-400 text-[11px] md:text-sm font-bold pl-2 py-4">💡 該当する商談営業履歴ログはありません。</div>;
                     
                     return displayHistory.map((log, index) => {
-                      // 🌟インデックスズレを防ぐため、本当のインデックス（realIdx）を特定
                       const realIdx = historyItems.findIndex(x => x.id === log.id);
                       return (
                         <div key={index} className={`print-avoid-break bg-slate-50 border p-4 md:p-6 rounded-2xl md:rounded-3xl space-y-3 relative group transition-all print:bg-white print:border-slate-300 ${log.is_hidden ? 'opacity-40 bg-slate-200 border-dashed shadow-none' : 'border-slate-100 hover:shadow-md'}`}>
@@ -1621,9 +1684,7 @@ export default function UniversalDashboardPage() {
                             <button onClick={() => handleToggleHideItem(log, 'sales_history')} className={`w-7 h-7 flex items-center justify-center rounded-full border shadow-sm transition-all ${log.is_hidden ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-white text-slate-400 hover:text-amber-500'}`} title={log.is_hidden ? "再表示する" : "隠す"}>
                               {log.is_hidden ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
-                            
                             <button onClick={() => handleOpenEditModal(realIdx)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-blue-500 transition-all"><Edit2 size={13} /></button>
-                            
                             <button onClick={() => { if(confirm("消去しますか？")) handleDeleteItem(realIdx); }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white border text-slate-400 shadow-sm hover:text-rose-500 transition-all"><X size={14} /></button>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 md:gap-3 pr-24 print:pr-0">
@@ -1634,8 +1695,6 @@ export default function UniversalDashboardPage() {
                           </div>
                           {log.proposal && <div className="text-[10px] md:text-xs font-black text-slate-800 bg-white border px-2.5 md:px-3 py-1.5 rounded-xl w-fit"><span className="text-rose-500 font-extrabold">💡 提案内容:</span> {log.proposal}</div>}
                           {log.detail && <p className="text-[11px] md:text-[12px] font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{log.detail}</p>}
-                          
-                          {/* 🌟 営業履歴用：URL資料リンク表示ボタンを追加 */}
                           {log.url && (
                             <a href={log.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-black hover:underline transition-colors px-3 py-1.5 rounded-lg border border-transparent bg-rose-100 text-rose-600">
                               <FileText size={12} /> 関連資料・リンクを開く
@@ -1657,15 +1716,15 @@ export default function UniversalDashboardPage() {
         {activeTab === 'accidents' && (
           <div className="space-y-4 md:space-y-6 print:space-y-6">
             
-            {/* 🎯 1. 四半期目標バナー ＆ 進捗プログレスバー（右寄せ・横幅半分固定） */}
+            {/* 🎯 1. 四半期目標バナー ＆ 進捗プログレスバー (★サイズ調整・文字拡大版) */}
             <div className="flex justify-end print:hidden w-full mb-4">
-              <div className="bg-gradient-to-r from-amber-500 to-rose-500 rounded-2xl p-[2px] shadow-sm w-full md:w-1/2">
-                <div className="bg-white/95 backdrop-blur-sm rounded-[14px] p-3 md:p-4 flex flex-col xl:flex-row items-center gap-4">
+              <div className="bg-gradient-to-r from-amber-500 to-rose-500 rounded-2xl p-[2px] shadow-sm w-full md:w-[37.5%]">
+                <div className="bg-white/95 backdrop-blur-sm rounded-[14px] p-6 md:p-7 flex flex-col xl:flex-row items-center gap-4">
                   <div className="flex items-center gap-3 flex-1 min-w-[200px] w-full">
                     <div className="bg-amber-100 text-amber-600 p-2 rounded-xl shrink-0"><Target size={20} /></div>
                     <div className="w-full">
                       <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest block">今四半期の安全目標</span>
-                      <h3 className="text-base font-black text-slate-800 tracking-tight truncate">{accidentGoal?.goal_text || "目標が未設定です"}</h3>
+                      <h3 className="text-2xl font-black text-slate-800 tracking-tight truncate">{accidentGoal?.goal_text || "目標が未設定です"}</h3>
                     </div>
                   </div>
                   
@@ -1698,7 +1757,7 @@ export default function UniversalDashboardPage() {
               </div>
             </div>
 
-            {/* 🌟 サブタブ切り替えボタン（インライン幅で無駄な伸びを排除） */}
+            {/* 🌟 サブタブ切り替えボタン */}
             <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shadow-sm w-fit self-start print:hidden">
               <button onClick={() => setActiveAccidentTab('summary')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${activeAccidentTab === 'summary' ? 'bg-white text-amber-600 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}>
                 <Activity size={14} /> 事故サマリー推移
@@ -1727,7 +1786,39 @@ export default function UniversalDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {accidentCategories.length === 0 && <div className="col-span-full py-6 text-center text-slate-400 font-bold">データがありません。</div>}
                   {accidentCategories.map((cat, i) => {
-                    const styles = getLevelStyles(cat.total); const daysSince = calculateDaysSince(cat.lastDate);
+                    const styles = getLevelStyles(cat.total); 
+                    const daysSince = calculateDaysSince(cat.lastDate);
+
+                    // 💡 スプレッドシートの1行目の列名から動的に「項目」と「単位」を抽出するロジック
+                    const curMonth = parseInt(globalSelectedMonth, 10);
+                    const catRows = (data?.accidentData || []).filter((r: any) => {
+                        const rowCat = r.category || r['カテゴリー'] || r['作業部門'];
+                        if (rowCat !== cat.name || !r.date) return false;
+                        const parts = r.date.split('/');
+                        return parts.length >= 2 && parseInt(parts[1], 10) === curMonth;
+                    });
+
+                    const dynamicStats: { name: string, value: number, unit: string }[] = [];
+                    const tempMap: any = {};
+                    
+                    catRows.forEach((r: any) => {
+                        Object.keys(r).forEach(key => {
+                            // 除外する基本キー（これら以外で「_」や「/」を含むものを集計）
+                            if (['date', 'category', 'カテゴリー', '作業部門', 'total', 'accident_type', 'type', '事故種類', '事故種別', '種類'].includes(key)) return;
+                            
+                            // _ または / が含まれている列を対象とする
+                            if (key.includes('_') || key.includes('/')) {
+                                const { name: itemName, unit } = splitLabelAndUnit(key);
+                                if (!tempMap[itemName]) tempMap[itemName] = { value: 0, unit };
+                                tempMap[itemName].value += n(r[key]);
+                            }
+                        });
+                    });
+                    
+                    Object.keys(tempMap).forEach(k => {
+                        dynamicStats.push({ name: k, value: tempMap[k].value, unit: tempMap[k].unit });
+                    });
+
                     return (
                       <div key={i} className={`bg-white border-2 ${styles.cardBorder} p-4 rounded-2xl shadow-sm relative flex flex-col justify-between`}>
                         <div className="flex justify-between items-start mb-3">
@@ -1741,12 +1832,25 @@ export default function UniversalDashboardPage() {
                         <div className="flex items-end justify-between">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">当月発生</span>
-                            <span className={`text-4xl font-black tracking-tighter ${styles.text}`}><AnimatedNumber value={cat.total} /></span>
+                            <div className="flex items-baseline gap-1">
+                              <span className={`text-4xl font-black tracking-tighter ${styles.text}`}><AnimatedNumber value={cat.total} /></span>
+                              <span className="text-sm font-bold text-slate-500">件</span>
+                            </div>
                           </div>
+                          
+                          {/* 🌟 動的単位の表示エリア */}
                           <div className="text-right text-[10px] font-bold text-slate-500">
-                            <p>追走あり: {cat.chaseOn}件</p>
-                            <p>追走なし: {cat.chaseOff}件</p>
-                            <p className="mt-1 text-[9px] text-slate-400 border-t pt-1">最終: {cat.lastDate}</p>
+                            {dynamicStats.length > 0 ? (
+                                dynamicStats.map((stat, idx) => (
+                                    <p key={idx}>{stat.name}: <span className="font-black text-slate-700">{stat.value.toLocaleString()}</span> {stat.unit}</p>
+                                ))
+                            ) : (
+                                <>
+                                  <p>追走あり: <span className="font-black text-slate-700">{cat.chaseOn}</span> 件</p>
+                                  <p>追走なし: <span className="font-black text-slate-700">{cat.chaseOff}</span> 件</p>
+                                </>
+                            )}
+                            <p className="mt-1 text-[9px] text-slate-400 border-t border-slate-200/60 pt-1">最終: {cat.lastDate}</p>
                           </div>
                         </div>
                       </div>
@@ -1894,10 +1998,19 @@ export default function UniversalDashboardPage() {
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {accidentMeasures.length === 0 ? (
-                    <div className="col-span-full py-10 bg-slate-50 rounded-2xl text-center text-slate-400 font-bold text-xs border border-dashed border-slate-200">💡 登録されている対策アクションはありません。</div>
-                  ) : (
-                    accidentMeasures.map((measure, index) => {
+                  {(() => {
+                    // 💡 ここで選択された月（globalSelectedMonth）の対策だけに絞り込み！
+                    const filteredMeasures = accidentMeasures.filter(m => {
+                      if (!m.start_date) return false;
+                      const parts = m.start_date.split(/[\/\-]/);
+                      return parts.length >= 2 && parseInt(parts[1], 10).toString() === globalSelectedMonth;
+                    });
+
+                    if (filteredMeasures.length === 0) {
+                      return <div className="col-span-full py-10 bg-slate-50 rounded-2xl text-center text-slate-400 font-bold text-xs border border-dashed border-slate-200">💡 この月（{globalSelectedMonth}月度）に開始した対策アクションはありません。</div>;
+                    }
+
+                    return filteredMeasures.map((measure, index) => {
                       const targetCategory = measure.category || '未設定';
                       const stats = getBeforeAfterStats(targetCategory, measure.start_date);
                       const isImproved = stats.hasData && stats.afterAvg < stats.beforeAvg;
@@ -1957,8 +2070,8 @@ export default function UniversalDashboardPage() {
                           )}
                         </div>
                       );
-                    })
-                  )}
+                    }); // 👈 閉じカッコのバグも修正済み！
+                  })()}
                 </div>
               </div>
             )}
@@ -2058,8 +2171,6 @@ export default function UniversalDashboardPage() {
                 <div className="space-y-1"><label className="text-slate-400">2. 誰に *必須</label><input type="text" value={newItem.client} onChange={(e) => setNewItem({...newItem, client: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">3. 何を *必須</label><input type="text" value={newItem.proposal} onChange={(e) => setNewItem({...newItem, proposal: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-16 resize-none font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">4. 内容詳細</label><textarea value={newItem.detail} onChange={(e) => setNewItem({...newItem, detail: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-20 md:h-24 resize-none font-semibold text-slate-900" /></div>
-
-                {/* 🌟 営業履歴用：URLリンクの入力欄を追加 */}
                 <div className="space-y-1"><label className="text-slate-400">5. 関連URLリンク</label><input type="url" placeholder="https://..." value={newItem.url} onChange={(e) => setNewItem({...newItem, url: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
 
                 <div className="space-y-1">
@@ -2076,8 +2187,6 @@ export default function UniversalDashboardPage() {
               <div className="space-y-3 md:space-y-4 text-[11px] md:text-xs font-bold text-slate-700">
                 <div className="space-y-1"><label className="text-slate-400">項目名 *必須</label><input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
                 <div className="space-y-1"><label className="text-slate-400">想定効果</label><textarea value={newItem.effect} onChange={(e) => setNewItem({...newItem, effect: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 h-16 resize-none font-semibold text-slate-900" /></div>
-
-                {/* 🌟 DX・現場改善用：URLリンクの入力欄を追加 */}
                 <div className="space-y-1"><label className="text-slate-400">関連URLリンク</label><input type="url" placeholder="https://..." value={newItem.url} onChange={(e) => setNewItem({...newItem, url: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-3 md:px-4 py-2.5 md:py-3 font-semibold text-slate-900" /></div>
 
                 <div className="grid grid-cols-2 gap-3 md:gap-4">
