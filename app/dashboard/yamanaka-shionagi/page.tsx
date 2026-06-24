@@ -1866,7 +1866,14 @@ export default function UniversalDashboardPage() {
                       <div className="h-full w-full flex items-center justify-center text-slate-400 font-bold text-xs">グラフデータがありません</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <RechartsLineChart data={accidentCategoryTrendData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <RechartsLineChart 
+          data={accidentCategoryTrendData.chartData.map((month: any) => {
+            const clean = { ...month };
+            accidentCategoryTrendData.categories.forEach(cat => { if (clean[cat] === undefined) clean[cat] = 0; });
+            return clean;
+          })} 
+          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+        >
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
