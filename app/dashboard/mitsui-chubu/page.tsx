@@ -1,10 +1,9 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin, Target, Award } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin, Target, Award, LineChart as LineChartIcon, Copy } from 'lucide-react';
 import Link from 'next/link';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
-
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart as RechartsLineChart, Line as RechartsLine } from 'recharts';
 // =========================================================
 // 🚀 共通ユーティリティ関数
 // =========================================================
