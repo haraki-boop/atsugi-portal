@@ -1,9 +1,9 @@
 // @ts-nocheck
 'use client';
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin, Target, Award } from 'lucide-react';
+import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, MessageSquare, Clock, Bot, ThumbsUp, ThumbsDown, Plus, X, Building2, ChevronDown, ShieldAlert as AccidentIcon, Zap, AlertTriangle, CheckCircle2, Edit2, Loader2, Search, BrainCircuit, Printer, FileText, Eye, EyeOff, RefreshCw, Pin, Target, Award, LineChart as LineChartIcon, Copy } from 'lucide-react';
 import Link from 'next/link';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart as RechartsLineChart, Line as RechartsLine } from 'recharts';
 
 // =========================================================
 // 🚀 共通ユーティリティ関数
@@ -54,8 +54,8 @@ export default function UniversalDashboardPage() {
   // =========================================================
   // 🏢 【拠点マスター設定】
   // =========================================================
-  const LOCATION_ID = 'oie-hannan'; 
-  const LOCATION_NAME = '尾家産業'; 
+  const LOCATION_ID = 'showa-reizo'; 
+  const LOCATION_NAME = '昭和冷蔵'; 
   
   const GAS_URL = `/api/gas?location=${LOCATION_ID}`;
   const [isMounted, setIsMounted] = useState(false);
@@ -1866,7 +1866,14 @@ export default function UniversalDashboardPage() {
                       <div className="h-full w-full flex items-center justify-center text-slate-400 font-bold text-xs">グラフデータがありません</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <RechartsLineChart data={accidentCategoryTrendData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <RechartsLineChart 
+          data={accidentCategoryTrendData.chartData.map((month: any) => {
+            const clean = { ...month };
+            accidentCategoryTrendData.categories.forEach(cat => { if (clean[cat] === undefined) clean[cat] = 0; });
+            return clean;
+          })} 
+          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+        >
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
