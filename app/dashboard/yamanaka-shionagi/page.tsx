@@ -5,7 +5,6 @@ import { ArrowLeft, Activity, Calculator, TrendingUp, Calendar, Rocket, Leaf, Me
 import Link from 'next/link';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, BarChart, Bar, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart as RechartsLineChart, Line as RechartsLine } from 'recharts';
 
-
 // =========================================================
 // 🚀 共通ユーティリティ関数
 // =========================================================
@@ -471,12 +470,19 @@ export default function UniversalDashboardPage() {
 
           if (fctVal > 0) { totalBudget += fctVal; validBudgetDays++; hasFct = true; }
           if (actVal > 0) { totalChakuchi += actVal; validChakuchiDays++; } 
-          else { totalChakuchi += fctVal; if (fctVal > 0) validChakuchiDays++; }
+          else { 
+  // 💡 外注費、募集（募集費/募集日）、事故 が含まれない場合のみ予測を足す
+  if (!m.title.match(/外注費|募集|事故/)) {
+    totalChakuchi += fctVal; 
+    if (fctVal > 0) validChakuchiDays++; 
+  }
+}
           if (lastAct > 0) { totalLastMonth += lastAct; validLastMonthDays++; }
           if (prevYearAct > 0) { totalLastYear += prevYearAct; validLastYearDays++; }
         });
 
-        if (!hasFct && validChakuchiDays > 0 && validChakuchiDays < currentMonthIndices.length && !isAvgMetric) {
+        if (!hasFct && validChakuchiDays > 0 && validChakuchiDays < currentMonthIndices.length && !isAvgMetric && !m.title.match(/外注費|募集|事故/)) {
+  
           const dailyAvg = totalChakuchi / validChakuchiDays; 
           totalChakuchi = dailyAvg * currentMonthIndices.length;
         }

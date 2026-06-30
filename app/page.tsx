@@ -46,6 +46,7 @@ export default function MapPortalPage() {
   const markersRef = useRef<{ [key: string]: any }>({});
   const layersRef = useRef<any>({ light: null, dark: null, emergencyGroup: null });
 
+  // 📍 拠点リストの定義
   const locations = [
     { id: 'showa-reizo', name: '昭和冷蔵', address: '神奈川県厚木市', lat: 35.4430, lng: 139.3640, type: 'hub', desc: '' },
     { id: 'afs-minamikanto', name: 'AFS南関東センター', address: '千葉県船橋市高瀬町24番12号', lat: 35.6717, lng: 139.9924, type: 'center', desc: '' },
@@ -62,6 +63,8 @@ export default function MapPortalPage() {
     { id: 'afs-bisai-seiso', name: 'AFS尾西_清掃', address: '愛知県一宮市明地南茱之木25-1', lat: 35.286934, lng: 136.739061, type: 'center', desc: '', isPink: true },
     { id: 'himeji-afs-seiso', name: '兵庫姫路_AFS_清掃', address: '兵庫県姫路市白浜町甲841-51', lat: 34.778469, lng: 134.703810, type: 'center', desc: '', isPink: true },
     { id: 'mandai-saito', name: '万代彩都', address: '大阪府茨木市彩都あかね3-1', lat: 34.861370, lng: 135.534495, type: 'center', desc: '万代 彩都物流センター', isPink: true },
+    // 🆕 万代渋川を万代彩都の下に追加
+    { id: 'mandai-sibukawa', name: '万代渋川', address: '大阪府東大阪市渋川町3丁目12-25', lat: 34.644177, lng: 135.561439, type: 'center', desc: '', isPink: true },
     { id: 'dts-division', name: 'DTS事業部', address: '千葉県船橋市高瀬町24番12号', lat: 35.6717, lng: 139.9924, type: 'center', desc: '', isLightGreen: true }
   ];
 
@@ -267,12 +270,9 @@ export default function MapPortalPage() {
           </div>
 
           <div className="space-y-2">
-            
-            {/* 🚪 ここに2つのアイコンを並べて配置しました！ */}
             <div className="flex items-center justify-between px-1">
               <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">拠点一覧 ({locations.length})</p>
               <div className="flex items-center gap-1">
-                {/* 1. 既存のドアアイコン */}
                 <Link 
                   href="https://palproductivity-dashboard.vercel.app/dashboard/compare" 
                   title="15現場 業績比較ダッシュボードを開く" 
@@ -281,7 +281,6 @@ export default function MapPortalPage() {
                   <DoorOpen size={18} />
                 </Link>
                 
-                {/* 2. 新規のマテハンアイコン（ロボットアーム） */}
                 <Link 
                   href="https://matehan-system.vercel.app/" 
                   title="マテハンシステムを開く" 
@@ -325,7 +324,6 @@ export default function MapPortalPage() {
                         <h3 className={`text-sm md:text-base font-black tracking-tighter leading-snug ${selectedLocation?.id === loc.id ? 'text-white' : (isEmergencyMode ? 'text-slate-200' : 'text-slate-900')}`}>
                           {loc.name}
                         </h3>
-                        {/* 🚨 現実の悪天候に応じて警告マークを出す */}
                         {showEmergencyUI && (
                           <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[8px] font-black rounded uppercase animate-pulse flex items-center gap-0.5">
                             <AlertTriangle size={8}/> 警戒
@@ -333,7 +331,6 @@ export default function MapPortalPage() {
                         )}
                       </div>
 
-                      {/* 📡 リアルタイム気象データの表示 */}
                       {wInfo ? (
                         <div className={`flex items-center gap-3 text-[10px] md:text-[11px] font-bold ${showEmergencyUI ? 'text-rose-300' : (isEmergencyMode ? 'text-slate-400' : 'text-slate-500')}`}>
                           <span className="flex items-center gap-1" title={wInfo.text}>
@@ -390,7 +387,6 @@ export default function MapPortalPage() {
               </div>
 
               <div className="space-y-3">
-                {/* 📡 現在の天気ステータスBOX */}
                 <div className={`flex items-center gap-3 p-3 rounded-xl border ${showEmergencyUI ? 'bg-rose-950/50 border-rose-800' : (isEmergencyMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100')}`}>
                   {wInfo ? (
                     <>
@@ -412,7 +408,6 @@ export default function MapPortalPage() {
                   )}
                 </div>
 
-                {/* 🚨 緊急モードかつ対象拠点の場合の警告文 */}
                 {showEmergencyUI && (
                   <div className="bg-rose-950/80 border border-rose-800 p-3 rounded-xl text-[10px] md:text-[11px] text-rose-200 font-bold space-y-1">
                     <p className="flex items-center gap-1 text-rose-400 font-black text-xs"><AlertTriangle size={12}/> 悪天候・強風アラート</p>
@@ -422,7 +417,6 @@ export default function MapPortalPage() {
                   </div>
                 )}
                 
-                {/* 通常の住所表示 */}
                 <div className={`text-[10px] md:text-[11px] font-medium flex items-start gap-1 ${isEmergencyMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   <MapPin 
                     size={12} 
