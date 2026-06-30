@@ -539,7 +539,7 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【先月比計算＆「★ 合計」への名称短縮】
+  // 🌟【先月比計算＆「★ 合計」への名称短縮 ＋ 生産性項目名表示】
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0, lastMonthRatio: { vol: 0, hrs: 0, prod: 0 } } };
     
@@ -548,6 +548,19 @@ export default function UniversalDashboardPage() {
     let prevM = parseInt(prodSelectedMonth, 10) - 1;
     if (prevM <= 0) prevM += 12;
     const prevMonthStr = `/${String(prevM).padStart(2, '0')}/`;
+
+    // 💡 拠点マスターの VOLUME_SUM_RULES をパースしてマッピング辞書を作成
+    // 例: { "生産パック数": "仕分け", "洗浄数": "洗浄", "原料CS数": "原料" }
+    const volSumMapping: Record<string, string> = {};
+    if (data.masterSettings?.VOLUME_SUM_RULES) {
+      const rules = Array.isArray(data.masterSettings.VOLUME_SUM_RULES) 
+        ? data.masterSettings.VOLUME_SUM_RULES 
+        : String(data.masterSettings.VOLUME_SUM_RULES).split(',');
+      rules.forEach((rule: string) => {
+        const parts = rule.split(':');
+        if (parts.length === 2) volSumMapping[parts[0].trim()] = parts[1].trim();
+      });
+    }
 
     const getMonthSummary = (monthStr: string) => {
         let vol = 0;
@@ -609,7 +622,8 @@ export default function UniversalDashboardPage() {
     const pRows: any[] = [];
     if (data.productivityAccumulatedData) {
       data.productivityAccumulatedData.forEach((item: any) => {
-        const itemName = item.title.replace('蓄積実績_作業生産性_', '');
+        // "作業生産性_仕分け" などの名前から "作業生産性_" だけを消して "仕分け" にする
+        const itemName = item.title.replace('蓄積実績_作業生産性_', '').replace('蓄積実績_', '').replace('作業生産性_', '');
         item.labels.forEach((date: string, idx: number) => {
           if (date.includes(targetMonthStr)) {
             pRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
@@ -634,19 +648,26 @@ export default function UniversalDashboardPage() {
       let prodSum = 0;
       let prodCount = 0;
       
-      let prodName = proc;
+      // 💡 1. 既存の NAME_MAPPING を適用
+      let searchProdName = proc;
       if (data.masterSettings?.NAME_MAPPING && data.masterSettings.NAME_MAPPING[proc]) {
-        prodName = data.masterSettings.NAME_MAPPING[proc];
+        searchProdName = data.masterSettings.NAME_MAPPING[proc];
       } else {
-        if (proc === "ユニー一括") prodName = "ユニー";
-        if (proc === "BB") prodName = "ブロンコビリー";
+        if (proc === "ユニー一括") searchProdName = "ユニー";
+        if (proc === "BB") searchProdName = "ブロンコビリー";
       }
+
+      // 💡 2. さらに VOLUME_SUM_RULES を適用して、最終的な「表示名」と「検索キー」を決定
+      // 例: proc が "生産パック数" の時、dispProdName は "仕分け" になる
+      const dispProdName = volSumMapping[proc] || searchProdName;
       
       const dailyList = allDates.map(dt => {
+        // 物量は元の TARGET_CATEGORIES の名前（生産パック数など）で探す
         const vMob = vRows.find((r: any) => r.date === dt && r.item === proc);
         const vol = vMob ? vMob.value : 0;
         
-        const pMob = pRows.find((r: any) => r.date === dt && r.item === prodName);
+        // 生産性はマッピング後の名前（仕分けなど）で探す
+        const pMob = pRows.find((r: any) => r.date === dt && r.item === dispProdName);
         const prod = pMob ? pMob.value : 0;
         
         procTotalVolume += vol;
@@ -661,7 +682,13 @@ export default function UniversalDashboardPage() {
       const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
       centerTotalVolume += procTotalVolume;
 
-      return { process: proc, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
+      return { 
+        process: dispProdName, // 🔥 カードのタイトルを生産性名（仕分けなど）に変更！
+        dailyList, 
+        totalVolume: procTotalVolume, 
+        totalHours: 0, 
+        totalProd: procTotalProd 
+      };
     });
     
     centerTotalHours = hTotalRows.reduce((sum, r) => sum + r.value, 0);
@@ -677,7 +704,7 @@ export default function UniversalDashboardPage() {
     const centerTotalProd = centerTotalHours > 0 ? centerTotalVolume / centerTotalHours : 0;
     
     items.unshift({
-      process: "★ 合計", // 💡 左端カードのタイトル短縮
+      process: "★ 合計",
       dailyList: centerDailyList,
       totalVolume: centerTotalVolume,
       totalHours: centerTotalHours,
@@ -698,27 +725,7 @@ export default function UniversalDashboardPage() {
       } 
     };
   }, [data, prodSelectedMonth]);
-
-  const contractList = (() => {
-    if (!data || !data.contractYojitsuData) return [];
-    const cMap = new Map();
-    data.contractYojitsuData.forEach((item: any) => {
-      if (!item.title) return;
-      const isYosan = item.title.startsWith('予算_');
-      const isJisseki = item.title.startsWith('実績_');
-      const cleanTitle = item.title.replace('予算_', '').replace('実績_', '');
-      if (!cMap.has(cleanTitle)) {
-        cMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || [], actual: new Array((item.labels || []).length).fill(0), forecast: new Array((item.labels || []).length).fill(0) });
-      }
-      const entry = cMap.get(cleanTitle);
-      if (isJisseki) entry.actual = item.values;
-      if (isYosan) entry.forecast = item.values;
-    });
-    let list = Array.from(cMap.values());
-    if (searchQuery) list = list.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
-    return list;
-  })();
-
+  
   // =========================================================
   // 🚨 事故管理ダッシュボード用の計算ロジック
   // =========================================================
