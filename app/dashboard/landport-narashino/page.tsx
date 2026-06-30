@@ -539,7 +539,7 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【先月比計算＆「★ 合計」への名称短縮 ＋ 生産性項目名表示】
+  // 🌟【先月比計算＆「★ 合計」への名称短縮 ＋ 生産性項目名表示】  
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0, lastMonthRatio: { vol: 0, hrs: 0, prod: 0 } } };
     
@@ -725,6 +725,27 @@ export default function UniversalDashboardPage() {
       } 
     };
   }, [data, prodSelectedMonth]);
+
+  // 🌟 ここが抜け落ちていた、請負予実用の計算ロジック（contractList）です！
+  const contractList = (() => {
+    if (!data || !data.contractYojitsuData) return [];
+    const cMap = new Map();
+    data.contractYojitsuData.forEach((item: any) => {
+      if (!item.title) return;
+      const isYosan = item.title.startsWith('予算_');
+      const isJisseki = item.title.startsWith('実績_');
+      const cleanTitle = item.title.replace('予算_', '').replace('実績_', '');
+      if (!cMap.has(cleanTitle)) {
+        cMap.set(cleanTitle, { title: cleanTitle, labels: item.labels || [], actual: new Array((item.labels || []).length).fill(0), forecast: new Array((item.labels || []).length).fill(0) });
+      }
+      const entry = cMap.get(cleanTitle);
+      if (isJisseki) entry.actual = item.values;
+      if (isYosan) entry.forecast = item.values;
+    });
+    let list = Array.from(cMap.values());
+    if (searchQuery) list = list.filter((m: any) => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    return list;
+  })();
   
   // =========================================================
   // 🚨 事故管理ダッシュボード用の計算ロジック
