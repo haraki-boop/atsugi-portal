@@ -539,7 +539,7 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【先月比計算＆「★ 合計」への名称短縮 ＋ 物量/生産性 完全分離検索版】
+  // 🌟【拠点マスター絶対服従・完全汎用クリーンリセット版】
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0, lastMonthRatio: { vol: 0, hrs: 0, prod: 0 } } };
     
@@ -548,7 +548,7 @@ export default function UniversalDashboardPage() {
     if (prevM <= 0) prevM += 12;
     const prevMonthStr = `/${String(prevM).padStart(2, '0')}/`;
 
-    // 💡 拠点マスターの VOLUME_SUM_RULES をパース
+    // 💡 1. 拠点マスターの VOLUME_SUM_RULES を読み込む（例: 1次仕分け:T-sort（PC/RS込））
     const volSumMapping: Record<string, string> = {};
     if (data.masterSettings?.VOLUME_SUM_RULES) {
       const rules = Array.isArray(data.masterSettings.VOLUME_SUM_RULES) 
@@ -560,15 +560,9 @@ export default function UniversalDashboardPage() {
       });
     }
 
-    // 🔥 全角/半角カッコやスペースを完全に消し去る無敵の正規化関数
-    const normalize = (str: string) => {
-      if (!str) return '';
-      return str.replace(/[（(）)]/g, '').replace(/\s+/g, '').toLowerCase();
-    };
-
     const getMonthSummary = (monthStr: string) => {
         let vol = 0; let hrs = 0;
-        const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
+        const processNames = data.masterSettings?.TARGET_CATEGORIES || [];
         if (data.volumeAccumulatedData) {
             data.volumeAccumulatedData.forEach((item: any) => {
                 const itemName = item.title.replace('蓄積実績_', '');
@@ -592,6 +586,7 @@ export default function UniversalDashboardPage() {
     const prevSummary = getMonthSummary(prevMonthStr);
     const calcRatio = (curr: number, prev: number) => prev > 0 ? (curr / prev) * 100 : 0;
 
+    // 💡 2. GASから蓄積・送信されたデータを配列化
     const vRows: any[] = [];
     if (data.volumeAccumulatedData) {
       data.volumeAccumulatedData.forEach((item: any) => {
@@ -625,103 +620,72 @@ export default function UniversalDashboardPage() {
       });
     }
     
-    const allDates = Array.from(new Set([
-      ...vRows.map((r: any) => r.date),
-      ...hTotalRows.map((r: any) => r.date),
-      ...pRows.map((r: any) => r.date)
-    ])).sort();
+    const allDates = Array.from(new Set([...vRows.map((r: any) => r.date), ...hTotalRows.map((r: any) => r.date), ...pRows.map((r: any) => r.date)])).sort();
     
-    const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
-    
-    // 💡【重要】カードの統合処理
+    // 💡 3. カードの統合・グループ化マップを作成（スプシの設定に完全連動）
+    const processNames = data.masterSettings?.TARGET_CATEGORIES || [];
     const cardsMap = new Map();
+    
     processNames.forEach((proc: string) => {
-      let searchProdName = proc;
-      if (data.masterSettings?.NAME_MAPPING && data.masterSettings.NAME_MAPPING[proc]) {
-        searchProdName = data.masterSettings.NAME_MAPPING[proc];
-      } else {
-        if (proc === "ユニー一括") searchProdName = "ユニー";
-        if (proc === "BB") searchProdName = "ブロンコビリー";
-      }
-
-      // dispGroupName がカードのタイトル 兼 「物量」を探すためのキーになります
-      const dispGroupName = volSumMapping[proc] || searchProdName;
+      const mappedName = data.masterSettings?.NAME_MAPPING?.[proc] || proc;
+      const dispGroupName = volSumMapping[proc] || mappedName;
 
       if (!cardsMap.has(dispGroupName)) {
-        cardsMap.set(dispGroupName, {
-          process: dispGroupName,
-          prodSourceItems: [] // 生産性を探すための元の名前（1次仕分け等）を格納
-        });
+        cardsMap.set(dispGroupName, { process: dispGroupName, sourceItems: [] });
       }
-      cardsMap.get(dispGroupName).prodSourceItems.push(proc);
+      cardsMap.get(dispGroupName).sourceItems.push(proc);
     });
 
     let centerTotalVolume = 0;
     let centerTotalHours = 0;
     
-    // 💡 統合されたカードデータをもとに計算
+    // 💡 4. 各拠点マスターのルール通りに日次計算を実行
     const items = Array.from(cardsMap.values()).map(cardDef => {
       let procTotalVolume = 0;
       let prodSum = 0;
       let prodCount = 0;
       
       const dailyList = allDates.map(dt => {
+        let vol = 0;
+        let prod = 0;
+        let prodValidItems = 0;
         
-        // 🔥 ① 物量データの検索
-        // カードのタイトル（dispGroupName）と物量項目名が「イコール」なので、それで一発検索！
-        const vMob = vRows.find((r: any) => r.date === dt && normalize(r.item) === normalize(cardDef.process));
-        const vol = vMob ? vMob.value : 0;
-        
-        // 🔥 ② 生産性データの検索
-        // 紐づけられた複数の生産性名（1次仕分け、流し、受けなど）で探して平均を出す
-        const dailyProds = new Map();
-        cardDef.prodSourceItems.forEach((pItemName: string) => {
-          let pMob = pRows.find((r: any) => r.date === dt && normalize(r.item) === normalize(pItemName));
+        cardDef.sourceItems.forEach((itemName: string) => {
+          // 物量はスプシの登録名ベースで素直に集計
+          const vMob = vRows.find((r: any) => r.date === dt && r.item === itemName);
+          if (vMob) vol += vMob.value;
           
-          // フォールバック（前の現場のように生産性名もカード名と同じになっている場合用）
-          if (!pMob) {
-            pMob = pRows.find((r: any) => r.date === dt && normalize(r.item) === normalize(cardDef.process));
-          }
-          
-          // 見つかったらMapに登録（同じ項目の重複加算を防止）
+          // 生産性は、元の項目名、または統合後のグループ名で一致するものを取得
+          let pMob = pRows.find((r: any) => r.date === dt && r.item === itemName) || 
+                     pRows.find((r: any) => r.date === dt && r.item === cardDef.process);
+                     
           if (pMob && pMob.value > 0) {
-            dailyProds.set(normalize(pMob.item), pMob.value);
+            prod += pMob.value;
+            prodValidItems++;
           }
         });
         
-        // 複数項目が合体した場合（流し・受け等）は、平均値を出す
-        let dailyProdSum = 0;
-        dailyProds.forEach(val => dailyProdSum += val);
-        const prod = dailyProds.size > 0 ? dailyProdSum / dailyProds.size : 0;
+        const finalProd = prodValidItems > 0 ? prod / prodValidItems : 0;
         
         procTotalVolume += vol;
-        if (prod > 0) {
-            prodSum += prod;
+        if (finalProd > 0) {
+            prodSum += finalProd;
             prodCount++;
         }
         
-        return { date: dt.split('/').slice(1).join('/'), volume: vol, hours: 0, prod: prod };
+        return { date: dt.split('/').slice(1).join('/'), volume: vol, hours: 0, prod: finalProd };
       });
       
       const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
       centerTotalVolume += procTotalVolume;
 
-      return { 
-        process: cardDef.process, // 🔥 カード名は綺麗な物量名（T-sort（PC/RS込）など）
-        dailyList, 
-        totalVolume: procTotalVolume, 
-        totalHours: 0, 
-        totalProd: procTotalProd 
-      };
+      return { process: cardDef.process, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
     });
     
     centerTotalHours = hTotalRows.reduce((sum, r) => sum + r.value, 0);
     
     const centerDailyList = allDates.map(dt => {
-      // センター全体の物量計算も、変換後の統合名ベースでカウントするように修正
-      const uniqueCardNames = Array.from(cardsMap.keys());
-      const dayVol = vRows.filter((r: any) => r.date === dt && uniqueCardNames.some(cn => normalize(cn) === normalize(r.item))).reduce((sum: number, r: any) => sum + r.value, 0);
-      
+      const dayVol = vRows.filter((r: any) => r.date === dt && processNames.includes(r.item)).reduce((sum: number, r: any) => sum + r.value, 0);
       const dayHrsRow = hTotalRows.find((r: any) => r.date === dt);
       const dayHrs = dayHrsRow ? dayHrsRow.value : 0;
       const dayProd = dayHrs > 0 ? dayVol / dayHrs : 0;
@@ -730,30 +694,12 @@ export default function UniversalDashboardPage() {
     
     const centerTotalProd = centerTotalHours > 0 ? centerTotalVolume / centerTotalHours : 0;
     
-    items.unshift({
-      process: "★ 合計",
-      dailyList: centerDailyList,
-      totalVolume: centerTotalVolume,
-      totalHours: centerTotalHours,
-      totalProd: centerTotalProd
-    });
+    items.unshift({ process: "★ 合計", dailyList: centerDailyList, totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd });
     
-    return { 
-      items, 
-      summary: { 
-        totalVolume: centerTotalVolume, 
-        totalHours: centerTotalHours, 
-        totalProd: centerTotalProd,
-        lastMonthRatio: {
-            vol: calcRatio(centerTotalVolume, prevSummary.vol),
-            hrs: calcRatio(centerTotalHours, prevSummary.hrs),
-            prod: calcRatio(centerTotalProd, prevSummary.prod)
-        }
-      } 
-    };
+    return { items, summary: { totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd, lastMonthRatio: { vol: calcRatio(centerTotalVolume, prevSummary.vol), hrs: calcRatio(centerTotalHours, prevSummary.hrs), prod: calcRatio(centerTotalProd, prevSummary.prod) } } };
   }, [data, prodSelectedMonth]);
 
-  // 🌟 請負予実の計算ロジック
+  // 🌟 請負予実の計算ロジック（エラー回避のため残しています）
   const contractList = (() => {
     if (!data || !data.contractYojitsuData) return [];
     const cMap = new Map();
