@@ -539,38 +539,58 @@ export default function UniversalDashboardPage() {
     });
   }, [sortedMetrics, displayMode, selectedWeek, dataMonth, currentMonthIndices, baseLabelsFiltered, activeTab, weeklyGroups, showHiddenMetrics]);
 
-  // 🌟【先月比計算＆「★ 合計」への名称短縮 ＋ 生産性項目名表示】  
+  // 🌟【真・拠点マスター完全服従 ＆ N:1自由マッピング版】
   const computedVaultProductivity = useMemo(() => {
     if (!data) return { items: [], summary: { totalVolume: 0, totalHours: 0, totalProd: 0, lastMonthRatio: { vol: 0, hrs: 0, prod: 0 } } };
     
     const targetMonthStr = `/${prodSelectedMonth.padStart(2, '0')}/`;
-    
     let prevM = parseInt(prodSelectedMonth, 10) - 1;
     if (prevM <= 0) prevM += 12;
     const prevMonthStr = `/${String(prevM).padStart(2, '0')}/`;
 
-    // 💡 拠点マスターの VOLUME_SUM_RULES をパースしてマッピング辞書を作成
-    // 例: { "生産パック数": "仕分け", "洗浄数": "洗浄", "原料CS数": "原料" }
-    const volSumMapping: Record<string, string> = {};
+    // 🔥 全角/半角カッコやスペースを無視する正規化関数
+    const normalize = (str: string) => (str || '').replace(/[（(）)]/g, '').replace(/\s+/g, '').toLowerCase();
+
+    // 💡 1. 画面に出したいカード（TARGET_CATEGORIES）をベースに枠を作る
+    const processNames = data.masterSettings?.TARGET_CATEGORIES || [];
+    const cardsMap = new Map();
+    
+    processNames.forEach((cardName: string) => {
+      cardsMap.set(cardName, {
+        process: cardName, // カードの表示名
+        searchKeys: [normalize(cardName)] // デフォルトで自分自身の名前は検索対象にする
+      });
+    });
+
+    // 💡 2. マスター設定の合算ルール（VOLUME_SUM_RULES）を解析し、検索キーを追加する
     if (data.masterSettings?.VOLUME_SUM_RULES) {
-      const rules = Array.isArray(data.masterSettings.VOLUME_SUM_RULES) 
-        ? data.masterSettings.VOLUME_SUM_RULES 
-        : String(data.masterSettings.VOLUME_SUM_RULES).split(',');
+      const rulesStr = data.masterSettings.VOLUME_SUM_RULES;
+      const rules = Array.isArray(rulesStr) ? rulesStr : String(rulesStr).split(',');
+      
       rules.forEach((rule: string) => {
         const parts = rule.split(':');
-        if (parts.length === 2) volSumMapping[parts[0].trim()] = parts[1].trim();
+        if (parts.length === 2) {
+          const sourceName = parts[0].trim();  // 例: 1次仕分け
+          const targetCardName = parts[1].trim(); // 例: T-sort（PC/RS込）
+
+          // 紐付け先のカードが存在すれば、そこに子分として検索キーを追加
+          const targetCard = cardsMap.get(targetCardName) || Array.from(cardsMap.values()).find(c => normalize(c.process) === normalize(targetCardName));
+          if (targetCard) {
+            targetCard.searchKeys.push(normalize(sourceName));
+          }
+        }
       });
     }
 
     const getMonthSummary = (monthStr: string) => {
-        let vol = 0;
-        let hrs = 0;
-        const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
+        let vol = 0; let hrs = 0;
+        const validVolKeys = new Set<string>();
+        cardsMap.forEach(cardDef => cardDef.searchKeys.forEach((k: string) => validVolKeys.add(k)));
 
         if (data.volumeAccumulatedData) {
             data.volumeAccumulatedData.forEach((item: any) => {
                 const itemName = item.title.replace('蓄積実績_', '');
-                if (processNames.includes(itemName)) {
+                if (validVolKeys.has(normalize(itemName))) {
                     item.labels.forEach((date: string, idx: number) => {
                         if (date.includes(monthStr)) vol += n(item.values[idx]);
                     });
@@ -584,8 +604,7 @@ export default function UniversalDashboardPage() {
                 });
             });
         }
-        const prod = hrs > 0 ? vol / hrs : 0;
-        return { vol, hrs, prod };
+        return { vol, hrs, prod: hrs > 0 ? vol / hrs : 0 };
     };
 
     const prevSummary = getMonthSummary(prevMonthStr);
@@ -596,9 +615,7 @@ export default function UniversalDashboardPage() {
       data.volumeAccumulatedData.forEach((item: any) => {
         const itemName = item.title.replace('蓄積実績_', '');
         item.labels.forEach((date: string, idx: number) => {
-          if (date.includes(targetMonthStr)) {
-            vRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
-          }
+          if (date.includes(targetMonthStr)) vRows.push({ date, item: itemName, value: n(item.values[idx]) });
         });
       });
     }
@@ -609,11 +626,8 @@ export default function UniversalDashboardPage() {
         item.labels.forEach((date: string, idx: number) => {
           if (date.includes(targetMonthStr)) {
             const existing = hTotalRows.find(h => h.date === date);
-            if (existing) {
-              existing.value += n(item.values[idx]);
-            } else {
-              hTotalRows.push({ date: date, value: n(item.values[idx]) });
-            }
+            if (existing) existing.value += n(item.values[idx]);
+            else hTotalRows.push({ date, value: n(item.values[idx]) });
           }
         });
       });
@@ -622,79 +636,86 @@ export default function UniversalDashboardPage() {
     const pRows: any[] = [];
     if (data.productivityAccumulatedData) {
       data.productivityAccumulatedData.forEach((item: any) => {
-        // "作業生産性_仕分け" などの名前から "作業生産性_" だけを消して "仕分け" にする
         const itemName = item.title.replace('蓄積実績_作業生産性_', '').replace('蓄積実績_', '').replace('作業生産性_', '');
         item.labels.forEach((date: string, idx: number) => {
-          if (date.includes(targetMonthStr)) {
-            pRows.push({ date: date, item: itemName, value: n(item.values[idx]) });
-          }
+          if (date.includes(targetMonthStr)) pRows.push({ date, item: itemName, value: n(item.values[idx]) });
         });
       });
     }
     
-    const allDates = Array.from(new Set([
-      ...vRows.map((r: any) => r.date),
-      ...hTotalRows.map((r: any) => r.date),
-      ...pRows.map((r: any) => r.date)
-    ])).sort();
-    
-    const processNames = data.masterSettings?.TARGET_CATEGORIES || ["リコス", "リコスアイス", "BB", "ユニー一括", "汎用"];
+    const allDates = Array.from(new Set([...vRows.map((r: any) => r.date), ...hTotalRows.map((r: any) => r.date), ...pRows.map((r: any) => r.date)])).sort();
     
     let centerTotalVolume = 0;
     let centerTotalHours = 0;
     
-    const items = processNames.map((proc: string) => {
+    // 💡 3. カードごとの日次計算
+    const items = Array.from(cardsMap.values()).map(cardDef => {
       let procTotalVolume = 0;
       let prodSum = 0;
       let prodCount = 0;
       
-      // 💡 1. 既存の NAME_MAPPING を適用
-      let searchProdName = proc;
-      if (data.masterSettings?.NAME_MAPPING && data.masterSettings.NAME_MAPPING[proc]) {
-        searchProdName = data.masterSettings.NAME_MAPPING[proc];
-      } else {
-        if (proc === "ユニー一括") searchProdName = "ユニー";
-        if (proc === "BB") searchProdName = "ブロンコビリー";
-      }
-
-      // 💡 2. さらに VOLUME_SUM_RULES を適用して、最終的な「表示名」と「検索キー」を決定
-      // 例: proc が "生産パック数" の時、dispProdName は "仕分け" になる
-      const dispProdName = volSumMapping[proc] || searchProdName;
-      
       const dailyList = allDates.map(dt => {
-        // 物量は元の TARGET_CATEGORIES の名前（生産パック数など）で探す
-        const vMob = vRows.find((r: any) => r.date === dt && r.item === proc);
-        const vol = vMob ? vMob.value : 0;
+        let vol = 0;
+        let prod = 0;
+        let prodValidItems = 0;
         
-        // 生産性はマッピング後の名前（仕分けなど）で探す
-        const pMob = pRows.find((r: any) => r.date === dt && r.item === dispProdName);
-        const prod = pMob ? pMob.value : 0;
+        // 重複して合算しないためのチェック用
+        const seenVols = new Set();
+        const seenProds = new Set();
+        
+        cardDef.searchKeys.forEach((searchKey: string) => {
+          // 物量の集計
+          vRows.forEach((r: any) => {
+            if (r.date === dt && normalize(r.item) === searchKey && !seenVols.has(searchKey)) {
+              vol += r.value;
+              seenVols.add(searchKey);
+            }
+          });
+          
+          // 生産性の集計
+          pRows.forEach((r: any) => {
+            if (r.date === dt && normalize(r.item) === searchKey && !seenProds.has(searchKey)) {
+              if (r.value > 0) {
+                prod += r.value;
+                prodValidItems++;
+              }
+              seenProds.add(searchKey);
+            }
+          });
+        });
+        
+        const finalProd = prodValidItems > 0 ? prod / prodValidItems : 0;
         
         procTotalVolume += vol;
-        if (prod > 0) {
-            prodSum += prod;
+        if (finalProd > 0) {
+            prodSum += finalProd;
             prodCount++;
         }
         
-        return { date: dt.split('/').slice(1).join('/'), volume: vol, hours: 0, prod: prod };
+        return { date: dt.split('/').slice(1).join('/'), volume: vol, hours: 0, prod: finalProd };
       });
       
       const procTotalProd = prodCount > 0 ? prodSum / prodCount : 0;
       centerTotalVolume += procTotalVolume;
 
-      return { 
-        process: dispProdName, // 🔥 カードのタイトルを生産性名（仕分けなど）に変更！
-        dailyList, 
-        totalVolume: procTotalVolume, 
-        totalHours: 0, 
-        totalProd: procTotalProd 
-      };
+      return { process: cardDef.process, dailyList, totalVolume: procTotalVolume, totalHours: 0, totalProd: procTotalProd };
     });
     
     centerTotalHours = hTotalRows.reduce((sum, r) => sum + r.value, 0);
     
     const centerDailyList = allDates.map(dt => {
-      const dayVol = vRows.filter((r: any) => r.date === dt && processNames.includes(r.item)).reduce((sum: number, r: any) => sum + r.value, 0);
+      const validVolKeys = new Set<string>();
+      cardsMap.forEach(cardDef => cardDef.searchKeys.forEach((k: string) => validVolKeys.add(k)));
+      
+      const seenDayVols = new Set();
+      let dayVol = 0;
+      vRows.forEach((r: any) => {
+          if (r.date === dt && validVolKeys.has(normalize(r.item)) && !seenDayVols.has(normalize(r.item))) {
+              dayVol += r.value;
+              seenDayVols.add(normalize(r.item));
+          }
+      });
+
       const dayHrsRow = hTotalRows.find((r: any) => r.date === dt);
       const dayHrs = dayHrsRow ? dayHrsRow.value : 0;
       const dayProd = dayHrs > 0 ? dayVol / dayHrs : 0;
@@ -703,30 +724,12 @@ export default function UniversalDashboardPage() {
     
     const centerTotalProd = centerTotalHours > 0 ? centerTotalVolume / centerTotalHours : 0;
     
-    items.unshift({
-      process: "★ 合計",
-      dailyList: centerDailyList,
-      totalVolume: centerTotalVolume,
-      totalHours: centerTotalHours,
-      totalProd: centerTotalProd
-    });
+    items.unshift({ process: "★ 合計", dailyList: centerDailyList, totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd });
     
-    return { 
-      items, 
-      summary: { 
-        totalVolume: centerTotalVolume, 
-        totalHours: centerTotalHours, 
-        totalProd: centerTotalProd,
-        lastMonthRatio: {
-            vol: calcRatio(centerTotalVolume, prevSummary.vol),
-            hrs: calcRatio(centerTotalHours, prevSummary.hrs),
-            prod: calcRatio(centerTotalProd, prevSummary.prod)
-        }
-      } 
-    };
+    return { items, summary: { totalVolume: centerTotalVolume, totalHours: centerTotalHours, totalProd: centerTotalProd, lastMonthRatio: { vol: calcRatio(centerTotalVolume, prevSummary.vol), hrs: calcRatio(centerTotalHours, prevSummary.hrs), prod: calcRatio(centerTotalProd, prevSummary.prod) } } };
   }, [data, prodSelectedMonth]);
 
-  // 🌟 ここが抜け落ちていた、請負予実用の計算ロジック（contractList）です！
+  // 🌟 請負予実の計算ロジック（エラー回避用）
   const contractList = (() => {
     if (!data || !data.contractYojitsuData) return [];
     const cMap = new Map();
@@ -746,7 +749,7 @@ export default function UniversalDashboardPage() {
     if (searchQuery) list = list.filter((m: any) => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
     return list;
   })();
-  
+
   // =========================================================
   // 🚨 事故管理ダッシュボード用の計算ロジック
   // =========================================================
